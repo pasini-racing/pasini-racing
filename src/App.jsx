@@ -1017,7 +1017,7 @@ function LogoutBar({ user, onLogout }) {
 }
 
 // ── Main App ──────────────────────────────────────────────
-function App() {
+export default function App() {
   var [currentUser, setCurrentUser] = useState(null);
   var [view, setView] = useState("overview");
   var [selPerson, setSelPerson] = useState(null);
@@ -1381,6 +1381,3 @@ function App() {
     </div>
   );
 }
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App/>);
