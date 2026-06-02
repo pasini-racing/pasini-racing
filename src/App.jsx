@@ -864,6 +864,210 @@ function AddBookingModal({ defaultEvent, onSave, onClose }) {
   );
 }
 
+
+// ── Excel Import ──────────────────────────────────────────
+function ExcelImport({ onImport, onClose }) {
+  var [file, setFile] = useState(null);
+  var [loading, setLoading] = useState(false);
+  var [preview, setPreview] = useState(null);
+  var [error, setError] = useState("");
+
+  function handleFile(f) {
+    if (!f) return;
+    setFile(f); setError(""); setPreview(null);
+  }
+
+  async function parseExcel() {
+    if (!file) return;
+    setLoading(true); setError("");
+    try {
+      var XLSX = await import("xlsx");
+      var data = await file.arrayBuffer();
+      var workbook = XLSX.read(data, {type:"array"});
+      
+      var allBookings = [];
+      var eventMap = {
+        "TEST1 BCN": "TEST1_BCN",
+        "TEST2 JEREZ": "TEST2_JEREZ", 
+        "R1 BARCELLONA": "R1_BARCELLONA",
+        "R2 ESTORIL": "R2_ESTORIL",
+        "R3 JEREZ": "R3_JEREZ",
+        "R4 MAGNY COURSE": "R4_MAGNY",
+        "R4 MAGNY-COURS": "R4_MAGNY",
+        "TEST3 VALENCIA": "TEST3_VALENCIA",
+        "R5 VALENCIA": "R5_VALENCIA",
+        "R6 ARAGON": "R6_ARAGON",
+        "R7 MISANO": "R7_MISANO",
+      };
+
+      workbook.SheetNames.forEach(function(sheetName) {
+        // Find matching event
+        var eventId = null;
+        var sheetUpper = sheetName.toUpperCase().trim();
+        Object.keys(eventMap).forEach(function(key) {
+          if (sheetUpper.includes(key) || key.includes(sheetUpper)) {
+            eventId = eventMap[key];
+          }
+        });
+        if (!eventId) return;
+
+        var sheet = workbook.Sheets[sheetName];
+        var rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:""});
+        
+        rows.forEach(function(row) {
+          if (!row || row.length < 3) return;
+          
+          // Try to detect booking type from row content
+          var rowStr = row.join(" ").toLowerCase();
+          var type = null;
+          if (rowStr.includes("volo") || rowStr.includes("flight") || rowStr.includes("fr") || rowStr.includes("vy") || rowStr.includes("w4")) type = "volo";
+          else if (rowStr.includes("hotel") || rowStr.includes("nh ") || rowStr.includes("ibis") || rowStr.includes("booking")) type = "hotel";
+          else if (rowStr.includes("gold car") || rowStr.includes("noleggio") || rowStr.includes("auto")) type = "auto";
+          else if (rowStr.includes("parkingo") || rowStr.includes("parcheggio")) type = "parcheggio";
+          if (!type) return;
+
+          // Find person name in row
+          var personId = null;
+          PEOPLE.forEach(function(p) {
+            var nameParts = p.name.toUpperCase().split(" ");
+            nameParts.forEach(function(part) {
+              if (part.length > 3 && rowStr.toUpperCase().includes(part)) {
+                personId = p.id;
+              }
+            });
+          });
+          if (!personId) return;
+
+          var booking = {event: eventId, person: personId, type: type};
+          
+          if (type === "volo") {
+            // Parse flight details from row
+            row.forEach(function(cell) {
+              var s = String(cell).trim();
+              if (/^[A-Z]{2}\d+$/.test(s)) booking.flight = s;
+              else if (/^\d{2}:\d{2}$/.test(s)) {
+                if (!booking.dep) booking.dep = s;
+                else booking.arr = s;
+              }
+              else if (/^[A-Z]{3}$/.test(s) && s !== "EUR") {
+                if (!booking.depAirport) booking.depAirport = s;
+                else booking.arrAirport = s;
+              }
+              else if (/^[A-Z0-9]{5,8}$/.test(s) && s.length >= 5) booking.booking = s;
+            });
+            if (booking.depAirport && booking.dep) booking.dep = booking.depAirport + " " + booking.dep;
+            if (booking.arrAirport && booking.arr) booking.arr = booking.arrAirport + " " + booking.arr;
+          } else if (type === "hotel") {
+            booking.hotel = row.filter(function(c){return String(c).length > 4;}).join(" ").substring(0,50);
+            row.forEach(function(cell){
+              var s = String(cell).trim();
+              if (/^\d{7,}$/.test(s)) booking.booking = s;
+              if (/^\d{1,2}$/.test(s) && !booking.nights) booking.nights = s;
+            });
+          } else {
+            booking.car = row.filter(function(c){return String(c).length > 2;}).slice(0,2).join(" ");
+            row.forEach(function(cell){
+              var s = String(cell).trim();
+              if (/^\d{6,}$/.test(s)) booking.booking = s;
+            });
+          }
+          
+          allBookings.push(booking);
+        });
+      });
+
+      setPreview(allBookings);
+      setLoading(false);
+    } catch(e) {
+      setError("Errore lettura file: " + e.message);
+      setLoading(false);
+    }
+  }
+
+  function confirmImport() {
+    if (!preview || !preview.length) return;
+    onImport(preview);
+    onClose();
+  }
+
+  var inp = {width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,overflowY:"auto",padding:"20px 16px"}}>
+      <div style={{maxWidth:600,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#4caf50"}}>📊 Importa da Excel</div>
+          <button onClick={onClose} style={{background:"#3a1a1a",color:"#ff6060",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>✕ Chiudi</button>
+        </div>
+        
+        <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #1e3a8a33",marginBottom:16}}>
+          <div style={{fontSize:13,color:"#7090c0",marginBottom:16}}>
+            Carica il file <b style={{color:"#4a9eff"}}>PIANO_STAGIONE_2026.xlsx</b> — le prenotazioni verranno importate automaticamente per ogni evento.
+          </div>
+          
+          <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:10,padding:"24px 16px",textAlign:"center",cursor:"pointer",marginBottom:14}}>
+            <input type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={function(e){handleFile(e.target.files[0]);}}/>
+            {file ? (
+              <div>
+                <div style={{fontSize:32,marginBottom:8}}>📊</div>
+                <div style={{fontSize:13,color:"#4caf50",fontWeight:700}}>{file.name}</div>
+                <div style={{fontSize:11,color:"#7090c0",marginTop:4}}>Tocca per cambiare</div>
+              </div>
+            ) : (
+              <div>
+                <div style={{fontSize:32,marginBottom:8}}>📎</div>
+                <div style={{fontSize:14,color:"#4a9eff",fontWeight:700}}>Carica file Excel</div>
+                <div style={{fontSize:11,color:"#7090c0",marginTop:6}}>.xlsx o .xls</div>
+              </div>
+            )}
+          </label>
+
+          {error && <div style={{color:"#ff6060",fontSize:12,marginBottom:12,padding:"8px 12px",background:"#3a1a1a",borderRadius:8}}>{error}</div>}
+
+          {!preview && (
+            <button onClick={parseExcel} disabled={!file||loading}
+              style={{width:"100%",padding:13,background:file&&!loading?"#1e3a8a":"#1a1a2a",color:file&&!loading?"#fff":"#444",border:"none",borderRadius:10,cursor:file&&!loading?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
+              {loading ? "⏳ Analisi in corso..." : "📊 Analizza Excel"}
+            </button>
+          )}
+        </div>
+
+        {preview && (
+          <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #4caf5033"}}>
+            <div style={{fontSize:14,fontWeight:800,color:"#4caf50",marginBottom:12}}>
+              ✅ Trovate {preview.length} prenotazioni
+            </div>
+            <div style={{maxHeight:300,overflowY:"auto",marginBottom:16}}>
+              {preview.slice(0,20).map(function(b,i){
+                var ev = EVENTS.find(function(e){return e.id===b.event;});
+                var person = PEOPLE.find(function(p){return p.id===b.person;});
+                return (
+                  <div key={i} style={{display:"flex",gap:8,padding:"6px 10px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12,alignItems:"center"}}>
+                    <span style={{color:b.type==="volo"?"#4a9eff":b.type==="hotel"?"#4caf50":"#ff9800"}}>
+                      {b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗"}
+                    </span>
+                    <span style={{color:"#4a9eff",minWidth:60}}>{ev?ev.label.substring(0,8):b.event}</span>
+                    <span style={{color:"#e8e8f0"}}>{person?person.name:b.person}</span>
+                    {b.flight && <span style={{color:"#7090c0"}}>{b.flight}</span>}
+                    {b.hotel && <span style={{color:"#7090c0"}}>{b.hotel.substring(0,20)}</span>}
+                  </div>
+                );
+              })}
+              {preview.length > 20 && <div style={{textAlign:"center",color:"#7090c0",fontSize:12,padding:8}}>...e altre {preview.length-20} prenotazioni</div>}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={function(){setPreview(null);}} style={{flex:1,padding:11,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>← Rianalizza</button>
+              <button onClick={confirmImport} style={{flex:2,padding:11,background:"#14532d",color:"#4caf50",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                💾 Importa {preview.length} prenotazioni
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── TeamManager ───────────────────────────────────────────
 var EMPTY_USER = {id:"",name:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italia",tshirt:"M",jacket:"M",pants:"M",shoes:"42",notes:"",pin:"",username:""};
 
@@ -1033,6 +1237,7 @@ export default function App() {
   var [addModal, setAddModal] = useState(null);
   var [editUser, setEditUser] = useState(null);
   var [confirmDeleteUser, setConfirmDeleteUser] = useState(null);
+  var [showExcelImport, setShowExcelImport] = useState(false);
   var [confirmDelete, setConfirmDelete] = useState(null);
   var [toast, setToast] = useState(null);
   var [fbLoaded, setFbLoaded] = useState(false);
@@ -1151,6 +1356,17 @@ export default function App() {
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       {editB && <EditModal booking={editB} onSave={handleSave} onClose={function(){setEditB(null);}} onDelete={function(){setConfirmDelete(editB);setEditB(null);}}/>}
       {pdfPreview && <PDFPreview data={pdfPreview.data} name={pdfPreview.name} onClose={function(){setPdfPreview(null);}}/>}
+      {showExcelImport && <ExcelImport
+        onImport={function(bookings) {
+          bookings.forEach(function(b) {
+            fbAdd("bookings", b).then(function(ref) {
+              if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});
+            }).catch(function(e){console.error(e);});
+          });
+          showToast("Importate " + bookings.length + " prenotazioni ✓");
+        }}
+        onClose={function(){setShowExcelImport(false);}}
+      />}
       {addModal!==null && <AddBookingModal defaultEvent={addModal||undefined}
         onSave={function(bs){bs.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat(bs);});});});}}
         onClose={function(){setAddModal(null);}}/>}
@@ -1387,6 +1603,10 @@ export default function App() {
         {view==="add" && isAdmin && (
           <div>
             <div style={{fontSize:18,fontWeight:800,color:"#4caf50",marginBottom:16}}>➕ Nuova Prenotazione</div>
+            <button onClick={function(){setShowExcelImport(true);}}
+              style={{width:"100%",maxWidth:560,padding:14,background:"#0d2a1a",color:"#4caf50",border:"2px solid #4caf5044",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:16,display:"block"}}>
+              📊 Importa da Excel (PIANO_STAGIONE_2026.xlsx)
+            </button>
             <div style={{maxWidth:560}}>
               <AddBookingForm onSave={function(bs){bs.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat(bs);});});});setView("overview");}}/>
             </div>
