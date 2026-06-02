@@ -2,7 +2,7 @@
 
 ## Login Admin
 - Username: `luca`
-- Codice: `admin2026`
+- Codice: `Elizabeth25@`
 
 ## Deploy
 Collegato a Vercel per deploy automatico.
