@@ -21,7 +21,7 @@ const LOGO_B64 = "/9j/4AAQSkZJRgABAQAAkACQAAD/4QD2RXhpZgAATU0AKgAAAAgABwEOAAIAAA
 
 const PEOPLE = [
   { id: "ILARIO", name: "Ilario Pasini", role: "Team Manager", phone:"", email:"", docType:"", docNum:"", docExpiry:"", nationality:"", tshirt:"", jacket:"", pants:"", shoes:"", notes:"" },
-  { id: "LUCA", name: "Luca Tonolini", role: "Capotecnico Pritelli-Borrelli", username:"luca", pin:"Elizabeth25@", isAdmin:true },
+  { id: "LUCA", name: "Luca Tonolini", role: "Capotecnico Pritelli-Borrelli", username:"luca", pin:"admin2026", isAdmin:true },
   { id: "DAVIDE", name: "Davide Migone", role: "Elettronico Pritelli-Borrelli" },
   { id: "TOMMASO", name: "Tommaso Faggiolì", role: "Aiutante Pritelli-Borrelli" },
   { id: "MATTEO", name: "Matteo Faggiolì", role: "Aiutante Michielon-Casadei" },
@@ -1042,6 +1042,15 @@ export default function App() {
     var unsub = db.collection("bookings").onSnapshot(function(snap) {
       if (snap.docs.length > 0) {
         setBookings(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      } else {
+        // Seed Firebase with initial BOOKINGS data
+        var batch = db.batch();
+        BOOKINGS.forEach(function(b) {
+          var ref = db.collection("bookings").doc();
+          batch.set(ref, b);
+        });
+        batch.commit().catch(function(e){console.error(e);});
+        setBookings(BOOKINGS);
       }
       setFbLoaded(true);
     }, function(err) { console.error(err); setFbLoaded(true); });
@@ -1052,6 +1061,12 @@ export default function App() {
     var unsub = db.collection("people").onSnapshot(function(snap) {
       if (snap.docs.length > 0) {
         setPeople(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      } else {
+        // Seed Firebase with initial PEOPLE data
+        PEOPLE.forEach(function(p) {
+          db.collection("people").doc(p.id).set(p).catch(function(e){console.error(e);});
+        });
+        setPeople(PEOPLE);
       }
     }, function(err){console.error(err);});
     return function(){unsub();};
@@ -1382,3 +1397,5 @@ export default function App() {
   );
 }
 
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
