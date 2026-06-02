@@ -21,7 +21,7 @@ const LOGO_B64 = "/9j/4AAQSkZJRgABAQAAkACQAAD/4QD2RXhpZgAATU0AKgAAAAgABwEOAAIAAA
 
 const PEOPLE = [
   { id: "ILARIO", name: "Ilario Pasini", role: "Team Manager", phone:"", email:"", docType:"", docNum:"", docExpiry:"", nationality:"", tshirt:"", jacket:"", pants:"", shoes:"", notes:"" },
-  { id: "LUCA", name: "Luca Tonolini", role: "Capotecnico Pritelli-Borrelli", username:"luca", pin:"admin2026", isAdmin:true },
+  { id: "LUCA", name: "Luca Tonolini", role: "Capotecnico Pritelli-Borrelli", username:"luca", pin:"Elizabeth25@", isAdmin:true },
   { id: "DAVIDE", name: "Davide Migone", role: "Elettronico Pritelli-Borrelli" },
   { id: "TOMMASO", name: "Tommaso Faggiolì", role: "Aiutante Pritelli-Borrelli" },
   { id: "MATTEO", name: "Matteo Faggiolì", role: "Aiutante Michielon-Casadei" },
