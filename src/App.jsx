@@ -1059,13 +1059,18 @@ export default function App() {
 
   useEffect(function() {
     var unsub = db.collection("people").onSnapshot(function(snap) {
-      if (snap.docs.length > 0) {
-        setPeople(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
-      } else {
-        // Seed Firebase with initial PEOPLE data
-        PEOPLE.forEach(function(p) {
+      var fbPeople = snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());});
+      // Seed missing members (don't overwrite existing ones like Luca)
+      var fbIds = fbPeople.map(function(p){return p.id;});
+      PEOPLE.forEach(function(p) {
+        if (!fbIds.includes(p.id)) {
           db.collection("people").doc(p.id).set(p).catch(function(e){console.error(e);});
-        });
+        }
+      });
+      // Show Firebase people + any local ones not yet synced
+      if (fbPeople.length > 0) {
+        setPeople(fbPeople);
+      } else {
         setPeople(PEOPLE);
       }
     }, function(err){console.error(err);});
@@ -1396,3 +1401,4 @@ export default function App() {
     </div>
   );
 }
+
