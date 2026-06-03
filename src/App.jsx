@@ -55,357 +55,263 @@ const EVENTS = [
 ];
 
 const BOOKINGS = [
-  // ── TEST 1 BARCELLONA ────────────────────────────────────
-  { event:"TEST1_BCN", person:"LUCA", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BGY 11:51", arr:"BCN 13:35", flight:"FR847", company:"Ryanair", booking:"QUG2XP", baggage:"1 mano", notes:"Auto Ilario (28794732 Gold Car)" },
-  { event:"TEST1_BCN", person:"ILARIO", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BGY 11:51", arr:"BCN 13:35", flight:"FR847", company:"Ryanair", booking:"QUG2XP", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"DAVIDE", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BGY 11:51", arr:"BCN 13:35", flight:"FR847", company:"Ryanair", booking:"QUG2XP", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"BORRELLI", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BGY 11:51", arr:"BCN 13:35", flight:"FR847", company:"Ryanair", booking:"QUG2XP", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"RICCARDO", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BGY 11:51", arr:"BCN 13:35", flight:"FR847", company:"Ryanair", booking:"M72WYR", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"GIACOMO", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BGY 11:51", arr:"BCN 13:35", flight:"FR847", company:"Ryanair", booking:"M72WYR", baggage:"1 mano", notes:"Auto con Lele" },
-  { event:"TEST1_BCN", person:"PRITELLI", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BLQ 09:10", arr:"BCN 11:00", flight:"VY6525", company:"Vueling", booking:"HK1VRW", baggage:"1 mano", notes:"Auto con Michielon" },
-  { event:"TEST1_BCN", person:"CASADEI", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BLQ 09:10", arr:"BCN 11:00", flight:"VY6525", company:"Vueling", booking:"HK1VRW", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"SANTIAGO", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BLQ 09:10", arr:"BCN 11:00", flight:"VY6525", company:"Vueling", booking:"HK1VRW", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"SAMULE", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BLQ 09:10", arr:"BCN 11:00", flight:"VY6525", company:"Vueling", booking:"HK1VRW", baggage:"1 mano", notes:"Auto Lele (28799443 Gold Car)" },
-  { event:"TEST1_BCN", person:"TOMMASO", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BLQ 09:10", arr:"BCN 11:00", flight:"VY6525", company:"Vueling", booking:"ELPCQ", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"MATTEO", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"BLQ 09:10", arr:"BCN 11:00", flight:"VY6525", company:"Vueling", booking:"ELPCQ", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"DANIELE", type:"volo", dir:"andata", date:"Sab 19 Apr", dep:"FCO 07:25", arr:"BCN 09:15", flight:"W46017", company:"Wizz", booking:"YJDY3S", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"ILARIO", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 21:20", arr:"BGY 23:05", flight:"FR846", company:"Ryanair", booking:"L6PHNE", baggage:"1 mano", notes:"Auto Ilario Gold Car" },
-  { event:"TEST1_BCN", person:"DAVIDE", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 21:20", arr:"BGY 23:05", flight:"FR846", company:"Ryanair", booking:"L6PHNE", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"RICCARDO", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 21:20", arr:"BGY 23:05", flight:"FR846", company:"Ryanair", booking:"M72WYR", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"GIACOMO", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 21:20", arr:"BGY 23:05", flight:"FR846", company:"Ryanair", booking:"M72WYR", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"MAURI", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 21:20", arr:"BGY 23:05", flight:"FR846", company:"Ryanair", booking:"M72WYR", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"LUCA", type:"volo", dir:"ritorno", date:"Dom 20 Apr", dep:"BCN 22:30", arr:"BGY 00:15", flight:"FR3320", company:"Ryanair", booking:"IS1YQV", baggage:"1 mano", notes:"Uber" },
-  { event:"TEST1_BCN", person:"PRITELLI", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 22:05", arr:"BLQ 23:55", flight:"FR8183", company:"Ryanair", booking:"P4GK4X", baggage:"1 mano", notes:"Auto Lele Gold Car" },
-  { event:"TEST1_BCN", person:"CASADEI", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 22:05", arr:"BLQ 23:55", flight:"FR8183", company:"Ryanair", booking:"P4GK4X", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"SANTIAGO", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 22:05", arr:"BLQ 23:55", flight:"FR8183", company:"Ryanair", booking:"P4GK4X", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"SAMULE", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 22:05", arr:"BLQ 23:55", flight:"FR8183", company:"Ryanair", booking:"P4GK4X", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"TOMMASO", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 22:05", arr:"BLQ 23:55", flight:"FR8183", company:"Ryanair", booking:"KWS1UB", baggage:"1 mano" },
-  { event:"TEST1_BCN", person:"DANIELE", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 21:45", arr:"FCO 23:40", flight:"W46020", company:"Wizz", booking:"YJDY3S", baggage:"1 mano", notes:"Auto Pep" },
-  { event:"TEST1_BCN", person:"MATTEO", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 22:05", arr:"SVQ 23:55", flight:"FR2402", company:"Ryanair", booking:"W6KIJK", baggage:"2 mano", notes:"Trasf. a Siviglia con Michielon" },
-  { event:"TEST1_BCN", person:"BORRELLI", type:"volo", dir:"ritorno", date:"Lun 21 Apr", dep:"BCN 22:05", arr:"SVQ 23:55", flight:"FR2402", company:"Ryanair", booking:"W6KIJK", baggage:"1 mano + 1 stiva" },
-  { event:"TEST1_BCN", person:"LUCA", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"1", stanza:"1 (tripla)" },
-  { event:"TEST1_BCN", person:"GIACOMO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"1", booking:"6845946871" },
-  { event:"TEST1_BCN", person:"DAVIDE", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"1", booking:"6845946871" },
-  { event:"TEST1_BCN", person:"MATTEO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"2", booking:"6200021154" },
-  { event:"TEST1_BCN", person:"TOMMASO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"2", booking:"6200021154" },
-  { event:"TEST1_BCN", person:"SANTIAGO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"2", booking:"6200021154" },
-  { event:"TEST1_BCN", person:"GUILLEM", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"3", booking:"5645131075" },
-  { event:"TEST1_BCN", person:"PEP", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"3", booking:"5645131075" },
-  { event:"TEST1_BCN", person:"DANIELE", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"3", booking:"5645131075" },
-  { event:"TEST1_BCN", person:"LUCA", type:"auto", car:"Auto Ilario", booking:"28794732 Gold Car" },
-  { event:"TEST1_BCN", person:"ILARIO", type:"auto", car:"Auto Ilario", booking:"28794732 Gold Car" },
-  { event:"TEST1_BCN", person:"SAMULE", type:"auto", car:"Auto Lele", booking:"28799443 Gold Car" },
-  { event:"TEST1_BCN", person:"PRITELLI", type:"auto", car:"Auto Michielon", booking:"-" },
-
-  // ── TEST 2 JEREZ ────────────────────────────────────────
-  { event:"TEST2_JEREZ", person:"MAURI", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 12:55", arr:"BCN 14:35", flight:"FR3142", company:"Ryanair", booking:"HVGK5Z", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"LUCA", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano", notes:"Auto Ilario (28980199)" },
-  { event:"TEST2_JEREZ", person:"ILARIO", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"DAVIDE", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"2 mano" },
-  { event:"TEST2_JEREZ", person:"MATTEO", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"2 mano" },
-  { event:"TEST2_JEREZ", person:"TOMMASO", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"SAMULE", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano", notes:"Auto Lele (28968052)" },
-  { event:"TEST2_JEREZ", person:"RICCARDO", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"SANTIAGO", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"GIACOMO", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"BORRELLI", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"PRITELLI", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano", notes:"Auto Luca (28980227)" },
-  { event:"TEST2_JEREZ", person:"CASADEI", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BGY 11:25", arr:"AGP 14:05", flight:"FR2649", company:"Ryanair", booking:"H3MD9N", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"DANIELE", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"FCO 06:00", arr:"AGP 08:45", flight:"FR6138", company:"Ryanair", booking:"E3DITQ", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"PEP", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BCN 11:55", arr:"XRY 13:45", flight:"VY2286", company:"Vueling", booking:"YJU9GM", baggage:"1 mano", notes:"Trasferimento con Uber" },
-  { event:"TEST2_JEREZ", person:"GUILLEM", type:"volo", dir:"andata", date:"Dom 3 Mag", dep:"BCN 11:55", arr:"XRY 13:45", flight:"VY2286", company:"Vueling", booking:"WG8DKI", baggage:"2 mano" },
-  { event:"TEST2_JEREZ", person:"LUCA", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano", notes:"Auto Ilario (28980199)" },
-  { event:"TEST2_JEREZ", person:"ILARIO", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"DAVIDE", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"2 mano" },
-  { event:"TEST2_JEREZ", person:"TOMMASO", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"SAMULE", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano", notes:"Auto Lele (28968052)" },
-  { event:"TEST2_JEREZ", person:"RICCARDO", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"SANTIAGO", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"GIACOMO", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"PRITELLI", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano", notes:"Auto Luca (28980227)" },
-  { event:"TEST2_JEREZ", person:"CASADEI", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:15", arr:"BLQ 00:50", flight:"FR8933", company:"Ryanair", booking:"PZBH2Z", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"DANIELE", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"AGP 22:00", arr:"FCO 00:55", flight:"W46114", company:"Wizz", booking:"TU1C2B", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"MATTEO", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"SVQ 22:40", arr:"BCN 00:25", flight:"Vueling", company:"Vueling", booking:"UMPWPD", baggage:"1 mano", notes:"Trasf. a Siviglia" },
-  { event:"TEST2_JEREZ", person:"BORRELLI", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"SVQ 22:40", arr:"BCN 00:25", flight:"Vueling", company:"Vueling", booking:"UMPWPD", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"PEP", type:"volo", dir:"ritorno", date:"Mar 5 Mag", dep:"SVQ 22:40", arr:"BCN 00:25", flight:"Vueling", company:"Vueling", booking:"UMPWPD", baggage:"1 mano" },
-  { event:"TEST2_JEREZ", person:"GUILLEM", type:"volo", dir:"ritorno", date:"Mer 6 Mag", dep:"SVQ 06:30", arr:"CDG 09:00", flight:"Trans.France", company:"Transavia", booking:"SCWN2Z", baggage:"2 mano + 1 stiva" },
-  { event:"TEST2_JEREZ", person:"MAURI", type:"volo", dir:"ritorno", date:"Mer 6 Mag", dep:"BCN 13:00", arr:"BGY 14:45", flight:"FR3320", company:"Ryanair", booking:"DZLTMJ", baggage:"1 mano", notes:"Camion a Barcellona" },
-  { event:"TEST2_JEREZ", person:"LUCA", type:"hotel", hotel:"La Cueva", room:"1", booking:"6933135321", nights:"2" },
-  { event:"TEST2_JEREZ", person:"GIACOMO", type:"hotel", hotel:"La Cueva", room:"1", booking:"6933135321", nights:"2" },
-  { event:"TEST2_JEREZ", person:"DAVIDE", type:"hotel", hotel:"La Cueva", room:"1", booking:"6933135321", nights:"2" },
-  { event:"TEST2_JEREZ", person:"MATTEO", type:"hotel", hotel:"La Cueva", room:"2", booking:"6933135321", nights:"2" },
-  { event:"TEST2_JEREZ", person:"TOMMASO", type:"hotel", hotel:"La Cueva", room:"2", booking:"6933135321", nights:"2" },
-  { event:"TEST2_JEREZ", person:"SANTIAGO", type:"hotel", hotel:"La Cueva", room:"2", booking:"6933135321", nights:"2" },
-  { event:"TEST2_JEREZ", person:"GUILLEM", type:"hotel", hotel:"La Cueva", room:"3", booking:"6089499613", nights:"2" },
-  { event:"TEST2_JEREZ", person:"PEP", type:"hotel", hotel:"La Cueva", room:"3", booking:"6089499613", nights:"2" },
-  { event:"TEST2_JEREZ", person:"DANIELE", type:"hotel", hotel:"La Cueva", room:"3", booking:"6089499613", nights:"2" },
-  { event:"TEST2_JEREZ", person:"LUCA", type:"auto", car:"Auto Ilario", booking:"28980199" },
-  { event:"TEST2_JEREZ", person:"SAMULE", type:"auto", car:"Auto Lele", booking:"28968052" },
-  { event:"TEST2_JEREZ", person:"PRITELLI", type:"auto", car:"Auto Luca", booking:"28980227" },
-
-  // ── R1 BARCELLONA ───────────────────────────────────────
-  { event:"R1_BARCELLONA", person:"ILARIO", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"1 mano", notes:"Auto Ilario (29146873)" },
-  { event:"R1_BARCELLONA", person:"LUCA", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"2 mano" },
-  { event:"R1_BARCELLONA", person:"DAVIDE", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"2 mano" },
-  { event:"R1_BARCELLONA", person:"BORRELLI", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"RICCARDO", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"GIACOMO", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"1 mano", notes:"Auto Erik" },
-  { event:"R1_BARCELLONA", person:"TOMMASO", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"MATTEO", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"MXP 08:20", arr:"BCN 10:00", flight:"FR270", company:"Ryanair", booking:"ETHNKC", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"ERIK", type:"volo", dir:"andata", date:"Mer 20 Mag", dep:"VCE 09:10", arr:"BCN 11:10", flight:"Vueling", company:"Vueling", baggage:"-" },
-  { event:"R1_BARCELLONA", person:"SAMULE", type:"volo", dir:"andata", date:"Mar 19 Mag", dep:"BLQ 12:10", arr:"BCN 13:55", flight:"FR2097", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano", notes:"Auto con Pep" },
-  { event:"R1_BARCELLONA", person:"SANTIAGO", type:"volo", dir:"andata", date:"Mar 19 Mag", dep:"BLQ 12:10", arr:"BCN 13:55", flight:"FR2097", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"CASADEI", type:"volo", dir:"andata", date:"Mar 19 Mag", dep:"BLQ 12:10", arr:"BCN 13:55", flight:"FR2097", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"PRITELLI", type:"volo", dir:"andata", date:"Mar 19 Mag", dep:"BLQ 12:10", arr:"BCN 13:55", flight:"FR2097", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"DANIELE", type:"volo", dir:"andata", date:"Mar 19 Mag", dep:"FCO 15:15", arr:"BCN 17:05", flight:"FR6986", company:"Ryanair", booking:"CV5IRM", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"MAURI", type:"volo", dir:"andata", date:"Gio 22 Mag", dep:"BGY 15:05", arr:"BCN 16:50", flight:"FR7714", company:"Ryanair", booking:"XUYRRF", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"ILARIO", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:10", arr:"BGY 01:00", flight:"FR6305", company:"Ryanair", booking:"B5CZJX", baggage:"1 mano", notes:"Auto Ilario (29146873)" },
-  { event:"R1_BARCELLONA", person:"LUCA", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:10", arr:"BGY 01:00", flight:"FR6305", company:"Ryanair", booking:"B5CZJX", baggage:"2 mano" },
-  { event:"R1_BARCELLONA", person:"DAVIDE", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:10", arr:"BGY 01:00", flight:"FR6305", company:"Ryanair", booking:"B5CZJX", baggage:"2 mano" },
-  { event:"R1_BARCELLONA", person:"RICCARDO", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:10", arr:"BGY 01:00", flight:"FR6305", company:"Ryanair", booking:"B5CZJX", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"GIACOMO", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:10", arr:"BGY 01:00", flight:"FR6305", company:"Ryanair", booking:"B5CZJX", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"TOMMASO", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:10", arr:"BGY 01:00", flight:"FR6305", company:"Ryanair", booking:"B5CZJX", baggage:"1 mano", notes:"Auto Erik" },
-  { event:"R1_BARCELLONA", person:"MATTEO", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:10", arr:"BGY 01:00", flight:"FR6305", company:"Ryanair", booking:"B5CZJX", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"ERIK", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 22:00", arr:"VCE 23:55", flight:"Wizz", company:"Wizz", baggage:"-" },
-  { event:"R1_BARCELLONA", person:"SAMULE", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:05", arr:"BLQ 00:50", flight:"FR5220", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano", notes:"Auto con Pep" },
-  { event:"R1_BARCELLONA", person:"SANTIAGO", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:05", arr:"BLQ 00:50", flight:"FR5220", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"CASADEI", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:05", arr:"BLQ 00:50", flight:"FR5220", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"PRITELLI", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:05", arr:"BLQ 00:50", flight:"FR5220", company:"Ryanair", booking:"WPLTXE", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"DANIELE", type:"volo", dir:"ritorno", date:"Dom 24 Mag", dep:"BCN 23:05", arr:"FCO 01:00", flight:"FR6927", company:"Ryanair", booking:"CV5IRM", baggage:"1 mano" },
-  { event:"R1_BARCELLONA", person:"LUCA", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"1", booking:"6154231243", nights:"4" },
-  { event:"R1_BARCELLONA", person:"DAVIDE", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"1", booking:"6154231243", nights:"4" },
-  { event:"R1_BARCELLONA", person:"MATTEO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"2", booking:"6154231243", nights:"4" },
-  { event:"R1_BARCELLONA", person:"TOMMASO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"2", booking:"6154231243", nights:"4" },
-  { event:"R1_BARCELLONA", person:"SANTIAGO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"2", booking:"6154231243", nights:"4" },
-  { event:"R1_BARCELLONA", person:"GUILLEM", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"3", booking:"5371700625", nights:"4" },
-  { event:"R1_BARCELLONA", person:"GIACOMO", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"3", booking:"5371700625", nights:"4" },
-  { event:"R1_BARCELLONA", person:"DANIELE", type:"hotel", hotel:"Augusta Barcelona Vallès", room:"3", booking:"5371700625", nights:"4" },
-  { event:"R1_BARCELLONA", person:"ILARIO", type:"auto", car:"Auto Ilario", booking:"29146873" },
-
-  // ── R2 ESTORIL ──────────────────────────────────────────
-  { event:"R2_ESTORIL", person:"ILARIO", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"1 mano", notes:"Auto Ilario (29190139) - Parkingo prenotato" },
-  { event:"R2_ESTORIL", person:"LUCA", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"2 mano", notes:"Auto Luca (29242078)" },
-  { event:"R2_ESTORIL", person:"DAVIDE", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"BORRELLI", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"RICCARDO", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"GIACOMO", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"1 mano", notes:"Auto Ilario (29190139)" },
-  { event:"R2_ESTORIL", person:"TOMMASO", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"MATTEO", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"MXP 11:05", arr:"LIS 13:10", flight:"EJU3871", company:"EasyJet", booking:"KCB4JN6", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"SAMULE", type:"volo", dir:"andata", date:"Mer 10 Giu", dep:"FCO 18:20", arr:"LIS 20:35", flight:"W46219", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano", notes:"Auto Lele (29242110) - Parkingo Roma" },
-  { event:"R2_ESTORIL", person:"SANTIAGO", type:"volo", dir:"andata", date:"Mer 10 Giu", dep:"FCO 18:20", arr:"LIS 20:35", flight:"W46219", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"CASADEI", type:"volo", dir:"andata", date:"Mer 10 Giu", dep:"FCO 18:20", arr:"LIS 20:35", flight:"W46219", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"PRITELLI", type:"volo", dir:"andata", date:"Mer 10 Giu", dep:"FCO 18:20", arr:"LIS 20:35", flight:"W46219", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"DANIELE", type:"volo", dir:"andata", date:"Mer 10 Giu", dep:"FCO 18:20", arr:"LIS 20:35", flight:"W46219", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"PEP", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"BCN 07:20", arr:"LIS 08:30", flight:"VY8460", company:"Vueling", booking:"VKP9JJ", baggage:"1 mano", notes:"Uber" },
-  { event:"R2_ESTORIL", person:"GUILLEM", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"BCN 07:20", arr:"LIS 08:30", flight:"VY8460", company:"Vueling", booking:"VKP9JJ", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"ERIK", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"VCE 11:40", arr:"LIS 13:55", flight:"TAP", company:"TAP Air Portugal", baggage:"-" },
-  { event:"R2_ESTORIL", person:"MAURI", type:"volo", dir:"andata", date:"Gio 11 Giu", dep:"BGY 15:35", arr:"LIS 17:35", flight:"FR820", company:"Ryanair", booking:"N7ZL2U", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"ILARIO", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano", notes:"Auto Ilario (29190139)" },
-  { event:"R2_ESTORIL", person:"LUCA", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano", notes:"Auto Luca (29242078)" },
-  { event:"R2_ESTORIL", person:"DAVIDE", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"BORRELLI", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"RICCARDO", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"GIACOMO", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"TOMMASO", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano", notes:"Auto Ilario (29190139)" },
-  { event:"R2_ESTORIL", person:"MATTEO", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:05", arr:"MXP 01:50", flight:"TP828", company:"TAP", booking:"YC43TB", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"SAMULE", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:15", arr:"FCO 01:10", flight:"W46220", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano", notes:"Auto Lele (29242110)" },
-  { event:"R2_ESTORIL", person:"SANTIAGO", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:15", arr:"FCO 01:10", flight:"W46220", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"CASADEI", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:15", arr:"FCO 01:10", flight:"W46220", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"PRITELLI", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:15", arr:"FCO 01:10", flight:"W46220", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"DANIELE", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 21:15", arr:"FCO 01:10", flight:"W46220", company:"Wizz", booking:"NTNJ4B", baggage:"1 mano" },
-  { event:"R2_ESTORIL", person:"PEP", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 22:10", arr:"BCN 01:05", flight:"VY8465", company:"Vueling", booking:"VKP9JJ", baggage:"1 mano", notes:"Auto Ilario (29190139)" },
-  { event:"R2_ESTORIL", person:"GUILLEM", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 22:10", arr:"BCN 01:05", flight:"VY8465", company:"Vueling", booking:"VKP9JJ", baggage:"2 mano" },
-  { event:"R2_ESTORIL", person:"ERIK", type:"volo", dir:"ritorno", date:"Dom 14 Giu", dep:"LIS 17:20", arr:"BGY 21:05", flight:"Ryanair", company:"Ryanair", baggage:"-" },
-  { event:"R2_ESTORIL", person:"MAURI", type:"volo", dir:"ritorno", date:"Mar 16 Giu", dep:"XRY 09:35", arr:"BGY 14:40", flight:"VY3154+FR7881", company:"Vueling/Ryanair", booking:"PNZ3YD/QV3W9C", baggage:"1 mano", notes:"via Palma" },
-  { event:"R2_ESTORIL", person:"LUCA", type:"hotel", hotel:"Hotel Lido", room:"1", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"GIACOMO", type:"hotel", hotel:"Hotel Lido", room:"1", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"DAVIDE", type:"hotel", hotel:"Hotel Lido", room:"1", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"MATTEO", type:"hotel", hotel:"Hotel Lido", room:"2", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"TOMMASO", type:"hotel", hotel:"Hotel Lido", room:"2", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"SANTIAGO", type:"hotel", hotel:"Hotel Lido", room:"2", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"GUILLEM", type:"hotel", hotel:"Hotel Lido", room:"3", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"PEP", type:"hotel", hotel:"Hotel Lido", room:"3", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"DANIELE", type:"hotel", hotel:"Hotel Lido", room:"3", booking:"6370734724", nights:"3" },
-  { event:"R2_ESTORIL", person:"ILARIO", type:"auto", car:"Auto Ilario", booking:"29190139 - Parkingo" },
-  { event:"R2_ESTORIL", person:"LUCA", type:"auto", car:"Auto Luca", booking:"29242078" },
-  { event:"R2_ESTORIL", person:"SAMULE", type:"auto", car:"Auto Lele", booking:"29242110 - Parkingo Roma" },
-  { event:"R2_ESTORIL", person:"PEP", type:"auto", car:"Uber", booking:"-" },
-
-  // ── R3 JEREZ ────────────────────────────────────────────
-  { event:"R3_JEREZ", person:"ILARIO", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"LUCA", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"DAVIDE", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"BORRELLI", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"RICCARDO", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"GIACOMO", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"TOMMASO", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"MATTEO", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"MXP 06:45", arr:"SVQ 09:25", flight:"W46309", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"SAMULE", type:"volo", dir:"andata", date:"Mer 1 Lug", dep:"BLQ 18:45", arr:"SVQ 21:30", flight:"FR4348", company:"Ryanair", booking:"F1I1MW", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"SANTIAGO", type:"volo", dir:"andata", date:"Mer 1 Lug", dep:"BLQ 18:45", arr:"SVQ 21:30", flight:"FR4348", company:"Ryanair", booking:"F1I1MW", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"CASADEI", type:"volo", dir:"andata", date:"Mer 1 Lug", dep:"BLQ 18:45", arr:"SVQ 21:30", flight:"FR4348", company:"Ryanair", booking:"F1I1MW", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"PRITELLI", type:"volo", dir:"andata", date:"Mer 1 Lug", dep:"BLQ 18:45", arr:"SVQ 21:30", flight:"FR4348", company:"Ryanair", booking:"F1I1MW", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"SIMONE", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"BLQ 10:15", arr:"SVQ 13:00", flight:"FR8476", company:"Ryanair", booking:"W8VZ7U", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"DANIELE", type:"volo", dir:"andata", date:"Mer 1 Lug", dep:"FCO 18:00", arr:"SVQ 20:50", flight:"W46023", company:"Wizz", booking:"MJ6B3S", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"PEP", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"BCN 07:10", arr:"SVQ 08:55", flight:"VY2210", company:"Vueling", booking:"ZF9V2Y", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"GUILLEM", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"BCN 07:10", arr:"SVQ 08:55", flight:"VY2210", company:"Vueling", booking:"ZF9V2Y", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"ERIK", type:"volo", dir:"andata", date:"Gio 2 Lug", dep:"BLQ 10:15", arr:"SVQ 13:00", flight:"Ryanair", company:"Ryanair", baggage:"-" },
-  { event:"R3_JEREZ", person:"ILARIO", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"LUCA", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"DAVIDE", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"BORRELLI", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"RICCARDO", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"GIACOMO", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"TOMMASO", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"MATTEO", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"TS4FNK", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"SAMULE", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"NJL33C", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"SANTIAGO", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"NJL33C", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"CASADEI", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"NJL33C", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"PRITELLI", type:"volo", dir:"ritorno", date:"Lun 6 Lug", dep:"SVQ 10:10", arr:"MXP 12:45", flight:"W46310", company:"Wizz", booking:"NJL33C", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"DANIELE", type:"volo", dir:"ritorno", date:"Dom 5 Lug", dep:"SVQ 21:30", arr:"FCO 01:40", flight:"W46024", company:"Wizz", booking:"MJ6B3S", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"PEP", type:"volo", dir:"ritorno", date:"Dom 5 Lug", dep:"SVQ 23:30", arr:"BCN 01:10", flight:"FR2403", company:"Ryanair", booking:"O31URG", baggage:"1 mano" },
-  { event:"R3_JEREZ", person:"GUILLEM", type:"volo", dir:"ritorno", date:"Dom 5 Lug", dep:"SVQ 23:30", arr:"BCN 01:10", flight:"FR2403", company:"Ryanair", booking:"O31URG", baggage:"2 mano" },
-  { event:"R3_JEREZ", person:"ERIK", type:"volo", dir:"ritorno", date:"Dom 5 Lug", dep:"SVQ 11:20", arr:"VCE 17:35", flight:"Air Europa", company:"Air Europa", baggage:"-", notes:"via Madrid" },
-  { event:"R3_JEREZ", person:"LUCA", type:"hotel", hotel:"NH Avenida Jerez", room:"1", booking:"6345144227", nights:"3" },
-  { event:"R3_JEREZ", person:"DAVIDE", type:"hotel", hotel:"NH Avenida Jerez", room:"1", booking:"6345144227", nights:"3" },
-  { event:"R3_JEREZ", person:"MATTEO", type:"hotel", hotel:"NH Avenida Jerez", room:"1", booking:"5471793740", nights:"3" },
-  { event:"R3_JEREZ", person:"TOMMASO", type:"hotel", hotel:"NH Avenida Jerez", room:"2", booking:"5471793740", nights:"3" },
-  { event:"R3_JEREZ", person:"PEP", type:"hotel", hotel:"NH Avenida Jerez", room:"3", booking:"5981852157", nights:"3" },
-  { event:"R3_JEREZ", person:"GUILLEM", type:"hotel", hotel:"NH Avenida Jerez", room:"3", booking:"5981852157", nights:"3" },
-  { event:"R3_JEREZ", person:"SANTIAGO", type:"hotel", hotel:"NH Avenida Jerez", room:"4", booking:"5981852157", nights:"3" },
-  { event:"R3_JEREZ", person:"SIMONE", type:"hotel", hotel:"NH Avenida Jerez", room:"4", booking:"5981852157", nights:"3" },
-  { event:"R3_JEREZ", person:"DANIELE", type:"hotel", hotel:"NH Avenida Jerez", room:"5", booking:"5981852157", nights:"3" },
-  { event:"R3_JEREZ", person:"GIACOMO", type:"hotel", hotel:"NH Avenida Jerez", room:"5", booking:"5981852157", nights:"3" },
-  { event:"R3_JEREZ", person:"LUCA", type:"hotel", hotel:"Hotel Cueva (domenica)", room:"1", booking:"5630965996", notes:"Notte domenica - 174€" },
-  { event:"R3_JEREZ", person:"ILARIO", type:"hotel", hotel:"Hotel Cueva (domenica)", room:"1", booking:"5630965996" },
-  { event:"R3_JEREZ", person:"BORRELLI", type:"hotel", hotel:"Hotel Cueva (domenica)", room:"2", booking:"5630965996" },
-  { event:"R3_JEREZ", person:"GIACOMO", type:"hotel", hotel:"Hotel Cueva (domenica)", room:"2", booking:"5630965996" },
-  { event:"R3_JEREZ", person:"PRITELLI", type:"hotel", hotel:"Hotel Cueva (domenica)", room:"2", booking:"5630965996" },
-  { event:"R3_JEREZ", person:"CASADEI", type:"hotel", hotel:"Hotel Cueva (domenica)", room:"2", booking:"5630965996" },
-
-  // ── R4 MAGNY-COURS ──────────────────────────────────────
-  { event:"R4_MAGNY", person:"MAURI", type:"volo", dir:"andata", date:"23 Lug", dep:"BGY 09:40", arr:"SVQ 12:15", flight:"FR76", company:"Ryanair", booking:"U3ZNSJ", baggage:"1 mano" },
-  { event:"R4_MAGNY", person:"ILARIO", type:"auto", car:"Furgoncino Team", booking:"-", notes:"Viaggio in auto" },
-  { event:"R4_MAGNY", person:"LUCA", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"DAVIDE", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"BORRELLI", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"RICCARDO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"GIACOMO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"TOMMASO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"MATTEO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"SAMULE", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"SANTIAGO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"CASADEI", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"PRITELLI", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"DANIELE", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R4_MAGNY", person:"PEP", type:"auto", car:"Auto Pep", booking:"-" },
-  { event:"R4_MAGNY", person:"GUILLEM", type:"auto", car:"Auto Pep", booking:"-" },
-  { event:"R4_MAGNY", person:"MAURI", type:"volo", dir:"ritorno", date:"29 Lug", dep:"VLC 13:25", arr:"BGY 15:25", flight:"FR496", company:"Ryanair", booking:"IU3EVV", baggage:"1 mano" },
-  { event:"R4_MAGNY", person:"LUCA", type:"hotel", hotel:"Hotel du Circuit", room:"1", nights:"3" },
-  { event:"R4_MAGNY", person:"DAVIDE", type:"hotel", hotel:"Hotel du Circuit", room:"1", nights:"3" },
-  { event:"R4_MAGNY", person:"MATTEO", type:"hotel", hotel:"Hotel du Circuit", room:"2", nights:"3" },
-  { event:"R4_MAGNY", person:"PEP", type:"hotel", hotel:"Hotel du Circuit", room:"2", nights:"3" },
-  { event:"R4_MAGNY", person:"GUILLEM", type:"hotel", hotel:"Hotel du Circuit", room:"2", nights:"3" },
-  { event:"R4_MAGNY", person:"TOMMASO", type:"hotel", hotel:"Hotel du Circuit", room:"3", nights:"3" },
-  { event:"R4_MAGNY", person:"CASADEI", type:"hotel", hotel:"Hotel du Circuit", room:"3", nights:"3" },
-  { event:"R4_MAGNY", person:"SANTIAGO", type:"hotel", hotel:"Hotel du Circuit", room:"4", nights:"3" },
-  { event:"R4_MAGNY", person:"SIMONE", type:"hotel", hotel:"Hotel du Circuit", room:"4", nights:"3" },
-  { event:"R4_MAGNY", person:"DANIELE", type:"hotel", hotel:"Hotel du Circuit", room:"4", nights:"3" },
-  { event:"R4_MAGNY", person:"GIACOMO", type:"hotel", hotel:"Hotel du Circuit", room:"4", nights:"3" },
-
-  // ── TEST 3 VALENCIA ─────────────────────────────────────
-  { event:"TEST3_VALENCIA", person:"ILARIO", type:"auto", car:"7 Furgone Ilario", booking:"-", notes:"Viaggio in furgone" },
-  { event:"TEST3_VALENCIA", person:"DAVIDE", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"BORRELLI", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"RICCARDO", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"GIACOMO", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"TOMMASO", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"MATTEO", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"SAMULE", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"SANTIAGO", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"CASADEI", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"PRITELLI", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"DANIELE", type:"auto", car:"Furgone Ilario", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"PEP", type:"auto", car:"Auto Pep", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"GUILLEM", type:"auto", car:"Auto Pep", booking:"-" },
-  { event:"TEST3_VALENCIA", person:"GIACOMO", type:"hotel", hotel:"La Carreta", room:"1", booking:"5609128099", nights:"2" },
-  { event:"TEST3_VALENCIA", person:"DAVIDE", type:"hotel", hotel:"La Carreta", room:"1", booking:"5609128099", nights:"2" },
-  { event:"TEST3_VALENCIA", person:"MATTEO", type:"hotel", hotel:"La Carreta", room:"2", booking:"5609128099", nights:"2" },
-  { event:"TEST3_VALENCIA", person:"TOMMASO", type:"hotel", hotel:"La Carreta", room:"2", booking:"5609128099", nights:"2" },
-  { event:"TEST3_VALENCIA", person:"SANTIAGO", type:"hotel", hotel:"La Carreta", room:"2", booking:"5719430973", nights:"2" },
-  { event:"TEST3_VALENCIA", person:"GUILLEM", type:"hotel", hotel:"La Carreta", room:"3", booking:"5719430973", nights:"2" },
-  { event:"TEST3_VALENCIA", person:"PEP", type:"hotel", hotel:"La Carreta", room:"3", booking:"5719430973", nights:"2" },
-  { event:"TEST3_VALENCIA", person:"DANIELE", type:"hotel", hotel:"La Carreta", room:"3", booking:"5719430973", nights:"2" },
-
-  // ── R5 VALENCIA ─────────────────────────────────────────
-  { event:"R5_VALENCIA", person:"MAURI", type:"volo", dir:"andata", date:"3 Set", dep:"BGY 10:55", arr:"VLC 12:55", flight:"FR497", company:"Ryanair", booking:"U44MRG", baggage:"1 mano" },
-  { event:"R5_VALENCIA", person:"ILARIO", type:"auto", car:"Furgoncino Team", booking:"-", notes:"Viaggio in furgoncino" },
-  { event:"R5_VALENCIA", person:"LUCA", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"DAVIDE", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"BORRELLI", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"RICCARDO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"GIACOMO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"TOMMASO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"MATTEO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"SAMULE", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"SANTIAGO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"CASADEI", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"PRITELLI", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"DANIELE", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R5_VALENCIA", person:"PEP", type:"auto", car:"Auto Pep", booking:"-" },
-  { event:"R5_VALENCIA", person:"GUILLEM", type:"auto", car:"Auto Pep", booking:"-" },
-  { event:"R5_VALENCIA", person:"ERIK", type:"volo", dir:"andata", date:"3 Set", dep:"TSF 14:20", arr:"VLC 16:35", flight:"Ryanair", company:"Ryanair", baggage:"-" },
-  { event:"R5_VALENCIA", person:"ERIK", type:"volo", dir:"ritorno", date:"6 Set", dep:"VLC 19:00", arr:"TSF 21:10", flight:"Ryanair", company:"Ryanair", baggage:"-" },
-  { event:"R5_VALENCIA", person:"LUCA", type:"hotel", hotel:"Hotel Xon's (4 doppie) + Ibis (1 doppia)", room:"1", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"DAVIDE", type:"hotel", hotel:"Hotel Xon's", room:"1", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"MATTEO", type:"hotel", hotel:"Hotel Xon's", room:"2", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"TOMMASO", type:"hotel", hotel:"Hotel Xon's", room:"2", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"PEP", type:"hotel", hotel:"Hotel Xon's", room:"3", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"GUILLEM", type:"hotel", hotel:"Hotel Xon's", room:"3", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"SANTIAGO", type:"hotel", hotel:"Hotel Xon's", room:"4", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"SIMONE", type:"hotel", hotel:"Ibis", room:"5", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"DANIELE", type:"hotel", hotel:"Hotel Xon's", room:"4", notes:"Prenotato" },
-  { event:"R5_VALENCIA", person:"GIACOMO", type:"hotel", hotel:"Hotel Xon's", room:"4", notes:"Prenotato" },
-
-  // ── R6 ARAGON ───────────────────────────────────────────
-  { event:"R6_ARAGON", person:"ILARIO", type:"auto", car:"Furgoncino Team", booking:"-", notes:"Viaggio in furgoncino" },
-  { event:"R6_ARAGON", person:"LUCA", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R6_ARAGON", person:"DAVIDE", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R6_ARAGON", person:"BORRELLI", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R6_ARAGON", person:"RICCARDO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R6_ARAGON", person:"GIACOMO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R6_ARAGON", person:"TOMMASO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R6_ARAGON", person:"MATTEO", type:"auto", car:"Furgoncino Team", booking:"-" },
-  { event:"R6_ARAGON", person:"SAMULE", type:"auto", car:"Furgoncino Pep", booking:"-" },
-  { event:"R6_ARAGON", person:"SANTIAGO", type:"auto", car:"Furgoncino Pep", booking:"-" },
-  { event:"R6_ARAGON", person:"CASADEI", type:"auto", car:"Furgoncino Pep", booking:"-" },
-  { event:"R6_ARAGON", person:"PRITELLI", type:"auto", car:"Furgoncino Pep", booking:"-" },
-  { event:"R6_ARAGON", person:"DANIELE", type:"auto", car:"Furgoncino Pep", booking:"-" },
-  { event:"R6_ARAGON", person:"PEP", type:"auto", car:"Furgoncino Pep", booking:"-" },
-  { event:"R6_ARAGON", person:"GUILLEM", type:"auto", car:"Furgoncino Pep", booking:"-" },
-  { event:"R6_ARAGON", person:"ERIK", type:"volo", dir:"andata", date:"24 Set", dep:"VCE 09:10", arr:"BCN 11:10", flight:"Vueling", company:"Vueling", baggage:"-" },
-  { event:"R6_ARAGON", person:"ERIK", type:"volo", dir:"ritorno", date:"27 Set", dep:"BCN 22:00", arr:"VCE 23:55", flight:"W46-", company:"Wizz", baggage:"-" },
-  { event:"R6_ARAGON", person:"LUCA", type:"hotel", hotel:"Casa Rural Aragón", room:"1", notes:"Totale 990€ - Acconto 190€ - Residuo 800€" },
-  { event:"R6_ARAGON", person:"DAVIDE", type:"hotel", hotel:"Casa Rural Aragón", room:"1", notes:"" },
-  { event:"R6_ARAGON", person:"MATTEO", type:"hotel", hotel:"Casa Rural Aragón", room:"2", notes:"" },
-  { event:"R6_ARAGON", person:"PEP", type:"hotel", hotel:"Casa Rural Aragón", room:"2", notes:"" },
-  { event:"R6_ARAGON", person:"GUILLEM", type:"hotel", hotel:"Casa Rural Aragón", room:"2", notes:"" },
-  { event:"R6_ARAGON", person:"TOMMASO", type:"hotel", hotel:"Casa Rural Aragón", room:"3", notes:"" },
-  { event:"R6_ARAGON", person:"CASADEI", type:"hotel", hotel:"Casa Rural Aragón", room:"3", notes:"" },
-  { event:"R6_ARAGON", person:"SANTIAGO", type:"hotel", hotel:"Casa Rural Aragón", room:"4", notes:"" },
-  { event:"R6_ARAGON", person:"DANIELE", type:"hotel", hotel:"Casa Rural Aragón", room:"4", notes:"" },
-  { event:"R6_ARAGON", person:"GIACOMO", type:"hotel", hotel:"Casa Rural Aragón", room:"4", notes:"" },
-
-  // ── R7 MISANO ───────────────────────────────────────────
-  // Misano: no flights listed (viaggio in camion/auto Italy)
-  { event:"R7_MISANO", person:"LUCA", type:"hotel", hotel:"Da definire", room:"1", notes:"Da prenotare" },
-  { event:"R7_MISANO", person:"GIACOMO", type:"hotel", hotel:"Da definire", room:"1", notes:"" },
-  { event:"R7_MISANO", person:"GUILLEM", type:"hotel", hotel:"Da definire", room:"2", notes:"" },
-  { event:"R7_MISANO", person:"CASADEI", type:"hotel", hotel:"Da definire", room:"2", notes:"" },
-  { event:"R7_MISANO", person:"TOMMASO", type:"hotel", hotel:"Da definire", room:"2", notes:"" },
-  { event:"R7_MISANO", person:"DAVIDE", type:"hotel", hotel:"Da definire", room:"3", notes:"" },
-  { event:"R7_MISANO", person:"SANTIAGO", type:"hotel", hotel:"Da definire", room:"3", notes:"" },
-  { event:"R7_MISANO", person:"PEP", type:"hotel", hotel:"Da definire", room:"3", notes:"" },
-  { event:"R7_MISANO", person:"DANIELE", type:"hotel", hotel:"Da definire", room:"4", notes:"" },
+  {   event:"TEST1_BCN",   person:"LUCA",   type:"volo",   dir:"andata",   flight:"FR847",   company:"Ryanair",   dep:"BGY 11:55",   arr:"BCN 13:35",   date:"19 Apr",   baggage:"1 mano",   booking:"QUG2XP",   notes:"AUTO ILARIO N° PRENOTAZIONE 28794732 GOLD CAR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"ILARIO",   type:"volo",   dir:"andata",   flight:"FR847",   company:"Ryanair",   dep:"BGY 11:55",   arr:"BCN 13:35",   date:"19 Apr",   baggage:"1 mano",   booking:"QUG2XP",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"DAVIDE",   type:"volo",   dir:"andata",   flight:"FR847",   company:"Ryanair",   dep:"BGY 11:55",   arr:"BCN 13:35",   date:"19 Apr",   baggage:"1 mano",   booking:"QUG2XP",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"BORRELLI",   type:"volo",   dir:"andata",   flight:"FR847",   company:"Ryanair",   dep:"BGY 11:55",   arr:"BCN 13:35",   date:"19 Apr",   baggage:"1 mano",   booking:"QUG2XP",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"RICCARDO",   type:"volo",   dir:"andata",   flight:"FR847",   company:"Ryanair",   dep:"BGY 11:55",   arr:"BCN 13:35",   date:"19 Apr",   baggage:"1 mano",   booking:"M72WYR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"GIACOMO",   type:"volo",   dir:"andata",   flight:"FR847",   company:"Ryanair",   dep:"BGY 11:55",   arr:"BCN 13:35",   date:"19 Apr",   baggage:"1 mano",   booking:"M72WYR",   notes:"AUTO CON LELE",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"PRITELLI",   type:"volo",   dir:"andata",   flight:"VY6525",   company:"Vueling",   dep:"BLQ 09:10",   arr:"BCN 11:00",   date:"19 Apr",   baggage:"1 mano",   booking:"HK1VRW",   notes:"AUTO CON IL MICHIELON",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"CASADEI",   type:"volo",   dir:"andata",   flight:"VY6525",   company:"Vueling",   dep:"BLQ 09:10",   arr:"BCN 11:00",   date:"19 Apr",   baggage:"1 mano",   booking:"HK1VRW",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"SANTIAGO",   type:"volo",   dir:"andata",   flight:"VY6525",   company:"Vueling",   dep:"BLQ 09:10",   arr:"BCN 11:00",   date:"19 Apr",   baggage:"1 mano",   booking:"HK1VRW",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"SAMULE",   type:"volo",   dir:"andata",   flight:"VY6525",   company:"Vueling",   dep:"BLQ 09:10",   arr:"BCN 11:00",   date:"19 Apr",   baggage:"1 mano",   booking:"HK1VRW",   notes:"AUTO LELE N° PRENOTAZIONE 28799443 GOLD CAR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"TOMMASO",   type:"volo",   dir:"andata",   flight:"VY6525",   company:"Vueling",   dep:"BLQ 09:10",   arr:"BCN 11:00",   date:"19 Apr",   baggage:"1 mano",   booking:"ELPCHQ",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"MATTEO",   type:"volo",   dir:"andata",   flight:"VY6525",   company:"Vueling",   dep:"BLQ 09:10",   arr:"BCN 11:00",   date:"19 Apr",   baggage:"1 mano",   booking:"ELPCHQ",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"DANIELE",   type:"volo",   dir:"andata",   flight:"W46017",   company:"Wizz",   dep:"FCO 07:25",   arr:"BCN 09:15",   date:"19 Apr",   baggage:"1 mano",   booking:"YJDY3S",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"ILARIO",   type:"volo",   dir:"ritorno",   flight:"FR846",   company:"Ryanair",   dep:"BCN 21:20",   arr:"BGY 23:05",   date:"21 Apr",   baggage:"1 mano",   booking:"L6PHNE",   notes:"AUTO ILARIO N° PRENOTAZIONE 28794732 GOLD CAR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"DAVIDE",   type:"volo",   dir:"ritorno",   flight:"FR846",   company:"Ryanair",   dep:"BCN 21:20",   arr:"BGY 23:05",   date:"21 Apr",   baggage:"1 mano",   booking:"L6PHNE",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"RICCARDO",   type:"volo",   dir:"ritorno",   flight:"FR846",   company:"Ryanair",   dep:"BCN 21:20",   arr:"BGY 23:05",   date:"21 Apr",   baggage:"1 mano",   booking:"M72WYR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"GIACOMO",   type:"volo",   dir:"ritorno",   flight:"FR846",   company:"Ryanair",   dep:"BCN 21:20",   arr:"BGY 23:05",   date:"21 Apr",   baggage:"1 mano",   booking:"M72WYR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"MAURI",   type:"volo",   dir:"ritorno",   flight:"FR846",   company:"Ryanair",   dep:"BCN 21:20",   arr:"BGY 23:05",   date:"21 Apr",   baggage:"1 mano",   booking:"M72WYR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"LUCA",   type:"volo",   dir:"ritorno",   flight:"FR3320",   company:"Ryanair",   dep:"BCN 22:30",   arr:"BGY 00:15",   date:"20 Apr",   baggage:"1 mano",   booking:"IS1YQV",   notes:"UBER",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"PRITELLI",   type:"volo",   dir:"ritorno",   flight:"FR8183",   company:"Ryanair",   dep:"BCN 22:05",   arr:"BLQ 23:50",   date:"21 Apr",   baggage:"1 mano",   booking:"P4GK4X",   notes:"AUTO LELE N° PRENOTAZIONE 28799443 GOLD CAR",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"CASADEI",   type:"volo",   dir:"ritorno",   flight:"FR8183",   company:"Ryanair",   dep:"BCN 22:05",   arr:"BLQ 23:50",   date:"21 Apr",   baggage:"1 mano",   booking:"P4GK4X",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"SANTIAGO",   type:"volo",   dir:"ritorno",   flight:"FR8183",   company:"Ryanair",   dep:"BCN 22:05",   arr:"BLQ 23:50",   date:"21 Apr",   baggage:"1 mano",   booking:"P4GK4X",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"SAMULE",   type:"volo",   dir:"ritorno",   flight:"FR8183",   company:"Ryanair",   dep:"BCN 22:05",   arr:"BLQ 23:50",   date:"21 Apr",   baggage:"1 mano",   booking:"P4GK4X",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"TOMMASO",   type:"volo",   dir:"ritorno",   flight:"FR8183",   company:"Ryanair",   dep:"BCN 22:05",   arr:"BLQ 23:50",   date:"21 Apr",   baggage:"1 mano",   booking:"KWS1UB",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"DANIELE",   type:"volo",   dir:"ritorno",   flight:"W46020",   company:"Wizz",   dep:"BCN 21:45",   arr:"FCO 23:40",   date:"21 Apr",   baggage:"1 mano",   booking:"YJDY3S",   notes:"AUTO PEP",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"MATTEO",   type:"volo",   dir:"ritorno",   flight:"FR2402",   company:"Ryanair",   dep:"BCN 22:05",   arr:"SVQ 23:50",   date:"21 Apr",   baggage:"2 MANO",   booking:"W6KIJK",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"BORRELLI",   type:"volo",   dir:"ritorno",   flight:"FR2402",   company:"Ryanair",   dep:"BCN 22:05",   arr:"SVQ 23:50",   date:"21 Apr",   baggage:"1 MANO + 1 STIVA",   booking:"W6KIJK",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"MAURI",   type:"volo",   dir:"andata",   flight:"FR3142",   company:"Ryanair",   dep:"BGY 12:55",   arr:"BCN 14:35",   date:"30 Apr",   baggage:"1 mano",   booking:"HVGK5Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"LUCA",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   notes:"1 AUTO ILATIO C. PRENOTAZIONE: 28980199",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"ILARIO",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"DAVIDE",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"2 MANO",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"MATTEO",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"2 MANO",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"TOMMASO",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"SAMULE",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   notes:"1 AUTO LELE C. PRENOTAZIONE: 28968052",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"RICCARDO",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"SANTIAGO",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"GIACOMO",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"BORRELLI",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"PRITELLI",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   notes:"1 AUTO LUCA C. PRENOTAZIONE: 28980227",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"CASADEI",   type:"volo",   dir:"andata",   flight:"FR2649",   company:"Ryanair",   dep:"BGY 11:25",   arr:"AGP 14:05",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"H3MD9N",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"DANIELE",   type:"volo",   dir:"andata",   flight:"FR6138",   company:"Ryanair",   dep:"FCO 06:00",   arr:"AGP 08:45",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"E3DITQ",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"PEP",   type:"volo",   dir:"andata",   flight:"VY2286",   company:"Vueling",   dep:"BCN 11:55",   arr:"XRY 13:45",   date:"DOM 3 MAGGIO",   baggage:"1 mano",   booking:"YJU9GM",   notes:"TRASFERIMENTO IN CIRCUITO CON UBER",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"GUILLEM",   type:"volo",   dir:"andata",   flight:"VY2286",   company:"Vueling",   dep:"BCN 11:55",   arr:"XRY 13:45",   date:"DOM 3 MAGGIO",   baggage:"2 MANO",   booking:"WG8DKI",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"LUCA",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   notes:"1 AUTO ILATIO C. PRENOTAZIONE: 28980199",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"ILARIO",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"DAVIDE",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"2 MANO",   booking:"PZBH2Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"TOMMASO",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"SAMULE",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   notes:"1 AUTO LELE C. PRENOTAZIONE: 28968052",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"RICCARDO",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"SANTIAGO",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"GIACOMO",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"PRITELLI",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   notes:"1 AUTO LUCA C. PRENOTAZIONE: 28980227",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"CASADEI",   type:"volo",   dir:"ritorno",   flight:"FR8933",   company:"Ryanair",   dep:"AGP 22:15",   arr:"BLQ 00:50",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"PZBH2Z",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"DANIELE",   type:"volo",   dir:"ritorno",   flight:"W46114",   company:"Wizz",   dep:"AGP 22:00",   arr:"FCO 00:55",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"TU1C2B",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"MATTEO",   type:"volo",   dir:"ritorno",   company:"Vueling",   dep:"SVQ 22:40",   arr:"BCN 00:25",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"UMPWPD",   notes:"TRASFERIMENTO A SIVIGLIA CON MICHIELON",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"BORRELLI",   type:"volo",   dir:"ritorno",   company:"Vueling",   dep:"SVQ 22:40",   arr:"BCN 00:25",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"UMPWPD",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"PEP",   type:"volo",   dir:"ritorno",   company:"Vueling",   dep:"SVQ 22:40",   arr:"BCN 00:25",   date:"MART 5 MAGGIO",   baggage:"1 mano",   booking:"UMPWPD",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"GUILLEM",   type:"volo",   dir:"ritorno",   company:"Transavia",   dep:"SVQ 06:30",   arr:"CDG 09:00",   date:"MERC 6 MAGGIO",   baggage:"2 MANO 1 STIVA",   booking:"SCWN2Z",   notes:"TEAM CIP",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"MAURI",   type:"volo",   dir:"ritorno",   flight:"FR3320",   company:"Ryanair",   dep:"BCN 13:00",   arr:"BGY 14:45",   date:"8 Mag",   baggage:"1 mano",   booking:"DZLTMJ",   notes:"CAMION A BARCELLONA",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"ILARIO",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"1 mano",   booking:"ETHNKC",   notes:"1 AUTO ILARIO N° PRENOTAZION 29146873",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"LUCA",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"2 MANO",   booking:"ETHNKC",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"DAVIDE",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"2 MANO",   booking:"ETHNKC",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"BORRELLI",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"1 mano",   booking:"ETHNKC",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"RICCARDO",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"1 mano",   booking:"ETHNKC",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"GIACOMO",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"1 mano",   booking:"ETHNKC",   notes:"AUTO ERIK",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"TOMMASO",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"1 mano",   booking:"ETHNKC",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"MATTEO",   type:"volo",   dir:"andata",   flight:"FR270",   company:"Ryanair",   dep:"MXP 08:20",   arr:"BCN 10:00",   date:"MERC 20 MAGGIO",   baggage:"1 mano",   booking:"ETHNKC",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"SAMULE",   type:"volo",   dir:"andata",   flight:"FR2097",   company:"Ryanair",   dep:"BLQ 12:10",   arr:"BCN 13:55",   date:"MART 19 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   notes:"AUTO CON PEP",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"SANTIAGO",   type:"volo",   dir:"andata",   flight:"FR2097",   company:"Ryanair",   dep:"BLQ 12:10",   arr:"BCN 13:55",   date:"MART 19 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"CASADEI",   type:"volo",   dir:"andata",   flight:"FR2097",   company:"Ryanair",   dep:"BLQ 12:10",   arr:"BCN 13:55",   date:"MART 19 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"PRITELLI",   type:"volo",   dir:"andata",   flight:"FR2097",   company:"Ryanair",   dep:"BLQ 12:10",   arr:"BCN 13:55",   date:"MART 19 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"DANIELE",   type:"volo",   dir:"andata",   flight:"FR6986",   company:"Ryanair",   dep:"FCO 15:15",   arr:"BCN 17:05",   date:"MART 19 MAGGIO",   baggage:"1 mano",   booking:"CV5IRM",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"MAURI",   type:"volo",   dir:"andata",   flight:"FR7714",   company:"Ryanair",   dep:"BGY 15:05",   arr:"BCN 16:50",   date:"23 Mag",   baggage:"1 mano",   booking:"XUYRTF",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"ILARIO",   type:"volo",   dir:"ritorno",   flight:"FR6305",   company:"Ryanair",   dep:"BCN 23:10",   arr:"BGY 00:55",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"B5CZJX",   notes:"1 AUTO ILARIO N° PRENOTAZION 29146873",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"LUCA",   type:"volo",   dir:"ritorno",   flight:"FR6305",   company:"Ryanair",   dep:"BCN 23:10",   arr:"BGY 00:55",   date:"DOM 24 MAGGIO",   baggage:"2 MANO",   booking:"B5CZJX",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"DAVIDE",   type:"volo",   dir:"ritorno",   flight:"FR6305",   company:"Ryanair",   dep:"BCN 23:10",   arr:"BGY 00:55",   date:"DOM 24 MAGGIO",   baggage:"2 MANO",   booking:"B5CZJX",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"RICCARDO",   type:"volo",   dir:"ritorno",   flight:"FR6305",   company:"Ryanair",   dep:"BCN 23:10",   arr:"BGY 00:55",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"B5CZJX",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"GIACOMO",   type:"volo",   dir:"ritorno",   flight:"FR6305",   company:"Ryanair",   dep:"BCN 23:10",   arr:"BGY 00:55",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"B5CZJX",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"TOMMASO",   type:"volo",   dir:"ritorno",   flight:"FR6305",   company:"Ryanair",   dep:"BCN 23:10",   arr:"BGY 00:55",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"B5CZJX",   notes:"AUTO ERIK",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"MATTEO",   type:"volo",   dir:"ritorno",   flight:"FR6305",   company:"Ryanair",   dep:"BCN 23:10",   arr:"BGY 00:55",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"B5CZJX",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"SAMULE",   type:"volo",   dir:"ritorno",   flight:"FR5220",   company:"Ryanair",   dep:"BCN 23:05",   arr:"BLQ 00:50",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   notes:"AUTO CON PEP",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"SANTIAGO",   type:"volo",   dir:"ritorno",   flight:"FR5220",   company:"Ryanair",   dep:"BCN 23:05",   arr:"BLQ 00:50",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"CASADEI",   type:"volo",   dir:"ritorno",   flight:"FR5220",   company:"Ryanair",   dep:"BCN 23:05",   arr:"BLQ 00:50",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"PRITELLI",   type:"volo",   dir:"ritorno",   flight:"FR5220",   company:"Ryanair",   dep:"BCN 23:05",   arr:"BLQ 00:50",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"WPLTXE",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"DANIELE",   type:"volo",   dir:"ritorno",   flight:"FR6927",   company:"Ryanair",   dep:"BCN 23:05",   arr:"FCO 01:00",   date:"DOM 24 MAGGIO",   baggage:"1 mano",   booking:"CV5IRM",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"ILARIO",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"1 mano",   booking:"KCB4JN6",   notes:"AUTO ILARIO 29190139",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"LUCA",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"2 MANO",   booking:"KCB4JN6",   notes:"AUTO LUCA 29242078",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"DAVIDE",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"2 MANO",   booking:"KCB4JN6",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"BORRELLI",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"1 mano",   booking:"KCB4JN6",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"RICCARDO",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"1 mano",   booking:"KCB4JN6",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"GIACOMO",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"1 mano",   booking:"KCB4JN6",   notes:"AUTO ILARIO 29190139",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"TOMMASO",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"1 mano",   booking:"KCB4JN6",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"MATTEO",   type:"volo",   dir:"andata",   flight:"EJU3871",   company:"EasyJet",   dep:"MXP 11:05",   arr:"LIS 13:10",   date:"GIOV 11 GIUGNO",   baggage:"1 mano",   booking:"KCB4JN6",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"SAMULE",   type:"volo",   dir:"andata",   flight:"W46219",   company:"Wizz",   dep:"FCO 18:20",   arr:"LIS 20:35",   date:"MERC 10 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   notes:"AUTO LELE 29242110",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"SANTIAGO",   type:"volo",   dir:"andata",   flight:"W46219",   company:"Wizz",   dep:"FCO 18:20",   arr:"LIS 20:35",   date:"MERC 10 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"CASADEI",   type:"volo",   dir:"andata",   flight:"W46219",   company:"Wizz",   dep:"FCO 18:20",   arr:"LIS 20:35",   date:"MERC 10 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"PRITELLI",   type:"volo",   dir:"andata",   flight:"W46219",   company:"Wizz",   dep:"FCO 18:20",   arr:"LIS 20:35",   date:"MERC 10 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"DANIELE",   type:"volo",   dir:"andata",   flight:"W46219",   company:"Wizz",   dep:"FCO 18:20",   arr:"LIS 20:35",   date:"MERC 10 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"PEP",   type:"volo",   dir:"andata",   flight:"VY8460",   company:"Vueling",   dep:"BCN 07:20",   arr:"LIS 08:30",   date:"GIOV 11 GIUGNO",   baggage:"1 mano",   booking:"VKP9JJ",   notes:"UBER",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"GUILLEM",   type:"volo",   dir:"andata",   flight:"VY8460",   company:"Vueling",   dep:"BCN 07:20",   arr:"LIS 08:30",   date:"GIOV 11 GIUGNO",   baggage:"2 MANO",   booking:"VKP9JJ",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"MAURI",   type:"volo",   dir:"andata",   flight:"FR820",   company:"Ryanair",   dep:"BGY 15:35",   arr:"LIS 17:35",   date:"13 Giu",   baggage:"1 mano",   booking:"N7ZL2U",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"ILARIO",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   notes:"AUTO ILARIO 29190139",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"LUCA",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   notes:"AUTO LUCA 29242078",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"DAVIDE",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"BORRELLI",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"RICCARDO",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"GIACOMO",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"TOMMASO",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   notes:"AUTO ILARIO 29190139",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"MATTEO",   type:"volo",   dir:"ritorno",   flight:"TP828",   company:"TAP",   dep:"LIS 21:05",   arr:"MXP 00:50",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"YC43TB",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"SAMULE",   type:"volo",   dir:"ritorno",   flight:"W46220",   company:"Wizz",   dep:"LIS 21:15",   arr:"FCO 01:10",   date:"DOM 14 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   notes:"AUTO LELE 29242110",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"SANTIAGO",   type:"volo",   dir:"ritorno",   flight:"W46220",   company:"Wizz",   dep:"LIS 21:15",   arr:"FCO 01:10",   date:"DOM 14 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"CASADEI",   type:"volo",   dir:"ritorno",   flight:"W46220",   company:"Wizz",   dep:"LIS 21:15",   arr:"FCO 01:10",   date:"DOM 14 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"PRITELLI",   type:"volo",   dir:"ritorno",   flight:"W46220",   company:"Wizz",   dep:"LIS 21:15",   arr:"FCO 01:10",   date:"DOM 14 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"DANIELE",   type:"volo",   dir:"ritorno",   flight:"W46220",   company:"Wizz",   dep:"LIS 21:15",   arr:"FCO 01:10",   date:"DOM 14 GIUGNO",   baggage:"1 mano",   booking:"NTNJ4B",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"PEP",   type:"volo",   dir:"ritorno",   flight:"VY8465",   company:"Vueling",   dep:"LIS 22:10",   arr:"BCN 01:05",   date:"DOM 14 GIUGNO",   baggage:"1 mano",   booking:"VKP9JJ",   notes:"AUTO ILARIO 29190139",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"GUILLEM",   type:"volo",   dir:"ritorno",   flight:"VY8465",   company:"Vueling",   dep:"LIS 22:10",   arr:"BCN 01:05",   date:"DOM 14 GIUGNO",   baggage:"2 MANO",   booking:"VKP9JJ",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"MAURI",   type:"volo",   dir:"ritorno",   flight:"VY3154",   company:"Vueling",   dep:"XRY 09:35",   arr:"PMI 11:10",   date:"MART 16 GIUGNO",   baggage:"1 mano",   booking:"PNZ3YD",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"MAURI",   type:"volo",   dir:"ritorno",   flight:"FR7881",   company:"Ryanair",   dep:"PMI 12:55",   arr:"BGY 14:40",   date:"MART 16 GIUGNO",   baggage:"1 mano",   booking:"QV3W9C",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"ILARIO",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"LUCA",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"DAVIDE",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"BORRELLI",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"RICCARDO",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"GIACOMO",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"TOMMASO",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"MATTEO",   type:"volo",   dir:"andata",   flight:"W46309",   company:"Wizz",   dep:"MXP 06:45",   arr:"SVQ 09:25",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"SAMULE",   type:"volo",   dir:"andata",   flight:"FR4348",   company:"Ryanair",   dep:"BLQ 18:45",   arr:"SVQ 21:30",   date:"MERC 1 LUGLIO",   baggage:"1 mano",   booking:"F1I1MW",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"SANTIAGO",   type:"volo",   dir:"andata",   flight:"FR4348",   company:"Ryanair",   dep:"BLQ 18:45",   arr:"SVQ 21:30",   date:"MERC 1 LUGLIO",   baggage:"1 mano",   booking:"F1I1MW",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"CASADEI",   type:"volo",   dir:"andata",   flight:"FR4348",   company:"Ryanair",   dep:"BLQ 18:45",   arr:"SVQ 21:30",   date:"MERC 1 LUGLIO",   baggage:"1 mano",   booking:"F1I1MW",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"PRITELLI",   type:"volo",   dir:"andata",   flight:"FR4348",   company:"Ryanair",   dep:"BLQ 18:45",   arr:"SVQ 21:30",   date:"MERC 1 LUGLIO",   baggage:"1 mano",   booking:"F1I1MW",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"SIMONE",   type:"volo",   dir:"andata",   flight:"FR8476",   company:"Ryanair",   dep:"BLQ 10:15",   arr:"SVQ 13:00",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"W8VZ7U",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"DANIELE",   type:"volo",   dir:"andata",   flight:"W46023",   company:"Wizz",   dep:"FCO 18:00",   arr:"SVQ 20:50",   date:"MERC 1 LUGLIO",   baggage:"1 mano",   booking:"MJ6B3S",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"PEP",   type:"volo",   dir:"andata",   flight:"VY2210",   company:"Vueling",   dep:"BCN 07:10",   arr:"SVQ 08:55",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"ZF9V2Y",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"GUILLEM",   type:"volo",   dir:"andata",   flight:"VY2210",   company:"Vueling",   dep:"BCN 07:10",   arr:"SVQ 08:55",   date:"GIOV 2 LUGLIO",   baggage:"1 mano",   booking:"ZF9V2Y",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"BORRELLI",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"DAVIDE",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"LUCA",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"RICCARDO",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"GIACOMO",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"TOMMASO",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"MATTEO",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"ILARIO",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"TS4FNK",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"SAMULE",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"NJL33C",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"SANTIAGO",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"NJL33C",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"CASADEI",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"NJL33C",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"PRITELLI",   type:"volo",   dir:"ritorno",   flight:"W46310",   company:"Wizz",   dep:"SVQ 10:10",   arr:"MXP 12:45",   date:"LUN 6 LUGLIO",   baggage:"1 mano",   booking:"NJL33C",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"DANIELE",   type:"volo",   dir:"ritorno",   flight:"W46024",   company:"Wizz",   dep:"SVQ 21:30",   arr:"FCO 00:10",   date:"DOM 5 LUGLIO",   baggage:"1 mano",   booking:"MJ6B3S",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"PEP",   type:"volo",   dir:"ritorno",   flight:"FR2403",   company:"Ryanair",   dep:"SVQ 23:30",   arr:"BCN 01:10",   date:"DOM 5 LUGLIO",   baggage:"1 mano",   booking:"O31URG",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"GUILLEM",   type:"volo",   dir:"ritorno",   flight:"FR2403",   company:"Ryanair",   dep:"SVQ 23:30",   arr:"BCN 01:10",   date:"DOM 5 LUGLIO",   baggage:"2 MANO",   booking:"O31URG",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"MAURI",   type:"volo",   dir:"andata",   flight:"FR76",   company:"Ryanair",   dep:"BGY 09:40",   arr:"SVQ 12:15",   date:"18 Lug",   baggage:"1 mano",   booking:"U3ZNSJ",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"MAURI",   type:"volo",   dir:"ritorno",   flight:"FR496",   company:"Ryanair",   dep:"VLC 13:25",   arr:"BGY 15:25",   date:"29 Lug",   baggage:"1 mano",   booking:"IU3EVV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"ILARIO",   type:"volo",   dir:"andata",   flight:"FR497",   company:"Ryanair",   dep:"BGY 06:35",   arr:"VLC 8:35",   date:"3 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"LUCA",   type:"volo",   dir:"andata",   flight:"FR497",   company:"Ryanair",   dep:"BGY 06:35",   arr:"VLC 8:35",   date:"3 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"DAVIDE",   type:"volo",   dir:"andata",   flight:"FR497",   company:"Ryanair",   dep:"BGY 06:35",   arr:"VLC 8:35",   date:"3 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"RICCARDO",   type:"volo",   dir:"andata",   flight:"FR497",   company:"Ryanair",   dep:"BGY 06:35",   arr:"VLC 8:35",   date:"3 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"GIACOMO",   type:"volo",   dir:"andata",   flight:"FR497",   company:"Ryanair",   dep:"BGY 06:35",   arr:"VLC 8:35",   date:"3 Set",   baggage:"1 mano",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"MAURI",   type:"volo",   dir:"andata",   flight:"FR497",   company:"Ryanair",   dep:"BGY 10:55",   arr:"VLC 12:55",   date:"23 Set",   baggage:"1 mano",   booking:"U44MRG",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"ILARIO",   type:"volo",   dir:"ritorno",   flight:"FR4664",   company:"Ryanair",   dep:"VLC 22:00",   arr:"BGY 23:59",   date:"6 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"LUCA",   type:"volo",   dir:"ritorno",   flight:"FR4664",   company:"Ryanair",   dep:"VLC 22:00",   arr:"BGY 23:59",   date:"6 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"DAVIDE",   type:"volo",   dir:"ritorno",   flight:"FR4664",   company:"Ryanair",   dep:"VLC 22:00",   arr:"BGY 23:59",   date:"6 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"RICCARDO",   type:"volo",   dir:"ritorno",   flight:"FR4664",   company:"Ryanair",   dep:"VLC 22:00",   arr:"BGY 23:59",   date:"6 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"GIACOMO",   type:"volo",   dir:"ritorno",   flight:"FR4664",   company:"Ryanair",   dep:"VLC 22:00",   arr:"BGY 23:59",   date:"6 Set",   baggage:"1 mano",   booking:"AT1HKV",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"ILARIO",   type:"volo",   dir:"andata",   booking:"VOLI AEREO",   notes:"FURGONCINO TEAM",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"ILARIO",   type:"volo",   dir:"ritorno",   booking:"RITORNO FURGONCINO",   notes:"FURGONCINO TEAM",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"LUCA",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"GIACOMO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"DAVIDE",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"MATTEO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"TOMMASO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"SANTIAGO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"GUILLEM",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"PEP",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST1_BCN",   person:"DANIELE",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"LUCA",   type:"hotel",   hotel:"LA CUEVA",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"GIACOMO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"DAVIDE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"MATTEO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"TOMMASO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"SANTIAGO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"GUILLEM",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST2_JEREZ",   person:"DANIELE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"LUCA",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"DAVIDE",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"MATTEO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"TOMMASO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"SANTIAGO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"GUILLEM",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"GIACOMO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"DANIELE",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R1_BARCELLONA",   person:"PEP",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"LUCA",   type:"hotel",   hotel:"https://maps.app.goo.gl/WiGdLGTihRSbfJmcA",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"GIACOMO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"DAVIDE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"MATTEO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"TOMMASO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"SANTIAGO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"GUILLEM",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R2_ESTORIL",   person:"DANIELE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"LUCA",   type:"hotel",   hotel:"NH Avenida Jerez.",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"DAVIDE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"TOMMASO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"MATTEO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"GUILLEM",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"SANTIAGO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"SIMONE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"DANIELE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R3_JEREZ",   person:"GIACOMO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"LUCA",   type:"hotel",   hotel:"HOTEL DU CIRCUIT",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"DAVIDE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"GUILLEM",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"TOMMASO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"SIMONE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"SANTIAGO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"SIMONE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"DANIELE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R4_MAGNY",   person:"GIACOMO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"GIACOMO",   type:"hotel",   hotel:"LA CARRETA",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"DAVIDE",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"MATTEO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"TOMMASO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"SANTIAGO",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"GUILLEM",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"PEP",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"TEST3_VALENCIA",   person:"DANIELE",   type:"hotel",   hotel:"Augusta Barcelona Vallès",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"LUCA",   type:"hotel",   hotel:"PRENOTATO HOTEL XON'S 4 DOPPIE ED 1 DOPPIA IBIS",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"DAVIDE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"TOMMASO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"SIMONE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"GUILLEM",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"SANTIAGO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"SIMONE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"DANIELE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R5_VALENCIA",   person:"GIACOMO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"LUCA",   type:"hotel",   hotel:"CASA RURAL ARAGON",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"DAVIDE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"GUILLEM",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"TOMMASO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"SIMONE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"SANTIAGO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"DANIELE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R6_ARAGON",   person:"GIACOMO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"LUCA",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"GIACOMO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"GUILLEM",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"SIMONE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"TOMMASO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"DAVIDE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"SANTIAGO",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"DANIELE",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
+  {   event:"R7_MISANO",   person:"PEP",   type:"hotel",   hotel:"Da definire",   status:"confermata" },
 ];
 
 
@@ -2046,6 +1952,243 @@ function CostsDashboard({ bookings, people }) {
 
 // ── ExportView ────────────────────────────────────────────
 function ExportView({ bookings, people, eventNotes }) {
+  var [exporting, setExporting] = useState(false);
+  var [exported, setExported] = useState(false);
+
+  async function exportToExcel() {
+    setExporting(true);
+    try {
+      var XLSX = await import("xlsx");
+
+      var wb = XLSX.utils.book_new();
+
+      // ── Helper: apply column widths ──
+      function setColWidths(ws, widths) {
+        ws["!cols"] = widths.map(function(w){ return {wch: w}; });
+      }
+
+      // ── Helper: style header row ──
+      function styleHeaders(ws, range, numCols) {
+        // xlsx community edition doesn't support full cell styles,
+        // but we can set freeze panes and auto-filter
+        ws["!freeze"] = {xSplit: 0, ySplit: 1};
+        ws["!autofilter"] = {ref: range};
+      }
+
+      // ── Sort bookings: by event order, then type (volo first), then person name ──
+      var eventOrder = ["TEST1_BCN","TEST2_JEREZ","R1_BARCELLONA","R2_ESTORIL","R3_JEREZ","R4_MAGNY","TEST3_VALENCIA","R5_VALENCIA","R6_ARAGON","R7_MISANO"];
+      var typeOrder = {"volo":0,"hotel":1,"auto":2,"parcheggio":3};
+
+      var sorted = bookings.slice().sort(function(a,b){
+        var ea = eventOrder.indexOf(a.event), eb = eventOrder.indexOf(b.event);
+        if (ea !== eb) return ea - eb;
+        var ta = typeOrder[a.type]||99, tb = typeOrder[b.type]||99;
+        if (ta !== tb) return ta - tb;
+        var pa = people.find(function(p){return p.id===a.person;}), pb = people.find(function(p){return p.id===b.person;});
+        var na = pa ? pa.name : a.person, nb = pb ? pb.name : b.person;
+        return na.localeCompare(nb);
+      });
+
+      // ── Sheet 1: Piano Stagione Completo ──
+      var headers1 = ["Evento","Date","Circuito","Persona","Ruolo","Tipo","Dir.","Volo","Compagnia","Partenza","Arrivo","Data Volo","Bagaglio","N° Prenotazione","Hotel","Camera","Notti","Auto/Parcheggio","Stato","Note"];
+      var rows1 = [headers1];
+      sorted.forEach(function(b){
+        var person = people.find(function(p){return p.id===b.person;});
+        var ev = EVENTS.find(function(e){return e.id===b.event;});
+        rows1.push([
+          ev ? ev.label : b.event,
+          ev ? ev.dates : "",
+          ev ? ev.circuit : "",
+          person ? person.name : b.person,
+          person ? person.role : "",
+          b.type||"",
+          b.dir === "andata" ? "↗ Andata" : b.dir === "ritorno" ? "↙ Ritorno" : "",
+          b.flight||"",
+          b.company||"",
+          b.dep||"",
+          b.arr||"",
+          b.date||"",
+          b.baggage||"",
+          b.booking||"",
+          b.hotel||"",
+          b.room||"",
+          b.nights||"",
+          b.car||"",
+          b.status === "cancellata" ? "❌ Cancellata" : b.status === "da_confermare" ? "⏳ Da confermare" : "✅ Confermata",
+          b.notes||"",
+        ]);
+      });
+      var ws1 = XLSX.utils.aoa_to_sheet(rows1);
+      setColWidths(ws1, [22,14,14,18,20,8,10,8,10,12,12,12,10,14,22,8,6,20,14,24]);
+      styleHeaders(ws1, "A1:T1", 20);
+      XLSX.utils.book_append_sheet(wb, ws1, "Piano Stagione");
+
+      // ── Sheet per ogni evento ──
+      EVENTS.forEach(function(ev){
+        var evBs = sorted.filter(function(b){return b.event===ev.id;});
+        if (evBs.length === 0) return;
+
+        var voli = evBs.filter(function(b){return b.type==="volo";});
+        var hotels = evBs.filter(function(b){return b.type==="hotel";});
+        var autos = evBs.filter(function(b){return b.type==="auto"||b.type==="parcheggio";});
+
+        var rows = [];
+
+        // Title row
+        rows.push([ev.label + " — " + ev.circuit + " — " + ev.dates]);
+        rows.push([]);
+
+        // Flights section
+        if (voli.length > 0) {
+          rows.push(["✈ VOLI"]);
+          rows.push(["Persona","Ruolo","Dir.","Volo","Compagnia","Partenza","Arrivo","Data","Bagaglio","N° Prenotazione","Stato","Note"]);
+          voli.forEach(function(b){
+            var person = people.find(function(p){return p.id===b.person;});
+            rows.push([
+              person ? person.name : b.person,
+              person ? person.role : "",
+              b.dir === "andata" ? "↗ Andata" : "↙ Ritorno",
+              b.flight||"",
+              b.company||"",
+              b.dep||"",
+              b.arr||"",
+              b.date||"",
+              b.baggage||"",
+              b.booking||"",
+              b.status === "cancellata" ? "❌ Cancellata" : b.status === "da_confermare" ? "⏳ Da confermare" : "✅ Confermata",
+              b.notes||"",
+            ]);
+          });
+          rows.push([]);
+        }
+
+        // Hotels section
+        if (hotels.length > 0) {
+          rows.push(["🏨 HOTEL"]);
+          rows.push(["Persona","Ruolo","Hotel","Camera","Notti","N° Prenotazione","Stato","Note"]);
+          hotels.forEach(function(b){
+            var person = people.find(function(p){return p.id===b.person;});
+            rows.push([
+              person ? person.name : b.person,
+              person ? person.role : "",
+              b.hotel||"",
+              b.room||"",
+              b.nights||"",
+              b.booking||"",
+              b.status === "cancellata" ? "❌ Cancellata" : b.status === "da_confermare" ? "⏳ Da confermare" : "✅ Confermata",
+              b.notes||"",
+            ]);
+          });
+          rows.push([]);
+        }
+
+        // Auto/Parcheggi section
+        if (autos.length > 0) {
+          rows.push(["🚗 AUTO / PARCHEGGI"]);
+          rows.push(["Persona","Ruolo","Veicolo/Parcheggio","N° Prenotazione","Stato","Note"]);
+          autos.forEach(function(b){
+            var person = people.find(function(p){return p.id===b.person;});
+            rows.push([
+              person ? person.name : b.person,
+              person ? person.role : "",
+              b.car||"",
+              b.booking||"",
+              b.status === "cancellata" ? "❌ Cancellata" : b.status === "da_confermare" ? "⏳ Da confermare" : "✅ Confermata",
+              b.notes||"",
+            ]);
+          });
+          rows.push([]);
+        }
+
+        var ws = XLSX.utils.aoa_to_sheet(rows);
+        ws["!cols"] = [{wch:20},{wch:20},{wch:12},{wch:10},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:16},{wch:14},{wch:24}];
+        var sheetName = ev.label.replace(/[:\\/\?\*\[\]]/g,"").substring(0,31);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
+
+      // ── Sheet per persona: itinerario completo ──
+      var personBs = {};
+      sorted.forEach(function(b){
+        if (!personBs[b.person]) personBs[b.person] = [];
+        personBs[b.person].push(b);
+      });
+
+      var personRows = [["Persona","Ruolo","Evento","Date","Tipo","Dir.","Volo","Compagnia","Partenza","Arrivo","Data Volo","Bagaglio","Hotel","Prenotazione","Stato","Note"]];
+      people.forEach(function(p){
+        var pBs = personBs[p.id];
+        if (!pBs || pBs.length === 0) return;
+        pBs.forEach(function(b){
+          var ev = EVENTS.find(function(e){return e.id===b.event;});
+          personRows.push([
+            p.name, p.role,
+            ev ? ev.label : b.event,
+            ev ? ev.dates : "",
+            b.type||"",
+            b.dir === "andata" ? "↗ Andata" : b.dir === "ritorno" ? "↙ Ritorno" : "",
+            b.flight||"",
+            b.company||"",
+            b.dep||"",
+            b.arr||"",
+            b.date||"",
+            b.baggage||"",
+            b.hotel||b.car||"",
+            b.booking||"",
+            b.status === "cancellata" ? "❌ Cancellata" : b.status === "da_confermare" ? "⏳ Da confermare" : "✅ Confermata",
+            b.notes||"",
+          ]);
+        });
+        personRows.push([]); // blank separator between people
+      });
+      var wsP = XLSX.utils.aoa_to_sheet(personRows);
+      setColWidths(wsP, [20,20,22,14,8,10,8,12,13,13,12,10,22,16,14,24]);
+      styleHeaders(wsP, "A1:P1", 16);
+      XLSX.utils.book_append_sheet(wb, wsP, "Per Persona");
+
+      // ── Sheet Team ──
+      var teamRows = [["Nome","Ruolo","Telefono","Email","Nazionalità","Aeroporto","Documento","N° Doc","Scadenza","T-Shirt","Giacca","Pantaloni","Scarpe","Note"]];
+      people.forEach(function(p){
+        teamRows.push([p.name||"",p.role||"",p.phone||"",p.email||"",p.nationality||"",p.airport||"",p.docType||"",p.docNum||"",p.docExpiry||"",p.tshirt||"",p.jacket||"",p.pants||"",p.shoes||"",p.notes||""]);
+      });
+      var wsTeam = XLSX.utils.aoa_to_sheet(teamRows);
+      setColWidths(wsTeam, [20,22,14,24,12,8,14,12,10,8,8,10,6,24]);
+      styleHeaders(wsTeam, "A1:N1", 14);
+      XLSX.utils.book_append_sheet(wb, wsTeam, "Team");
+
+      var filename = "PasiniRacing_PianoStagione_" + new Date().toISOString().substring(0,10) + ".xlsx";
+      XLSX.writeFile(wb, filename);
+      setExported(true);
+      setTimeout(function(){ setExported(false); }, 3000);
+    } catch(e) {
+      console.error(e);
+      alert("Errore export: " + e.message);
+    }
+    setExporting(false);
+  }
+
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:20}}>📥 Esporta Piano Stagione</div>
+      <div style={{background:"#12121f",borderRadius:12,padding:24,border:"1px solid #1e3a8a33",maxWidth:560}}>
+        <div style={{fontSize:14,fontWeight:700,color:"#e8e8f0",marginBottom:8}}>📊 Export Excel professionale</div>
+        <div style={{fontSize:12,color:"#7090c0",marginBottom:20,lineHeight:1.8}}>
+          Il file include:
+          <br/>📋 <b style={{color:"#e8e8f0"}}>Piano Stagione</b> — tutte le prenotazioni ordinate per evento, tipo e persona
+          <br/>🏁 <b style={{color:"#e8e8f0"}}>Un foglio per ogni evento</b> — voli, hotel e auto separati con intestazioni
+          <br/>👤 <b style={{color:"#e8e8f0"}}>Per Persona</b> — itinerario completo di ogni membro
+          <br/>👥 <b style={{color:"#e8e8f0"}}>Team</b> — anagrafica completa con taglie e documenti
+          <br/>✅ Colonne ottimizzate, filtri automatici, righe congelate
+        </div>
+        <button onClick={exportToExcel} disabled={exporting}
+          style={{width:"100%",padding:14,background:exporting?"#222":exported?"#14532d":"#1e3a8a",color:exporting?"#555":exported?"#4caf50":"#fff",border:"none",borderRadius:10,cursor:exporting?"not-allowed":"pointer",fontWeight:700,fontSize:15,transition:"all 0.3s"}}>
+          {exporting ? "⏳ Esportazione in corso..." : exported ? "✅ File scaricato!" : "📥 Scarica Excel"}
+        </button>
+        {!exporting && <div style={{marginTop:10,fontSize:11,color:"#7090c0",textAlign:"center"}}>
+          {bookings.length} prenotazioni · {people.length} membri · {EVENTS.length} eventi
+        </div>}
+      </div>
+    </div>
+  );
+}) {
   var [exporting, setExporting] = useState(false);
 
   async function exportToExcel() {
