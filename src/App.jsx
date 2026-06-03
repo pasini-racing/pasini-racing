@@ -864,6 +864,305 @@ function AddBookingModal({ defaultEvent, onSave, onClose }) {
   );
 }
 
+
+// ── Excel Import ──────────────────────────────────────────
+function ExcelImport({ onImport, onClose }) {
+  var [file, setFile] = useState(null);
+  var [loading, setLoading] = useState(false);
+  var [preview, setPreview] = useState(null);
+  var [error, setError] = useState("");
+  var [selEvent, setSelEvent] = useState("");
+
+  function handleFile(f) {
+    if (!f) return;
+    setFile(f); setError(""); setPreview(null);
+  }
+
+  async function parseExcel() {
+    if (!file) return;
+    setLoading(true); setError("");
+    try {
+      var XLSX = await import("xlsx");
+      var data = await file.arrayBuffer();
+      var wb = XLSX.read(data, {type:"array"});
+      var allBookings = [];
+
+      // ── Detect Ryanair/compagnia aerea confirmation format ──
+      var isConfirmation = wb.SheetNames.some(function(s){
+        return s.toLowerCase().includes("prenotazion") || 
+               s.toLowerCase().includes("passegg") ||
+               s.toLowerCase().includes("booking") ||
+               s.toLowerCase().includes("itinerar");
+      });
+
+      if (isConfirmation) {
+        // Parse confirmation format (Ryanair, Vueling, etc.)
+        var prenotSheet = null, passeggSheet = null;
+        wb.SheetNames.forEach(function(s) {
+          var sl = s.toLowerCase();
+          if (sl.includes("prenotazion") || sl.includes("itinerar") || sl.includes("booking") || sl.includes("flight")) prenotSheet = s;
+          if (sl.includes("passegg") || sl.includes("passenger") || sl.includes("pax")) passeggSheet = s;
+        });
+        if (!prenotSheet) prenotSheet = wb.SheetNames[0];
+        if (!passeggSheet && wb.SheetNames.length > 1) passeggSheet = wb.SheetNames[1];
+
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[prenotSheet], {header:1, defval:""});
+        
+        // Extract flight details
+        var flights = { andata: {}, ritorno: {} };
+        var currentDir = null;
+        var bookingNum = "";
+        
+        rows.forEach(function(row) {
+          var r0 = String(row[0]||"").trim();
+          var r1 = String(row[1]||"").trim();
+          
+          // Booking number
+          if (r0.toLowerCase().includes("prenotazione") || r0.toLowerCase().includes("booking")) {
+            var m = r0.match(/:\s*([A-Z0-9]{5,8})/i) || r1.match(/([A-Z0-9]{5,8})/);
+            if (m) bookingNum = m[1];
+          }
+          
+          // Direction
+          if (r0.includes("ANDATA") || r0.includes("OUTBOUND") || r0.includes("DEPARTURE")) currentDir = "andata";
+          if (r0.includes("RITORNO") || r0.includes("RETURN") || r0.includes("INBOUND")) currentDir = "ritorno";
+          if (!currentDir) return;
+          
+          var f = flights[currentDir];
+          if (!f.booking) f.booking = bookingNum;
+          
+          var key = r0.toLowerCase();
+          if (key.includes("volo") || key.includes("flight") || key.includes("numero")) f.flight = r1.replace(/\s+/g,"");
+          else if (key.includes("data") || key.includes("date")) f.date = r1;
+          else if (key.includes("partenza") || key.includes("departure") || key.includes("depart")) {
+            if (r1.match(/\d{2}:\d{2}/)) f.depTime = r1;
+            else if (r1.length > 3) f.depAirport = r1.substring(0,3);
+          }
+          else if (key.includes("arrivo") || key.includes("arrival") || key.includes("arrive")) {
+            if (r1.match(/\d{2}:\d{2}/)) f.arrTime = r1;
+            else if (r1.length > 3) f.arrAirport = r1.substring(0,3);
+          }
+          else if (key.includes("aeroporto partenza") || key.includes("origin")) {
+            var code3 = r1.match(/^([A-Z]{3})\s*-/);
+            if (code3) f.depAirport = code3[1];
+          }
+          else if (key.includes("aeroporto arrivo") || key.includes("destination")) {
+            var code3 = r1.match(/^([A-Z]{3})\s*-/);
+            if (code3) f.arrAirport = code3[1];
+          }
+          else if (key.includes("compagnia") || key.includes("carrier") || key.includes("airline")) f.company = r1;
+        });
+
+        // Detect company from flight number if not found
+        if (!flights.andata.company) {
+          var fn = (flights.andata.flight||"").toUpperCase();
+          if (fn.startsWith("FR")) flights.andata.company = flights.ritorno.company = "Ryanair";
+          else if (fn.startsWith("VY")) flights.andata.company = flights.ritorno.company = "Vueling";
+          else if (fn.startsWith("W4") || fn.startsWith("W6")) flights.andata.company = flights.ritorno.company = "Wizz";
+          else if (fn.startsWith("U2")) flights.andata.company = flights.ritorno.company = "EasyJet";
+          else if (fn.startsWith("TP")) flights.andata.company = flights.ritorno.company = "TAP";
+        }
+
+        // Build dep/arr strings
+        ["andata","ritorno"].forEach(function(dir) {
+          var f = flights[dir];
+          if (f.depAirport && f.depTime) f.dep = f.depAirport + " " + f.depTime;
+          else if (f.depAirport) f.dep = f.depAirport;
+          else if (f.depTime) f.dep = f.depTime;
+          if (f.arrAirport && f.arrTime) f.arr = f.arrAirport + " " + f.arrTime;
+          else if (f.arrAirport) f.arr = f.arrAirport;
+          else if (f.arrTime) f.arr = f.arrTime;
+          if (!f.booking) f.booking = bookingNum;
+          if (!f.company) f.company = "";
+        });
+
+        // Parse passengers
+        var passengers = [];
+        if (passeggSheet) {
+          var pRows = XLSX.utils.sheet_to_json(wb.Sheets[passeggSheet], {header:1, defval:""});
+          pRows.forEach(function(row) {
+            var nameCell = String(row[1]||row[0]||"").trim().toUpperCase();
+            if (!nameCell || nameCell.includes("NOME") || nameCell.includes("ELENCO") || nameCell.includes("#")) return;
+            // Match against PEOPLE
+            var found = PEOPLE.find(function(p) {
+              var pName = p.name.toUpperCase();
+              var nameParts = pName.split(" ");
+              return nameParts.some(function(part) { 
+                return part.length > 3 && nameCell.includes(part); 
+              });
+            });
+            if (found && !passengers.includes(found.id)) passengers.push(found.id);
+          });
+        }
+
+        // Create bookings for each passenger
+        passengers.forEach(function(personId) {
+          if (flights.andata.flight) {
+            allBookings.push({
+              event: selEvent, person: personId, type: "volo", dir: "andata",
+              flight: flights.andata.flight, company: flights.andata.company,
+              dep: flights.andata.dep||"", arr: flights.andata.arr||"",
+              date: flights.andata.date||"", booking: flights.andata.booking||bookingNum,
+              baggage: "", notes: ""
+            });
+          }
+          if (flights.ritorno.flight) {
+            allBookings.push({
+              event: selEvent, person: personId, type: "volo", dir: "ritorno",
+              flight: flights.ritorno.flight, company: flights.ritorno.company,
+              dep: flights.ritorno.dep||"", arr: flights.ritorno.arr||"",
+              date: flights.ritorno.date||"", booking: flights.ritorno.booking||bookingNum,
+              baggage: "", notes: ""
+            });
+          }
+        });
+
+      } else {
+        // General Excel format - try to parse row by row
+        wb.SheetNames.forEach(function(sheetName) {
+          var sheetRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:""});
+          sheetRows.forEach(function(row) {
+            if (!row || row.length < 2) return;
+            var rowStr = row.join(" ").toLowerCase();
+            var type = null;
+            if (rowStr.includes("volo") || rowStr.match(/fr\d|vy\d|w4\d|u2\d/)) type = "volo";
+            else if (rowStr.includes("hotel") || rowStr.includes("nh ") || rowStr.includes("ibis")) type = "hotel";
+            else if (rowStr.includes("gold car") || rowStr.includes("noleggio")) type = "auto";
+            else if (rowStr.includes("parkingo") || rowStr.includes("parcheggio")) type = "parcheggio";
+            if (!type) return;
+            var personId = null;
+            PEOPLE.forEach(function(p) {
+              p.name.toUpperCase().split(" ").forEach(function(part) {
+                if (part.length > 3 && rowStr.toUpperCase().includes(part)) personId = p.id;
+              });
+            });
+            if (!personId || !selEvent) return;
+            var b = {event:selEvent, person:personId, type:type};
+            if (type==="volo") {
+              row.forEach(function(cell) {
+                var s = String(cell).trim();
+                if (/^[A-Z]{2,3}\d+$/.test(s)) b.flight=s;
+                else if (/^\d{2}:\d{2}$/.test(s)) { if(!b.depTime) b.depTime=s; else b.arrTime=s; }
+                else if (/^[A-Z]{3}$/.test(s)) { if(!b.depCode) b.depCode=s; else b.arrCode=s; }
+                else if (/^[A-Z0-9]{5,8}$/.test(s)) b.booking=s;
+              });
+              b.dep = (b.depCode||"") + (b.depTime?" "+b.depTime:"");
+              b.arr = (b.arrCode||"") + (b.arrTime?" "+b.arrTime:"");
+            } else if (type==="hotel") {
+              b.hotel = row.filter(function(c){return String(c).length>4;}).slice(0,2).join(" ");
+            } else {
+              b.car = row.filter(function(c){return String(c).length>2;}).slice(0,2).join(" ");
+            }
+            allBookings.push(b);
+          });
+        });
+      }
+
+      if (allBookings.length === 0) {
+        setError("Nessuna prenotazione trovata. Verifica il formato del file.");
+      } else {
+        setPreview(allBookings);
+      }
+    } catch(e) {
+      setError("Errore lettura file: " + e.message);
+      console.error(e);
+    }
+    setLoading(false);
+  }
+
+  function confirmImport() {
+    if (!preview || !preview.length) return;
+    onImport(preview);
+    onClose();
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,overflowY:"auto",padding:"20px 16px"}}>
+      <div style={{maxWidth:600,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#4caf50"}}>📊 Importa da Excel</div>
+          <button onClick={onClose} style={{background:"#3a1a1a",color:"#ff6060",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>✕ Chiudi</button>
+        </div>
+
+        <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #1e3a8a33",marginBottom:16}}>
+          <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>
+            Supporta: <b style={{color:"#4a9eff"}}>Conferme Ryanair, Vueling, TAP, EasyJet, Wizz</b> e file Excel generali con prenotazioni hotel, auto, parcheggi.
+          </div>
+
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:5,fontWeight:600}}>EVENTO DI DESTINAZIONE</label>
+            <select value={selEvent} onChange={function(e){setSelEvent(e.target.value);}}
+              style={{width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:selEvent?"#e8e8f0":"#7090c0",fontSize:13,boxSizing:"border-box",outline:"none"}}>
+              <option value="">-- Seleziona evento --</option>
+              {EVENTS.map(function(ev){ return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" ("+ev.dates+")"); })}
+            </select>
+          </div>
+
+          <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:10,padding:"20px 16px",textAlign:"center",cursor:"pointer",marginBottom:14}}>
+            <input type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={function(e){handleFile(e.target.files[0]);}}/>
+            {file ? (
+              <div>
+                <div style={{fontSize:28,marginBottom:6}}>📊</div>
+                <div style={{fontSize:13,color:"#4caf50",fontWeight:700}}>{file.name}</div>
+                <div style={{fontSize:11,color:"#7090c0",marginTop:4}}>Tocca per cambiare</div>
+              </div>
+            ) : (
+              <div>
+                <div style={{fontSize:28,marginBottom:8}}>📎</div>
+                <div style={{fontSize:14,color:"#4a9eff",fontWeight:700}}>Carica file Excel</div>
+                <div style={{fontSize:11,color:"#7090c0",marginTop:4}}>.xlsx o .xls</div>
+              </div>
+            )}
+          </label>
+
+          {error && <div style={{color:"#ff6060",fontSize:12,marginBottom:12,padding:"8px 12px",background:"#3a1a1a",borderRadius:8}}>{error}</div>}
+
+          {!preview && (
+            <button onClick={parseExcel} disabled={!file||!selEvent||loading}
+              style={{width:"100%",padding:13,background:(file&&selEvent&&!loading)?"#1e3a8a":"#1a1a2a",color:(file&&selEvent&&!loading)?"#fff":"#444",border:"none",borderRadius:10,cursor:(file&&selEvent&&!loading)?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
+              {loading ? "⏳ Analisi in corso..." : "📊 Analizza e importa"}
+            </button>
+          )}
+        </div>
+
+        {preview && (
+          <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #4caf5033"}}>
+            <div style={{fontSize:14,fontWeight:800,color:"#4caf50",marginBottom:12}}>
+              ✅ Trovate {preview.length} prenotazioni
+            </div>
+            <div style={{maxHeight:320,overflowY:"auto",marginBottom:16}}>
+              {preview.map(function(b,i){
+                var ev = EVENTS.find(function(e){return e.id===b.event;});
+                var person = PEOPLE.find(function(p){return p.id===b.person;});
+                var tc = b.type==="volo"?"#4a9eff":b.type==="hotel"?"#4caf50":"#ff9800";
+                var icon = b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗";
+                return (
+                  <div key={i} style={{display:"flex",gap:8,padding:"8px 10px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12,alignItems:"center",borderLeft:"3px solid "+tc}}>
+                    <span>{icon}</span>
+                    <span style={{color:tc,fontWeight:700,minWidth:24}}>{b.dir==="andata"?"↗":b.dir==="ritorno"?"↙":""}</span>
+                    <span style={{color:"#e8e8f0",fontWeight:700,flex:1}}>{person?person.name:b.person}</span>
+                    {b.flight && <span style={{color:"#7090c0"}}>{b.flight}</span>}
+                    {b.dep && <span style={{color:"#7090c0"}}>{b.dep}→{b.arr}</span>}
+                    {b.hotel && <span style={{color:"#7090c0"}}>{String(b.hotel).substring(0,20)}</span>}
+                    {b.booking && <span style={{color:"#ff9800",fontFamily:"monospace"}}>#{b.booking}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={function(){setPreview(null);}} style={{flex:1,padding:11,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>← Rianalizza</button>
+              <button onClick={confirmImport} style={{flex:2,padding:11,background:"#14532d",color:"#4caf50",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                💾 Importa {preview.length} prenotazioni
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ── TeamManager ───────────────────────────────────────────
 var EMPTY_USER = {id:"",name:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italia",tshirt:"M",jacket:"M",pants:"M",shoes:"42",notes:"",pin:"",username:""};
 
@@ -1033,6 +1332,7 @@ export default function App() {
   var [addModal, setAddModal] = useState(null);
   var [editUser, setEditUser] = useState(null);
   var [confirmDeleteUser, setConfirmDeleteUser] = useState(null);
+  var [showExcelImport, setShowExcelImport] = useState(false);
   var [confirmDelete, setConfirmDelete] = useState(null);
   var [toast, setToast] = useState(null);
   var [fbLoaded, setFbLoaded] = useState(false);
@@ -1151,6 +1451,17 @@ export default function App() {
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       {editB && <EditModal booking={editB} onSave={handleSave} onClose={function(){setEditB(null);}} onDelete={function(){setConfirmDelete(editB);setEditB(null);}}/>}
       {pdfPreview && <PDFPreview data={pdfPreview.data} name={pdfPreview.name} onClose={function(){setPdfPreview(null);}}/>}
+      {showExcelImport && <ExcelImport
+        onImport={function(bookings) {
+          bookings.forEach(function(b) {
+            fbAdd("bookings", b).then(function(ref) {
+              if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});
+            }).catch(function(e){console.error(e);});
+          });
+          showToast("Importate " + bookings.length + " prenotazioni ✓");
+        }}
+        onClose={function(){setShowExcelImport(false);}}
+      />}
       {addModal!==null && <AddBookingModal defaultEvent={addModal||undefined}
         onSave={function(bs){bs.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat(bs);});});});}}
         onClose={function(){setAddModal(null);}}/>}
@@ -1387,6 +1698,10 @@ export default function App() {
         {view==="add" && isAdmin && (
           <div>
             <div style={{fontSize:18,fontWeight:800,color:"#4caf50",marginBottom:16}}>➕ Nuova Prenotazione</div>
+            <button onClick={function(){setShowExcelImport(true);}}
+              style={{width:"100%",maxWidth:560,padding:14,background:"#0d2a1a",color:"#4caf50",border:"2px solid #4caf5044",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:16,display:"block"}}>
+              📊 Importa da Excel (PIANO_STAGIONE_2026.xlsx)
+            </button>
             <div style={{maxWidth:560}}>
               <AddBookingForm onSave={function(bs){bs.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat(bs);});});});setView("overview");}}/>
             </div>
@@ -1401,4 +1716,3 @@ export default function App() {
     </div>
   );
 }
-
