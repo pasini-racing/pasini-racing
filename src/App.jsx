@@ -1281,7 +1281,7 @@ function ExcelImport({ onImport, onClose }) {
 
 
 // ── TeamManager ───────────────────────────────────────────
-var EMPTY_USER = {id:"",name:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italia",tshirt:"M",jacket:"M",pants:"M",shoes:"42",notes:"",pin:"",username:""};
+var EMPTY_USER = {id:"",name:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italia",tshirt:"M",jacket:"M",pants:"M",shoes:"42",notes:"",pin:"",username:"",address:"",airport:""};
 
 function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
   var [showForm, setShowForm] = useState(false);
@@ -1319,6 +1319,22 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
           <div><label style={lbl}>Telefono</label><input value={form.phone||""} onChange={function(e){set("phone",e.target.value);}} placeholder="+39 333..." style={inp}/></div>
           <div><label style={lbl}>Email</label><input value={form.email||""} onChange={function(e){set("email",e.target.value);}} placeholder="nome@email.com" style={inp}/></div>
           <div><label style={lbl}>Nazionalità</label><input value={form.nationality||""} onChange={function(e){set("nationality",e.target.value);}} placeholder="es. Italia" style={inp}/></div>
+          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Indirizzo di residenza</label><input value={form.address||""} onChange={function(e){set("address",e.target.value);}} placeholder="es. Via Roma 1, Milano" style={inp}/></div>
+          <div>
+            <label style={lbl}>Aeroporto preferito</label>
+            <select value={form.airport||""} onChange={function(e){set("airport",e.target.value);}} style={inp}>
+              <option value="">-- Seleziona --</option>
+              <option value="BGY">BGY — Milano/Bergamo Orio al Serio</option>
+              <option value="MXP">MXP — Milano Malpensa</option>
+              <option value="BLQ">BLQ — Bologna Marconi</option>
+              <option value="FCO">FCO — Roma Fiumicino</option>
+              <option value="VCE">VCE — Venezia Marco Polo</option>
+              <option value="TSF">TSF — Treviso</option>
+              <option value="TRN">TRN — Torino Caselle</option>
+              <option value="GRS">GRS — Grosseto</option>
+              <option value="BCN">BCN — Barcellona</option>
+            </select>
+          </div>
         </div>
         {sec("Documento","🪪")}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
@@ -1373,6 +1389,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
               {p.docNum&&<span style={{background:"#2a1a3d22",color:"#9c27b0",borderRadius:5,padding:"2px 8px",fontSize:11}}>🪪 {p.docNum}</span>}
               {p.tshirt&&<span style={{background:"#3d2a1a22",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>👕 {p.tshirt}</span>}
             </div>
+            {p.airport&&<div style={{background:"#1a2a1a",borderRadius:5,padding:"4px 8px",fontSize:11,color:"#4caf50",border:"1px solid #4caf5022",marginBottom:4}}>✈ Aeroporto: <b>{p.airport}</b></div>}
             {p.username&&<div style={{background:"#0d1a2a",borderRadius:5,padding:"4px 8px",fontSize:11,color:"#4a9eff",border:"1px solid #1e3a8a22"}}>🔑 {p.username} / {p.pin||"—"}{p.isAdmin&&<span style={{color:"#ff9800",marginLeft:6,fontWeight:700}}>ADMIN</span>}</div>}
             {p.notes&&<div style={{marginTop:6,fontSize:11,color:"#c0a060",fontStyle:"italic"}}>📋 {p.notes}</div>}
           </div>
@@ -1381,6 +1398,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
     </div>
   );
 }
+
 // ── LoginScreen ───────────────────────────────────────────
 function LoginScreen({ people, onLogin }) {
   var [username, setUsername] = useState("");
@@ -1573,7 +1591,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"team",l:"⚙️",adminOnly:true}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"team",l:"⚙️",adminOnly:true}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -1900,6 +1918,10 @@ export default function App() {
           <ExportView bookings={bookings} people={people} eventNotes={eventNotes}/>
         )}
 
+        {view==="flights" && isAdmin && (
+          <FlightPlanner people={people} bookings={bookings}/>
+        )}
+
         {view==="team" && isAdmin && (
           <TeamManager people={people} setPeople={setPeople} setConfirmDeleteUser={setConfirmDeleteUser} showToast={showToast}/>
         )}
@@ -2121,6 +2143,212 @@ function ExportView({ bookings, people, eventNotes }) {
           Il file sarà scaricato automaticamente nel tuo dispositivo
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── FlightPlanner ─────────────────────────────────────────
+var AIRPORTS = {
+  BGY: { name:"Milano/Bergamo", code:"BGY", lat:45.67, lng:9.70 },
+  MXP: { name:"Milano Malpensa", code:"MXP", lat:45.63, lng:8.72 },
+  BLQ: { name:"Bologna", code:"BLQ", lat:44.53, lng:11.29 },
+  FCO: { name:"Roma Fiumicino", code:"FCO", lat:41.80, lng:12.25 },
+  VCE: { name:"Venezia", code:"VCE", lat:45.50, lng:12.35 },
+  TSF: { name:"Treviso", code:"TSF", lat:45.65, lng:12.19 },
+  TRN: { name:"Torino", code:"TRN", lat:45.20, lng:7.65 },
+  BCN: { name:"Barcellona", code:"BCN", lat:41.30, lng:2.08 },
+};
+
+var EVENT_AIRPORTS = {
+  TEST1_BCN:    { dest:"BCN", destName:"Barcellona" },
+  TEST2_JEREZ:  { dest:"AGP", destName:"Malaga/Jerez" },
+  R1_BARCELLONA:{ dest:"BCN", destName:"Barcellona" },
+  R2_ESTORIL:   { dest:"LIS", destName:"Lisbona" },
+  R3_JEREZ:     { dest:"SVQ", destName:"Siviglia" },
+  R4_MAGNY:     { dest:"LYS", destName:"Lione" },
+  TEST3_VALENCIA:{ dest:"VLC", destName:"Valencia" },
+  R5_VALENCIA:  { dest:"VLC", destName:"Valencia" },
+  R6_ARAGON:    { dest:"ZAZ", destName:"Saragozza" },
+  R7_MISANO:    { dest:"RMI", destName:"Rimini" },
+};
+
+var LOW_COST = ["Ryanair","Wizz","EasyJet","Vueling","Transavia","Volotea"];
+
+function buildGoogleFlightsUrl(origin, dest, dateOut, dateBack) {
+  var base = "https://www.google.com/travel/flights";
+  var params = "?q=Voli+" + origin + "+"+dest;
+  if (dateOut) params += "&hl=it";
+  return base + params;
+}
+
+function buildSkycannerUrl(origin, dest, dateOut, dateBack) {
+  var dOut = dateOut ? dateOut.replace(/-/g,"") : "";
+  var dBack = dateBack ? dateBack.replace(/-/g,"") : "";
+  if (dOut && dBack) {
+    return "https://www.skyscanner.it/transport/flights/"+origin.toLowerCase()+"/"+dest.toLowerCase()+"/"+dOut+"/"+dBack+"/?adults=1&directFlightsOnly=true";
+  }
+  return "https://www.skyscanner.it/transport/flights/"+origin.toLowerCase()+"/"+dest.toLowerCase()+"/";
+}
+
+function FlightPlanner({ people, bookings }) {
+  var [selEvent, setSelEvent] = useState("");
+  var [dateOut, setDateOut] = useState("");
+  var [dateBack, setDateBack] = useState("");
+  var [groups, setGroups] = useState(null);
+
+  function buildGroups() {
+    if (!selEvent) return;
+    var ev = EVENTS.find(function(e){return e.id===selEvent;});
+    if (!ev) return;
+
+    // Get people going to this event (from existing bookings or all staff)
+    var eventPeople = bookings
+      .filter(function(b){return b.event===selEvent;})
+      .map(function(b){return b.person;})
+      .filter(function(v,i,a){return a.indexOf(v)===i;});
+    
+    // If no bookings yet, use all people
+    if (eventPeople.length === 0) {
+      eventPeople = people.map(function(p){return p.id;});
+    }
+
+    // Group by airport
+    var byAirport = {};
+    eventPeople.forEach(function(pid) {
+      var person = people.find(function(p){return p.id===pid;});
+      if (!person) return;
+      var airport = person.airport || "BGY"; // default BGY
+      if (!byAirport[airport]) byAirport[airport] = [];
+      byAirport[airport].push(person);
+    });
+
+    // Split into groups of max 5
+    var result = [];
+    Object.keys(byAirport).forEach(function(airportCode) {
+      var pList = byAirport[airportCode];
+      var ap = AIRPORTS[airportCode] || {name:airportCode, code:airportCode};
+      var destInfo = EVENT_AIRPORTS[selEvent] || {dest:"???", destName:"Destinazione"};
+      
+      for (var i=0; i<pList.length; i+=5) {
+        var group = pList.slice(i, i+5);
+        result.push({
+          airport: ap,
+          dest: destInfo,
+          people: group,
+          groupNum: Math.floor(i/5)+1,
+          totalGroups: Math.ceil(pList.length/5),
+          googleUrl: buildGoogleFlightsUrl(ap.code, destInfo.dest, dateOut, dateBack),
+          skycannerUrl: buildSkycannerUrl(ap.code, destInfo.dest, dateOut, dateBack),
+          ryanairUrl: "https://www.ryanair.com/it/it/trip/flights/select?ADT="+group.length+"&orig="+ap.code+"&dest="+destInfo.dest+(dateOut?"&dateOut="+dateOut:"")+"&isConnectedFlight=false&discount=0&promoCode=&sFlight=&ryanairView=true",
+          wizzUrl: "https://wizzair.com/it-it/flights/timetable?departureStation="+ap.code+"&arrivalStation="+destInfo.dest,
+          vuUrl: "https://www.vueling.com/it/cerca-il-tuo-volo#/?from="+ap.code+"&to="+destInfo.dest,
+        });
+      }
+    });
+
+    setGroups(result);
+  }
+
+  var inp = {padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,outline:"none",boxSizing:"border-box"};
+
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:6}}>🗺️ Pianificatore Voli</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:20}}>Organizza gruppi di max 5 persone per aeroporto — voli low cost</div>
+
+      <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #1e3a8a33",marginBottom:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:5,fontWeight:600}}>EVENTO</label>
+            <select value={selEvent} onChange={function(e){setSelEvent(e.target.value);setGroups(null);}} style={Object.assign({},inp,{width:"100%"})}>
+              <option value="">-- Seleziona evento --</option>
+              {EVENTS.map(function(ev){
+                var dest = EVENT_AIRPORTS[ev.id];
+                return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" → "+(dest?dest.destName:"?")+" ("+ev.dates+")");
+              })}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:5,fontWeight:600}}>DATA ANDATA</label>
+            <input type="date" value={dateOut} onChange={function(e){setDateOut(e.target.value);setGroups(null);}} style={Object.assign({},inp,{width:"100%"})}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:5,fontWeight:600}}>DATA RITORNO</label>
+            <input type="date" value={dateBack} onChange={function(e){setDateBack(e.target.value);setGroups(null);}} style={Object.assign({},inp,{width:"100%"})}/>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-end"}}>
+            <button onClick={buildGroups} disabled={!selEvent}
+              style={{width:"100%",padding:"10px",background:selEvent?"#1e3a8a":"#222",color:selEvent?"#fff":"#555",border:"none",borderRadius:8,cursor:selEvent?"pointer":"not-allowed",fontWeight:700,fontSize:13}}>
+              🗺️ Organizza gruppi
+            </button>
+          </div>
+        </div>
+
+        {!groups && selEvent && (
+          <div style={{fontSize:12,color:"#7090c0",background:"#0d0d1a",borderRadius:8,padding:12}}>
+            💡 Le persone vengono raggruppate per aeroporto preferito (impostato nell'anagrafica ⚙️). Gruppi di max 5 persone per tratta.
+          </div>
+        )}
+      </div>
+
+      {groups && groups.map(function(g, gi) {
+        return (
+          <div key={gi} style={{background:"#12121f",borderRadius:12,padding:20,marginBottom:16,border:"1px solid #1e3a8a44"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>
+                  ✈ {g.airport.code} → {g.dest.dest}
+                  <span style={{fontSize:12,color:"#7090c0",marginLeft:8}}>Gruppo {g.groupNum}{g.totalGroups>1?" di "+g.totalGroups:""}</span>
+                </div>
+                <div style={{fontSize:12,color:"#7090c0",marginTop:2}}>
+                  {g.airport.name} → {g.dest.destName} · {g.people.length} {g.people.length===1?"persona":"persone"}
+                  {dateOut && <span style={{marginLeft:8}}>· Andata: {dateOut}</span>}
+                  {dateBack && <span style={{marginLeft:8}}>· Ritorno: {dateBack}</span>}
+                </div>
+              </div>
+              <span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:700}}>
+                {g.people.length}/5 posti
+              </span>
+            </div>
+
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+              {g.people.map(function(p){return(
+                <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,background:"#0d0d1a",borderRadius:8,padding:"6px 10px",border:"1px solid #1e3a8a22"}}>
+                  <div style={{width:26,height:26,borderRadius:"50%",background:"#1e3a8a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff",flexShrink:0}}>{p.name.charAt(0)}</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#e8e8f0"}}>{p.name}</div>
+                    <div style={{fontSize:10,color:"#7090c0"}}>{p.role}</div>
+                  </div>
+                </div>
+              );})}
+            </div>
+
+            <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>🔍 Cerca voli low cost</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+              {[
+                {label:"Google Flights", url:g.googleUrl, color:"#4285f4", icon:"🔍"},
+                {label:"Skyscanner", url:g.skycannerUrl, color:"#0770e3", icon:"🌐"},
+                {label:"Ryanair", url:g.ryanairUrl, color:"#073590", icon:"✈"},
+                {label:"Wizz Air", url:g.wizzUrl, color:"#c6007e", icon:"✈"},
+                {label:"Vueling", url:g.vuUrl, color:"#c8a800", icon:"✈"},
+              ].map(function(link){return(
+                <a key={link.label} href={link.url} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",alignItems:"center",gap:6,padding:"9px 12px",background:"#0d0d1a",borderRadius:8,border:"2px solid "+link.color+"44",color:link.color,textDecoration:"none",fontSize:12,fontWeight:700,transition:"border-color 0.2s"}}>
+                  <span>{link.icon}</span>
+                  <span>{link.label}</span>
+                </a>
+              );})}
+            </div>
+          </div>
+        );
+      })}
+
+      {groups && groups.length === 0 && (
+        <div style={{background:"#12121f",borderRadius:12,padding:24,textAlign:"center",color:"#7090c0",fontSize:13}}>
+          Nessuna persona trovata per questo evento.<br/>
+          Aggiungi prima le prenotazioni o imposta l'aeroporto preferito nell'anagrafica ⚙️
+        </div>
+      )}
     </div>
   );
 }
