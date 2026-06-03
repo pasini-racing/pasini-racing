@@ -1381,7 +1381,6 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
     </div>
   );
 }
-
 // ── LoginScreen ───────────────────────────────────────────
 function LoginScreen({ people, onLogin }) {
   var [username, setUsername] = useState("");
