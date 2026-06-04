@@ -2257,6 +2257,8 @@ function ExportView({ bookings, people, eventNotes }) {
       </div>
     </div>
   );
+}
+
 // ── FlightPlanner ─────────────────────────────────────────
 var AIRPORTS = {
   BGY: { name:"Milano/Bergamo", code:"BGY", lat:45.67, lng:9.70 },
