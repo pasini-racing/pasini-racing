@@ -1801,6 +1801,7 @@ export default function App() {
         })()}
 
         {view==="event" && !selEvent && (
+          <div>
           <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
             <button onClick={function(){setShowPast(function(v){return !v;});}} style={{fontSize:11,padding:"5px 12px",background:showPast?"#1e3a8a":"#1a2a1a",color:showPast?"#4a9eff":"#4caf50",border:"1px solid #ffffff22",borderRadius:6,cursor:"pointer"}}>
               {showPast?"🙈 Nascondi eventi passati":"📅 Mostra tutti gli eventi"}
@@ -1823,6 +1824,7 @@ export default function App() {
                 </div>
               );
             })}
+          </div>
           </div>
         )}
 
