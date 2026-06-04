@@ -1396,6 +1396,7 @@ export default function App() {
   var [confirmDelete, setConfirmDelete] = useState(null);
   var [toast, setToast] = useState(null);
   var [fbLoaded, setFbLoaded] = useState(false);
+  var [personEventFilter, setPersonEventFilter] = useState(null);
 
   // Firebase sync
   useEffect(function() {
@@ -1747,12 +1748,11 @@ export default function App() {
           var person=people.find(function(p){return p.id===selPerson;});
           var events=[];
           personBs.forEach(function(b){if(!events.includes(b.event)) events.push(b.event);});
-          var [personEventFilter, setPersonEventFilter] = useState(null);
           var visibleEvents = personEventFilter ? events.filter(function(e){return e===personEventFilter;}) : events;
           return(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:8}}>
-                <button onClick={function(){setSelPerson(null);}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>← Lista</button>
+                <button onClick={function(){setSelPerson(null);setPersonEventFilter(null);}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>← Lista</button>
                 <button onClick={function(){setPdfPreview({data:buildPDFData(selPerson,bookings,eventNotes),name:person?person.name:selPerson});}} style={{background:"#1e3a8a",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>📄 PDF</button>
               </div>
               {events.length > 1 && (
