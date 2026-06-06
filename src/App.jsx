@@ -1798,6 +1798,9 @@ export default function App() {
                   </div>
                 );
               })}
+              <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #4caf5022"}}>
+                <MealQRSection personId={selPerson} person={person} events={events}/>
+              </div>
             </div>
           );
         })()}
@@ -1856,7 +1859,6 @@ export default function App() {
                 <textarea value={eventNotes[evNK]||""} onChange={function(e){setNote(evNK,e.target.value);}} placeholder="Note logistiche..." style={{width:"100%",background:"#0d0d1a",border:"1px solid #f0c04022",borderRadius:6,color:"#e8c87a",fontSize:12,resize:"vertical",minHeight:48,padding:"7px 9px",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
               </div>}
               <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
-              <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
               {filterType==="all" ? people2.map(function(pid){
                 var person2=people.find(function(p){return p.id===pid;});
                 var pBs=eventBs.filter(function(b){return b.person===pid;});
@@ -1871,11 +1873,7 @@ export default function App() {
                     {eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
                   </div>
                 );
-              })}
-              {/* QR Code Pasti */}
-              <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:16,border:"1px solid #4caf5022"}}>
-                <MealQRSection personId={selPerson} person={people.find(function(p){return p.id===selPerson;})} events={visibleEvents}/>
-              </div>
+              }) : eventBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
             </div>
           );
         })()}
