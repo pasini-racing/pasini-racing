@@ -1187,7 +1187,7 @@ function ExcelImport({ onImport, onClose }) {
 
 
 // ── TeamManager ───────────────────────────────────────────
-var EMPTY_USER = {id:"",name:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italia",tshirt:"M",jacket:"M",pants:"M",shoes:"42",notes:"",pin:"",username:"",address:"",airport:""};
+var EMPTY_USER = {id:"",name:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italia",tshirt:"M",jacket:"M",pants:"M",hoodie:"M",notes:"",pin:"",username:"",address:"",airport:""};
 
 function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
   var [showForm, setShowForm] = useState(false);
@@ -1250,8 +1250,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
         </div>
         {sec("Abbigliamento","👕")}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:4}}>
-          {[["tshirt","T-Shirt"],["jacket","Giacca"],["pants","Pantaloni"]].map(function(pair){return(<div key={pair[0]}><label style={lbl}>{pair[1]}</label><select value={form[pair[0]]||"M"} onChange={function(e){set(pair[0],e.target.value);}} style={inp}>{["XS","S","M","L","XL","XXL","XXXL"].map(function(s){return<option key={s}>{s}</option>;})}</select></div>);})}
-          <div><label style={lbl}>Scarpe</label><select value={form.shoes||"42"} onChange={function(e){set("shoes",e.target.value);}} style={inp}>{["38","39","40","41","42","43","44","45","46"].map(function(s){return<option key={s}>{s}</option>;})}</select></div>
+          {[["tshirt","T-Shirt"],["jacket","Giacca"],["pants","Pantaloni"],["hoodie","Felpa"]].map(function(pair){return(<div key={pair[0]}><label style={lbl}>{pair[1]}</label><select value={form[pair[0]]||"M"} onChange={function(e){set(pair[0],e.target.value);}} style={inp}>{["XS","S","M","L","XL","XXL","XXXL"].map(function(s){return<option key={s}>{s}</option>;})}</select></div>);})}
         </div>
         {sec("Accesso App","🔑")}
         <div style={{background:"#0d1a2a",borderRadius:8,padding:14,marginBottom:4,border:"1px solid #1e3a8a33"}}>
@@ -1293,7 +1292,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
               {p.phone&&<span style={{background:"#1a4a1a22",color:"#4caf50",borderRadius:5,padding:"2px 8px",fontSize:11}}>📞 {p.phone}</span>}
               {p.email&&<span style={{background:"#1e3a8a22",color:"#4a9eff",borderRadius:5,padding:"2px 8px",fontSize:11,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>✉️ {p.email}</span>}
               {p.docNum&&<span style={{background:"#2a1a3d22",color:"#9c27b0",borderRadius:5,padding:"2px 8px",fontSize:11}}>🪪 {p.docNum}</span>}
-              {p.tshirt&&<span style={{background:"#3d2a1a22",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>👕 {p.tshirt}</span>}
+              {p.tshirt&&<span style={{background:"#3d2a1a22",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>👕 {p.tshirt}</span>}{p.hoodie&&<span style={{background:"#2a1a3d22",color:"#9c27b0",borderRadius:5,padding:"2px 8px",fontSize:11}}>🧥 {p.hoodie}</span>}
             </div>
             {p.airport&&<div style={{background:"#1a2a1a",borderRadius:5,padding:"4px 8px",fontSize:11,color:"#4caf50",border:"1px solid #4caf5022",marginBottom:4}}>✈ Aeroporto: <b>{p.airport}</b></div>}
             {p.username&&<div style={{background:"#0d1a2a",borderRadius:5,padding:"4px 8px",fontSize:11,color:"#4a9eff",border:"1px solid #1e3a8a22"}}>🔑 {p.username} / {p.pin||"—"}{p.isAdmin&&<span style={{color:"#ff9800",marginLeft:6,fontWeight:700}}>ADMIN</span>}</div>}
@@ -1511,6 +1510,8 @@ export default function App() {
   });
 
   var personBs = useMemo(function(){return selPerson?bookings.filter(function(b){return b.person===selPerson;}):[]; },[selPerson,bookings]);
+  // When personEventFilter is active, filter personBs to that event only
+  var filteredPersonBs = useMemo(function(){return personEventFilter?personBs.filter(function(b){return b.event===personEventFilter;}):personBs;},[personBs,personEventFilter]);
   var eventBs = useMemo(function(){
     if(!selEvent) return [];
     var b=bookings.filter(function(b){return b.event===selEvent;});
@@ -1748,6 +1749,7 @@ export default function App() {
           var person=people.find(function(p){return p.id===selPerson;});
           var events=[];
           personBs.forEach(function(b){if(!events.includes(b.event)) events.push(b.event);});
+          // visibleEvents: which event tabs to show (filter buttons)
           var visibleEvents = personEventFilter ? events.filter(function(e){return e===personEventFilter;}) : events;
           return(
             <div>
@@ -1771,15 +1773,15 @@ export default function App() {
                   <div style={{fontSize:20,fontWeight:800}}>{person?person.name:selPerson}</div>
                   <div style={{color:"#7090c0",fontSize:12}}>{person?person.role:""}</div>
                   <div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>
-                    <span style={{background:"#1e3a8a22",color:"#4a9eff",borderRadius:5,padding:"2px 8px",fontSize:11}}>✈ {personBs.filter(function(b){return b.type==="volo";}).length}</span>
-                    <span style={{background:"#1a4a1a22",color:"#4caf50",borderRadius:5,padding:"2px 8px",fontSize:11}}>🏨 {personBs.filter(function(b){return b.type==="hotel";}).length}</span>
-                    <span style={{background:"#3d2a1a22",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>🚗 {personBs.filter(function(b){return b.type==="auto";}).length}</span>
+                    <span style={{background:"#1e3a8a22",color:"#4a9eff",borderRadius:5,padding:"2px 8px",fontSize:11}}>✈ {filteredPersonBs.filter(function(b){return b.type==="volo";}).length}</span>
+                    <span style={{background:"#1a4a1a22",color:"#4caf50",borderRadius:5,padding:"2px 8px",fontSize:11}}>🏨 {filteredPersonBs.filter(function(b){return b.type==="hotel";}).length}</span>
+                    <span style={{background:"#3d2a1a22",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>🚗 {filteredPersonBs.filter(function(b){return b.type==="auto";}).length}</span>
                   </div>
                 </div>
               </div>
               {events.map(function(evId){
                 var ev=EVENTS.find(function(e){return e.id===evId;});
-                var evB=personBs.filter(function(b){return b.event===evId;});
+                var evB=filteredPersonBs.filter(function(b){return b.event===evId;});
                 var nk=selPerson+"_"+evId;
                 return(
                   <div key={evId} style={{background:"#12121f",borderRadius:12,padding:18,marginBottom:14,border:"1px solid #ffffff11"}}>
@@ -1849,10 +1851,12 @@ export default function App() {
                   {types.map(function(t){return <button key={t} onClick={function(){setFilterType(t);}} style={{padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:filterType===t?"#1e3a8a":"#0d0d1a",color:filterType===t?"#fff":"#7090c0"}}>{t==="all"?"Tutti":t==="volo"?"✈":t==="hotel"?"🏨":t==="auto"?"🚗":"🅿️"}</button>;})}
                 </div>
               </div>
-              {isAdmin && <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:16,border:"1px solid #f0c04033"}}>
+              {isAdmin && <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #f0c04033"}}>
                 <div style={{fontSize:11,color:"#c0a060",fontWeight:700,marginBottom:5}}>📋 Note generali evento</div>
                 <textarea value={eventNotes[evNK]||""} onChange={function(e){setNote(evNK,e.target.value);}} placeholder="Note logistiche..." style={{width:"100%",background:"#0d0d1a",border:"1px solid #f0c04022",borderRadius:6,color:"#e8c87a",fontSize:12,resize:"vertical",minHeight:48,padding:"7px 9px",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
               </div>}
+              <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
+              <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
               {filterType==="all" ? people2.map(function(pid){
                 var person2=people.find(function(p){return p.id===pid;});
                 var pBs=eventBs.filter(function(b){return b.person===pid;});
@@ -1867,7 +1871,11 @@ export default function App() {
                     {eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
                   </div>
                 );
-              }) : eventBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
+              })}
+              {/* QR Code Pasti */}
+              <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:16,border:"1px solid #4caf5022"}}>
+                <MealQRSection personId={selPerson} person={people.find(function(p){return p.id===selPerson;})} events={visibleEvents}/>
+              </div>
             </div>
           );
         })()}
@@ -1907,9 +1915,272 @@ export default function App() {
 }
 
 
+// ── EventDocuments ────────────────────────────────────────
+function EventDocuments({ eventId, isAdmin }) {
+  var [docs, setDocs] = useState([]);
+  var [uploading, setUploading] = useState(false);
+  var [expanded, setExpanded] = useState(false);
+
+  useEffect(function(){
+    var unsub = db.collection("eventDocs").where("event","==",eventId)
+      .onSnapshot(function(snap){
+        setDocs(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      }, function(e){console.error(e);});
+    return function(){unsub();};
+  }, [eventId]);
+
+  async function handleUpload(file) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      var reader = new FileReader();
+      reader.onload = async function(e) {
+        var b64 = e.target.result;
+        var sizeMB = (b64.length * 0.75) / 1024 / 1024;
+        if (sizeMB > 5) {
+          alert("File troppo grande (max 5MB). Comprimi il PDF prima di caricarlo.");
+          setUploading(false);
+          return;
+        }
+        await db.collection("eventDocs").add({
+          event: eventId,
+          name: file.name,
+          data: b64,
+          type: file.type,
+          size: Math.round(sizeMB * 100) / 100,
+          uploadedAt: new Date().toISOString(),
+        });
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch(err) {
+      console.error(err);
+      setUploading(false);
+    }
+  }
+
+  function download(doc) {
+    var a = document.createElement("a");
+    a.href = doc.data;
+    a.download = doc.name;
+    a.click();
+  }
+
+  async function deleteDoc(id) {
+    await db.collection("eventDocs").doc(id).delete();
+  }
+
+  return (
+    <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:16,border:"1px solid #4a9eff22"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={function(){setExpanded(function(v){return !v;});}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>📎</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#4a9eff"}}>Documenti Evento</span>
+          {docs.length>0&&<span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:10,padding:"1px 8px",fontSize:11,fontWeight:700}}>{docs.length}</span>}
+        </div>
+        <span style={{color:"#4a9eff",fontSize:16}}>{expanded?"▲":"▼"}</span>
+      </div>
+
+      {expanded && (
+        <div style={{marginTop:12}}>
+          {docs.length===0 && <div style={{fontSize:12,color:"#7090c0",fontStyle:"italic",marginBottom:10}}>Nessun documento caricato.</div>}
+          {docs.map(function(doc){return(
+            <div key={doc._id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#0d0d1a",borderRadius:7,marginBottom:6,border:"1px solid #1e3a8a22"}}>
+              <span style={{fontSize:18}}>📄</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
+                <div style={{fontSize:10,color:"#7090c0"}}>{doc.size} MB · {doc.uploadedAt?doc.uploadedAt.substring(0,10):""}</div>
+              </div>
+              <button onClick={function(){download(doc);}} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>⬇ Scarica</button>
+              {isAdmin&&<button onClick={function(){if(window.confirm("Eliminare "+doc.name+"?")) deleteDoc(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>🗑️</button>}
+            </div>
+          );})}
+          {isAdmin && (
+            <label style={{display:"block",marginTop:8,background:"#0d1a2a",border:"2px dashed #1e3a8a",borderRadius:8,padding:"12px",textAlign:"center",cursor:uploading?"not-allowed":"pointer"}}>
+              <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png" style={{display:"none"}} disabled={uploading}
+                onChange={function(e){handleUpload(e.target.files[0]);e.target.value="";}}/>
+              {uploading
+                ? <span style={{fontSize:12,color:"#7090c0"}}>⏳ Caricamento...</span>
+                : <span style={{fontSize:12,color:"#4a9eff"}}>📎 Tocca per caricare un documento (PDF, Excel, immagine — max 5MB)</span>
+              }
+            </label>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ── MealQRSection ─────────────────────────────────────────
+function MealQRSection({ personId, person, events }) {
+  var [expanded, setExpanded] = useState(false);
+  var pName = person ? person.name : personId;
+  var meals = [
+    {label:"Colazione", emoji:"☕", color:"#ff9800"},
+    {label:"Pranzo",    emoji:"🍽️", color:"#4caf50"},
+    {label:"Cena",      emoji:"🌙", color:"#4a9eff"},
+  ];
+  if (!events || events.length === 0) return null;
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:expanded?10:0}} onClick={function(){setExpanded(function(v){return !v;});}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>🍽️</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#4caf50"}}>QR Code Pasti</span>
+          <span style={{fontSize:10,color:"#7090c0"}}>({events.length} evento{events.length>1?"i":""})</span>
+        </div>
+        <span style={{color:"#4caf50",fontSize:14}}>{expanded?"▲":"▼"}</span>
+      </div>
+      {expanded && events.map(function(evId){
+        var ev = EVENTS.find(function(e){return e.id===evId;});
+        return (
+          <div key={evId} style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{ev?ev.label:evId} — {ev?ev.dates:""}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              {meals.map(function(meal){
+                var content = "PASINI-RACING-2026|"+personId+"|"+evId+"|"+meal.label.toUpperCase();
+                var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+encodeURIComponent(content)+"&bgcolor=0d0d1a&color=ffffff&margin=10";
+                var dlUrl = "https://api.qrserver.com/v1/create-qr-code/?size=600x600&data="+encodeURIComponent(content)+"&bgcolor=ffffff&color=000000&margin=20";
+                return (
+                  <div key={meal.label} style={{background:"#0d0d1a",borderRadius:8,padding:"10px 8px",border:"2px solid "+meal.color+"33",textAlign:"center"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:meal.color,marginBottom:6}}>{meal.emoji} {meal.label}</div>
+                    <div style={{background:"#fff",borderRadius:4,padding:4,marginBottom:6,display:"inline-block"}}>
+                      <img src={qrUrl} alt={meal.label} style={{width:80,height:80,display:"block"}}/>
+                    </div>
+                    <div style={{fontSize:9,color:"#7090c0",marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pName}</div>
+                    <a href={dlUrl} target="_blank" rel="noopener noreferrer"
+                      style={{display:"block",padding:"5px 4px",background:meal.color+"22",color:meal.color,borderRadius:5,textDecoration:"none",fontSize:10,fontWeight:700}}>
+                      ⬇ Scarica
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── EventDocuments ─────────────────────────────────────────
+function EventDocuments({ eventId, isAdmin }) {
+  var [docs, setDocs] = useState([]);
+  var [uploading, setUploading] = useState(false);
+  var [expanded, setExpanded] = useState(false);
+
+  useEffect(function(){
+    var unsub = db.collection("eventDocs").where("event","==",eventId)
+      .onSnapshot(function(snap){
+        setDocs(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      }, function(e){console.error(e);});
+    return function(){unsub();};
+  }, [eventId]);
+
+  async function handleUpload(file) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      await new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = async function(e) {
+          var b64 = e.target.result;
+          var sizeMB = Math.round((b64.length * 0.75) / 1024 / 1024 * 100) / 100;
+          if (sizeMB > 5) {
+            alert("File troppo grande (max 5MB).");
+            reject();
+            return;
+          }
+          await db.collection("eventDocs").add({
+            event: eventId, name: file.name,
+            data: b64, type: file.type,
+            size: sizeMB, uploadedAt: new Date().toISOString().substring(0,10),
+          });
+          resolve();
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    } catch(e){ console.error(e); }
+    setUploading(false);
+  }
+
+  function download(doc) {
+    var a = document.createElement("a");
+    a.href = doc.data; a.download = doc.name; a.click();
+  }
+
+  return (
+    <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #4a9eff22"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={function(){setExpanded(function(v){return !v;});}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>📎</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#4a9eff"}}>Documenti Evento</span>
+          {docs.length>0&&<span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:10,padding:"1px 8px",fontSize:11,fontWeight:700}}>{docs.length}</span>}
+        </div>
+        <span style={{color:"#4a9eff"}}>{expanded?"▲":"▼"}</span>
+      </div>
+      {expanded && (
+        <div style={{marginTop:12}}>
+          {docs.length===0&&!isAdmin&&<div style={{fontSize:12,color:"#7090c0",fontStyle:"italic"}}>Nessun documento caricato.</div>}
+          {docs.map(function(doc){return(
+            <div key={doc._id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#0d0d1a",borderRadius:7,marginBottom:6,border:"1px solid #1e3a8a22"}}>
+              <span style={{fontSize:18,flexShrink:0}}>{doc.type&&doc.type.includes("pdf")?"📄":"📁"}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
+                <div style={{fontSize:10,color:"#7090c0"}}>{doc.size} MB · {doc.uploadedAt}</div>
+              </div>
+              <button onClick={function(){download(doc);}} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>⬇</button>
+              {isAdmin&&<button onClick={async function(){ if(window.confirm("Eliminare?")) await db.collection("eventDocs").doc(doc._id).delete(); }} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>🗑️</button>}
+            </div>
+          );})}
+          {isAdmin&&(
+            <label style={{display:"block",marginTop:8,background:"#0d1a2a",border:"2px dashed #1e3a8a",borderRadius:8,padding:12,textAlign:"center",cursor:uploading?"not-allowed":"pointer",opacity:uploading?0.6:1}}>
+              <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png" style={{display:"none"}} disabled={uploading} onChange={function(e){handleUpload(e.target.files[0]);e.target.value="";}}/>
+              <span style={{fontSize:12,color:"#4a9eff"}}>{uploading?"⏳ Caricamento...":"📎 Carica documento (PDF, Excel, immagine — max 5MB)"}</span>
+            </label>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ── CostsDashboard ────────────────────────────────────────
 function CostsDashboard({ bookings, people }) {
   var [selEvent, setSelEvent] = useState("all");
+  var [costs, setCosts] = useState({});
+  var [editingCost, setEditingCost] = useState(null);
+  var [costForm, setCostForm] = useState({event:"",category:"Voli",amount:"",notes:""});
+
+  useEffect(function(){
+    var unsub = db.collection("eventCosts").onSnapshot(function(snap){
+      var obj = {};
+      snap.docs.forEach(function(d){ 
+        var data = d.data();
+        if (!obj[data.event]) obj[data.event] = [];
+        obj[data.event].push(Object.assign({_id:d.id},data));
+      });
+      setCosts(obj);
+    }, function(e){console.error(e);});
+    return function(){unsub();};
+  },[]);
+
+  async function saveCost() {
+    if (!costForm.event || !costForm.amount) return;
+    var data = {event:costForm.event, category:costForm.category, amount:parseFloat(costForm.amount)||0, notes:costForm.notes, date:new Date().toISOString().substring(0,10)};
+    if (editingCost) {
+      await db.collection("eventCosts").doc(editingCost).set(data,{merge:true});
+    } else {
+      await db.collection("eventCosts").add(data);
+    }
+    setEditingCost(null);
+    setCostForm({event:"",category:"Voli",amount:"",notes:""});
+  }
+
+  var totalCost = Object.values(costs).flat().reduce(function(s,c){return s+(c.amount||0);},0);
 
   var filtered = selEvent === "all" ? bookings : bookings.filter(function(b){return b.event===selEvent;});
 
@@ -2014,6 +2285,86 @@ function CostsDashboard({ bookings, people }) {
             </div>
           );})}
         </div>
+      </div>
+
+      {/* Cost tracking per event */}
+      <div style={{marginTop:24}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#ff9800"}}>💶 Spese per Evento</div>
+          <div style={{fontSize:14,fontWeight:800,color:"#4caf50"}}>Totale: €{totalCost.toFixed(2)}</div>
+        </div>
+        {/* Add cost form */}
+        <div style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:16,border:"1px solid #ff980033"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#ff9800",marginBottom:10}}>➕ Aggiungi spesa</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Evento</label>
+              <select value={costForm.event} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{event:e.target.value});});}}
+                style={{width:"100%",padding:"7px 9px",background:"#0d0d1a",border:"1px solid #ff980033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none"}}>
+                <option value="">-- Seleziona --</option>
+                {EVENTS.map(function(ev){return React.createElement("option",{key:ev.id,value:ev.id},ev.label);})}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Categoria</label>
+              <select value={costForm.category} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{category:e.target.value});});}}
+                style={{width:"100%",padding:"7px 9px",background:"#0d0d1a",border:"1px solid #ff980033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none"}}>
+                {["Voli","Hotel","Auto/Noleggio","Parcheggio","Visti/Documenti","Trasferimenti","Altro"].map(function(c){return React.createElement("option",{key:c},c);})}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Importo (€)</label>
+              <input type="number" value={costForm.amount} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{amount:e.target.value});});}}
+                placeholder="0.00" style={{width:"100%",padding:"7px 9px",background:"#0d0d1a",border:"1px solid #ff980033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Note</label>
+              <input value={costForm.notes} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{notes:e.target.value});});}}
+                placeholder="es. 5 biglietti Ryanair" style={{width:"100%",padding:"7px 9px",background:"#0d0d1a",border:"1px solid #ff980033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+          </div>
+          <button onClick={saveCost} disabled={!costForm.event||!costForm.amount}
+            style={{width:"100%",padding:10,background:(costForm.event&&costForm.amount)?"#b45309":"#222",color:(costForm.event&&costForm.amount)?"#fff":"#555",border:"none",borderRadius:8,cursor:(costForm.event&&costForm.amount)?"pointer":"not-allowed",fontWeight:700}}>
+            {editingCost?"💾 Salva Modifica":"➕ Aggiungi Spesa"}
+          </button>
+        </div>
+
+        {/* Cost list per event */}
+        {EVENTS.filter(function(ev){return costs[ev.id]&&costs[ev.id].length>0;}).map(function(ev){
+          var evCosts = costs[ev.id]||[];
+          var evTotal = evCosts.reduce(function(s,c){return s+(c.amount||0);},0);
+          var byCat = {};
+          evCosts.forEach(function(c){if(!byCat[c.category])byCat[c.category]=0;byCat[c.category]+=c.amount||0;});
+          return(
+            <div key={ev.id} style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:12,border:"1px solid #ff980022"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div style={{fontWeight:800,fontSize:13}}>{ev.label} <span style={{fontWeight:400,fontSize:11,color:"#7090c0"}}>{ev.dates}</span></div>
+                <div style={{fontSize:14,fontWeight:800,color:"#4caf50"}}>€{evTotal.toFixed(2)}</div>
+              </div>
+              {/* Category breakdown */}
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+                {Object.keys(byCat).map(function(cat){return(
+                  <span key={cat} style={{background:"#b4530922",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>
+                    {cat}: €{byCat[cat].toFixed(2)}
+                  </span>
+                );})}
+              </div>
+              {/* Individual entries */}
+              {evCosts.map(function(c){return(
+                <div key={c._id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12}}>
+                  <span style={{background:"#b4530922",color:"#ff9800",borderRadius:4,padding:"1px 6px",fontSize:10,flexShrink:0}}>{c.category}</span>
+                  <span style={{fontWeight:700,color:"#4caf50",flexShrink:0}}>€{(c.amount||0).toFixed(2)}</span>
+                  {c.notes&&<span style={{color:"#7090c0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</span>}
+                  <span style={{color:"#555",fontSize:10,flexShrink:0}}>{c.date}</span>
+                  <button onClick={function(){setCostForm({event:c.event,category:c.category,amount:String(c.amount),notes:c.notes||""});setEditingCost(c._id);}}
+                    style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>✏️</button>
+                  <button onClick={async function(){await db.collection("eventCosts").doc(c._id).delete();}}
+                    style={{background:"none",border:"1px solid #ff444433",color:"#ff6060",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
+                </div>
+              );})}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -2214,12 +2565,12 @@ function ExportView({ bookings, people, eventNotes }) {
       XLSX.utils.book_append_sheet(wb, wsP, "Per Persona");
 
       // ── Sheet Team ──
-      var teamRows = [["Nome","Ruolo","Telefono","Email","Nazionalità","Aeroporto","Documento","N° Doc","Scadenza","T-Shirt","Giacca","Pantaloni","Scarpe","Note"]];
+      var teamRows = [["Nome","Ruolo","Telefono","Email","Nazionalità","Aeroporto","Documento","N° Doc","Scadenza","T-Shirt","Giacca","Pantaloni","Felpa","Note"]];
       people.forEach(function(p){
-        teamRows.push([p.name||"",p.role||"",p.phone||"",p.email||"",p.nationality||"",p.airport||"",p.docType||"",p.docNum||"",p.docExpiry||"",p.tshirt||"",p.jacket||"",p.pants||"",p.shoes||"",p.notes||""]);
+        teamRows.push([p.name||"",p.role||"",p.phone||"",p.email||"",p.nationality||"",p.airport||"",p.docType||"",p.docNum||"",p.docExpiry||"",p.tshirt||"",p.jacket||"",p.pants||"",p.hoodie||"",p.notes||""]);
       });
       var wsTeam = XLSX.utils.aoa_to_sheet(teamRows);
-      setColWidths(wsTeam, [20,22,14,24,12,8,14,12,10,8,8,10,6,24]);
+      setColWidths(wsTeam, [20,22,14,24,12,8,14,12,10,8,8,10,8,24]);
       styleHeaders(wsTeam, "A1:N1", 14);
       XLSX.utils.book_append_sheet(wb, wsTeam, "Team");
 
