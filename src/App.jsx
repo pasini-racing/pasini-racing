@@ -2184,7 +2184,7 @@ function MealQRUploader({ eventId }) {
 
   return (
     <div style={{background:"#0d1a0d",borderRadius:8,padding:14,border:"1px solid #4caf5033",marginBottom:12}}>
-      <div style={{fontSize:12,fontWeight:700,color:"#4caf50",marginBottom:6}}>📂 Carica QR Code Pasti — {EVENTS.find(function(e){return e.id===eventId;})||{label:eventId}}.label</div>
+      <div style={{fontSize:12,fontWeight:700,color:"#4caf50",marginBottom:6}}>📂 Carica QR Code Pasti — {(EVENTS.find(function(e){return e.id===eventId;})||{label:eventId}).label}</div>
       <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>
         Seleziona i file di ogni pasto (PDF numerati: 1=Ilario, 2=Luca, ecc.)
       </div>
