@@ -1859,6 +1859,7 @@ export default function App() {
                 <textarea value={eventNotes[evNK]||""} onChange={function(e){setNote(evNK,e.target.value);}} placeholder="Note logistiche..." style={{width:"100%",background:"#0d0d1a",border:"1px solid #f0c04022",borderRadius:6,color:"#e8c87a",fontSize:12,resize:"vertical",minHeight:48,padding:"7px 9px",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
               </div>}
               <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
+              {isAdmin && <MealQRUploader eventId={selEvent}/>}
               {filterType==="all" ? people2.map(function(pid){
                 var person2=people.find(function(p){return p.id===pid;});
                 var pBs=eventBs.filter(function(b){return b.person===pid;});
@@ -2011,56 +2012,206 @@ function EventDocuments({ eventId, isAdmin }) {
 
 
 // ── MealQRSection ─────────────────────────────────────────
+// Mapping numero file → person ID
+var MEAL_NUM_TO_ID = {
+  1:"ILARIO", 2:"LUCA", 3:"DAVIDE", 4:"MATTEO", 5:"TOMMASO",
+  6:"SAMULE", 7:"DANIELE", 8:"RICCARDO", 9:"PEP", 10:"SANTIAGO",
+  11:"GIACOMO", 12:"GUILLEM", 13:"BORRELLI", 14:"PRITELLI",
+  15:"CASADEI", 16:"ERIK", 17:"MAURI", 18:"SIMONE"
+};
+
 function MealQRSection({ personId, person, events }) {
   var [expanded, setExpanded] = useState(false);
-  var pName = person ? person.name : personId;
-  var meals = [
-    {label:"Colazione", emoji:"☕", color:"#ff9800"},
-    {label:"Pranzo",    emoji:"🍽️", color:"#4caf50"},
-    {label:"Cena",      emoji:"🌙", color:"#4a9eff"},
-  ];
+  var [mealDocs, setMealDocs] = useState({}); // { eventId: { data, name } }
+
+  // Load meal PDFs for this person from Firestore
+  useEffect(function(){
+    var unsub = db.collection("mealQR")
+      .where("personId","==",personId)
+      .onSnapshot(function(snap){
+        var obj = {};
+        snap.docs.forEach(function(d){
+          var data = d.data();
+          obj[data.event] = { data: data.fileData, name: data.fileName, _id: d.id };
+        });
+        setMealDocs(obj);
+      }, function(e){ console.error(e); });
+    return function(){ unsub(); };
+  }, [personId]);
+
   if (!events || events.length === 0) return null;
+
+  var hasDocs = Object.keys(mealDocs).length > 0;
+
   return (
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:expanded?10:0}} onClick={function(){setExpanded(function(v){return !v;});}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:expanded?10:0}}
+        onClick={function(){setExpanded(function(v){return !v;});}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:14}}>🍽️</span>
           <span style={{fontSize:13,fontWeight:700,color:"#4caf50"}}>QR Code Pasti</span>
-          <span style={{fontSize:10,color:"#7090c0"}}>({events.length} evento{events.length>1?"i":""})</span>
+          {hasDocs && <span style={{background:"#14532d",color:"#4caf50",borderRadius:10,padding:"1px 8px",fontSize:10,fontWeight:700}}>✓ Disponibili</span>}
+          {!hasDocs && <span style={{background:"#1a1a1a",color:"#555",borderRadius:10,padding:"1px 8px",fontSize:10}}>In attesa</span>}
         </div>
         <span style={{color:"#4caf50",fontSize:14}}>{expanded?"▲":"▼"}</span>
       </div>
-      {expanded && events.map(function(evId){
-        var ev = EVENTS.find(function(e){return e.id===evId;});
-        return (
-          <div key={evId} style={{marginBottom:16}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{ev?ev.label:evId} — {ev?ev.dates:""}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-              {meals.map(function(meal){
-                var content = "PASINI-RACING-2026|"+personId+"|"+evId+"|"+meal.label.toUpperCase();
-                var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+encodeURIComponent(content)+"&bgcolor=0d0d1a&color=ffffff&margin=10";
-                var dlUrl = "https://api.qrserver.com/v1/create-qr-code/?size=600x600&data="+encodeURIComponent(content)+"&bgcolor=ffffff&color=000000&margin=20";
-                return (
-                  <div key={meal.label} style={{background:"#0d0d1a",borderRadius:8,padding:"10px 8px",border:"2px solid "+meal.color+"33",textAlign:"center"}}>
-                    <div style={{fontSize:11,fontWeight:700,color:meal.color,marginBottom:6}}>{meal.emoji} {meal.label}</div>
-                    <div style={{background:"#fff",borderRadius:4,padding:4,marginBottom:6,display:"inline-block"}}>
-                      <img src={qrUrl} alt={meal.label} style={{width:80,height:80,display:"block"}}/>
+      {expanded && (
+        <div>
+          {events.map(function(evId){
+            var ev = EVENTS.find(function(e){return e.id===evId;});
+            var doc = mealDocs[evId];
+            return (
+              <div key={evId} style={{background:"#0d0d1a",borderRadius:8,padding:12,marginBottom:8,border:"1px solid "+(doc?"#4caf5033":"#ffffff11")}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>
+                  🏁 {ev?ev.label:evId} {ev&&<span style={{fontWeight:400}}>— {ev.dates}</span>}
+                </div>
+                {doc ? (
+                  <div>
+                    <div style={{fontSize:11,color:"#4caf50",marginBottom:8}}>
+                      ✅ QR Code disponibile — contiene Colazione, Pranzo e Cena
                     </div>
-                    <div style={{fontSize:9,color:"#7090c0",marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pName}</div>
-                    <a href={dlUrl} target="_blank" rel="noopener noreferrer"
-                      style={{display:"block",padding:"5px 4px",background:meal.color+"22",color:meal.color,borderRadius:5,textDecoration:"none",fontSize:10,fontWeight:700}}>
-                      ⬇ Scarica
-                    </a>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <a href={doc.data} download={doc.name}
+                        style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",background:"#14532d",color:"#4caf50",borderRadius:8,textDecoration:"none",fontSize:13,fontWeight:700}}>
+                        ⬇️ Scarica PDF
+                      </a>
+                      <a href={doc.data} target="_blank" rel="noopener noreferrer"
+                        style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",background:"#1e3a8a22",color:"#4a9eff",borderRadius:8,textDecoration:"none",fontSize:13,fontWeight:700}}>
+                        👁️ Visualizza
+                      </a>
+                    </div>
+                    <div style={{marginTop:8,fontSize:10,color:"#7090c0"}}>
+                      💡 Apri il PDF e salva i QR singoli nelle app Wallet del tuo telefono
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+                ) : (
+                  <div style={{fontSize:12,color:"#555",fontStyle:"italic"}}>
+                    QR non ancora caricati dall'amministratore
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
+
+// ── MealQRUploader (admin) ─────────────────────────────────
+function MealQRUploader({ eventId }) {
+  var [uploading, setUploading] = useState(false);
+  var [progress, setProgress] = useState("");
+  var [done, setDone] = useState(false);
+
+  async function handleZip(file) {
+    if (!file) return;
+    setUploading(true);
+    setDone(false);
+    setProgress("Lettura ZIP...");
+    try {
+      // Load JSZip from CDN if not already loaded
+      if (!window.JSZip) {
+        await new Promise(function(resolve, reject) {
+          var s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      var JSZip = window.JSZip;
+      if (!JSZip) throw new Error("JSZip non disponibile");
+
+      var arrayBuf = await file.arrayBuffer();
+      var zip = await JSZip.loadAsync(arrayBuf);
+      
+      var files = [];
+      zip.forEach(function(path, zipEntry) {
+        if (zipEntry.dir) return;
+        // Skip macOS metadata files
+        if (path.includes("__MACOSX") || path.includes(".DS_Store") || path.startsWith("._")) return;
+        var fname = path.split("/").pop();
+        if (!fname || fname.startsWith("._")) return;
+        files.push({ path, zipEntry, fname });
+      });
+
+      setProgress("Trovati "+files.length+" file. Caricamento...");
+      var uploaded = 0;
+
+      for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        // Extract number from filename: "TEAM PASINI 3.pdf" → 3
+        var numMatch = f.fname.match(/([0-9]+)/);
+        if (!numMatch) continue;
+        var num = parseInt(numMatch[1]);
+        var personId = MEAL_NUM_TO_ID[num];
+        if (!personId) continue;
+
+        setProgress("Caricamento "+f.fname+" ("+personId+")... "+(i+1)+"/"+files.length);
+
+        var b64 = await f.zipEntry.async("base64");
+        var dataUrl = "data:application/pdf;base64," + b64;
+        var sizeMB = Math.round(b64.length * 0.75 / 1024 / 1024 * 10) / 10;
+
+        if (sizeMB > 5) {
+          console.warn("File troppo grande:", f.fname, sizeMB+"MB");
+          continue;
+        }
+
+        // Save to Firestore - upsert by event+personId
+        var existing = await db.collection("mealQR")
+          .where("event","==",eventId)
+          .where("personId","==",personId)
+          .get();
+        
+        var docData = {
+          event: eventId,
+          personId: personId,
+          fileNum: num,
+          fileName: f.fname,
+          fileData: dataUrl,
+          uploadedAt: new Date().toISOString().substring(0,10),
+        };
+
+        if (!existing.empty) {
+          await existing.docs[0].ref.set(docData);
+        } else {
+          await db.collection("mealQR").add(docData);
+        }
+        uploaded++;
+      }
+
+      setProgress("✅ Caricati "+uploaded+" QR su "+files.length+" file");
+      setDone(true);
+    } catch(err) {
+      console.error(err);
+      setProgress("❌ Errore: " + err.message);
+    }
+    setUploading(false);
+  }
+
+  return (
+    <div style={{background:"#0d1a0d",borderRadius:8,padding:12,border:"1px solid #4caf5033",marginTop:8}}>
+      <div style={{fontSize:12,fontWeight:700,color:"#4caf50",marginBottom:6}}>📦 Carica ZIP QR Code Pasti</div>
+      <div style={{fontSize:11,color:"#7090c0",marginBottom:8}}>
+        Carica lo zip con i PDF (es. "TEAM PASINI 1.pdf" → Ilario, "TEAM PASINI 2.pdf" → Luca, ecc.)
+        I file vengono associati automaticamente per numero.
+      </div>
+      <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(done?"#4caf50":"#1e3a8a"),borderRadius:8,padding:12,textAlign:"center",cursor:uploading?"not-allowed":"pointer",opacity:uploading?0.7:1}}>
+        <input type="file" accept=".zip" style={{display:"none"}} disabled={uploading}
+          onChange={function(e){handleZip(e.target.files[0]);e.target.value="";}}/>
+        {uploading
+          ? <span style={{fontSize:12,color:"#4caf50"}}>⏳ {progress}</span>
+          : done
+          ? <span style={{fontSize:12,color:"#4caf50"}}>{progress} — Tocca per ricaricare</span>
+          : <span style={{fontSize:12,color:"#4a9eff"}}>📦 Tocca per caricare ZIP (max 5MB per file)</span>
+        }
+      </label>
+      {progress && !uploading && <div style={{fontSize:11,color:done?"#4caf50":"#ff6060",marginTop:6}}>{progress}</div>}
+    </div>
+  );
+}
+
 
 // ── CostsDashboard ────────────────────────────────────────
 function CostsDashboard({ bookings, people }) {
