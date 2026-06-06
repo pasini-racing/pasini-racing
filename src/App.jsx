@@ -2257,4 +2257,3 @@ function PersonMealQR({ personId, eventId }) {
   );
 }
 
-}
