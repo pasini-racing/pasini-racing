@@ -615,7 +615,7 @@ function AIImportSection({ onImported, onSkip }) {
       var parsed = JSON.parse(text.substring(start, end + 1));
       onImported(parsed);
     } catch(err) {
-      setError("Estrazione fallita: " + err.message);
+      setError("Errore: " + (err.message||"Connessione fallita. Verifica di essere connesso a internet."));
     }
     setLoading(false);
   }
@@ -906,15 +906,22 @@ function ExcelImport({ onImport, onClose }) {
     try {
       var b64 = await new Promise(function(res, rej) {
         var r = new FileReader();
-        r.onload = function(e) { res(e.target.result.split(",")[1]); };
-        r.onerror = rej;
+        r.onload = function(e) {
+          var result = e.target.result;
+          // Strip data URL prefix if present
+          var idx = result.indexOf(",");
+          res(idx >= 0 ? result.substring(idx+1) : result);
+        };
+        r.onerror = function(){ rej(new Error("Lettura file fallita")); };
         r.readAsDataURL(file);
       });
 
-      var isPDF = file.type === "application/pdf" || file.name.endsWith(".pdf");
+      // Detect PDF by extension OR mime type (iOS Safari sometimes sets wrong mime)
+      var fname = file.name.toLowerCase();
+      var isPDF = fname.endsWith(".pdf") || file.type === "application/pdf" || file.type === "application/octet-stream";
       var block = isPDF
         ? {type:"document", source:{type:"base64", media_type:"application/pdf", data:b64}}
-        : {type:"image", source:{type:"base64", media_type:file.type||"image/jpeg", data:b64}};
+        : {type:"image", source:{type:"base64", media_type:(file.type&&file.type.startsWith("image/")?file.type:"image/jpeg"), data:b64}};
 
       var prompt = "Analizza questa conferma di prenotazione volo (Ryanair, Wizz, EasyJet, Vueling, TAP, Iberia). " +
         "Estrai TUTTI i passeggeri. " +
@@ -967,7 +974,7 @@ function ExcelImport({ onImport, onClose }) {
 
       setPreview(bookings);
     } catch(err) {
-      setError("Estrazione fallita: " + err.message);
+      setError("Errore: " + (err.message||"Connessione fallita. Verifica di essere connesso a internet."));
       console.error(err);
     }
     setLoading(false);
