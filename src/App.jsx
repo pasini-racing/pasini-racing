@@ -916,16 +916,14 @@ function ExcelImport({ onImport, onClose }) {
         ? {type:"document", source:{type:"base64", media_type:"application/pdf", data:b64}}
         : {type:"image", source:{type:"base64", media_type:file.type||"image/jpeg", data:b64}};
 
-      var prompt = [
-        "Analizza questa conferma di prenotazione volo (Ryanair, Wizz, EasyJet, Vueling, TAP, Iberia, ecc.).",
-        "Estrai TUTTI i passeggeri e i dettagli del volo.",
-        "Rispondi SOLO con un array JSON valido, senza markdown, senza testo aggiuntivo.",
-        "Formato: [{"person":"NOME_COGNOME","flight":"FR1234","company":"Ryanair","dep":"BGY 11:55","arr":"BCN 13:35","date":"19 Apr","dir":"andata","baggage":"1 mano","booking":"ABC123"}]",
-        "Per 'person' usa il cognome in maiuscolo seguito dal nome (es. PASINI ILARIO).",
-        "Per 'dep' e 'arr' usa il formato 'CODICE_AEROPORTO HH:MM'.",
-        "Per 'dir': 'andata' se volo verso destinazione, 'ritorno' se torna in Italia.",
-        "Se ci sono più passeggeri sullo stesso volo, crea un oggetto per ognuno con gli stessi dati volo."
-      ].join(" ");
+      var prompt = "Analizza questa conferma di prenotazione volo (Ryanair, Wizz, EasyJet, Vueling, TAP, Iberia). " +
+        "Estrai TUTTI i passeggeri. " +
+        "Rispondi SOLO con array JSON valido senza markdown. " +
+        "Formato: [{person:COGNOME NOME, flight:FR1234, company:Ryanair, dep:BGY 11:55, arr:BCN 13:35, date:19 Apr, dir:andata, baggage:1 mano, booking:ABC123}] " +
+        "Per person usa COGNOME NOME maiuscolo. " +
+        "Per dep e arr usa CODICE HH:MM. " +
+        "Per dir: andata o ritorno. " +
+        "Un oggetto per ogni passeggero anche se stesso volo.";
 
       var resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
