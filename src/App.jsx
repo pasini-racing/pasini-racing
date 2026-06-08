@@ -598,7 +598,7 @@ function AIImportSection({ onImported, onSkip }) {
         "Struttura: {type, provider, booking, flight, company, dep, arr, date, dir, baggage, hotel, room, nights, checkin, checkout, car, notes}. ",
         "type = volo/hotel/auto/parcheggio. dep/arr = codice aeroporto + orario es BGY 11:51. Lascia vuoto ciò che non trovi."
       ].join("");
-      var resp = await fetch("https://api.anthropic.com/v1/messages", {
+      var resp = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -932,7 +932,7 @@ function ExcelImport({ onImport, onClose }) {
         "Per dir: andata o ritorno. " +
         "Un oggetto per ogni passeggero anche se stesso volo.";
 
-      var resp = await fetch("https://api.anthropic.com/v1/messages", {
+      var resp = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
