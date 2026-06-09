@@ -1,1 +1,24 @@
-
+{
+  "name": "Team Echovit Pasini Racing",
+  "short_name": "Pasini Racing",
+  "description": "Gestionale prenotazioni Team Echovit Pasini Racing",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#203E92",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
