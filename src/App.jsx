@@ -2335,6 +2335,372 @@ function MealQRUploader({ eventId }) {
 }
 
 
+// ── CostsDashboard ────────────────────────────────────────
+function CostsDashboard({ bookings, people }) {
+  var [selEvent, setSelEvent] = useState("all");
+  var [costs, setCosts] = useState({});
+  var [editingCost, setEditingCost] = useState(null);
+  var [costForm, setCostForm] = useState({event:"",category:"Voli",amount:"",notes:""});
+
+  useEffect(function(){
+    var unsub = db.collection("eventCosts").onSnapshot(function(snap){
+      var obj = {};
+      snap.docs.forEach(function(d){
+        var data = d.data();
+        if (!obj[data.event]) obj[data.event] = [];
+        obj[data.event].push(Object.assign({_id:d.id},data));
+      });
+      setCosts(obj);
+    }, function(e){console.error(e);});
+    return function(){unsub();};
+  },[]);
+
+  async function saveCost() {
+    if (!costForm.event || !costForm.amount) return;
+    var data = {event:costForm.event, category:costForm.category, amount:parseFloat(costForm.amount)||0, notes:costForm.notes, date:new Date().toISOString().substring(0,10)};
+    if (editingCost) {
+      await db.collection("eventCosts").doc(editingCost).set(data,{merge:true});
+    } else {
+      await db.collection("eventCosts").add(data);
+    }
+    setEditingCost(null);
+    setCostForm({event:"",category:"Voli",amount:"",notes:""});
+  }
+
+  var totalCost = Object.values(costs).flat().reduce(function(s,c){return s+(c.amount||0);},0);
+  var inp = {width:"100%",padding:"7px 9px",background:"#0d0d1a",border:"1px solid #ff980033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none",boxSizing:"border-box"};
+
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:800,color:"#ff9800",marginBottom:6}}>💰 Dashboard Costi</div>
+
+      {/* Add cost form */}
+      <div style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:16,border:"1px solid #ff980033"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#ff9800",marginBottom:10}}>➕ {editingCost?"Modifica spesa":"Aggiungi spesa"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div>
+            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Evento</label>
+            <select value={costForm.event} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{event:e.target.value});});}} style={inp}>
+              <option value="">-- Seleziona --</option>
+              {EVENTS.map(function(ev){return React.createElement("option",{key:ev.id,value:ev.id},ev.label);})}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Categoria</label>
+            <select value={costForm.category} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{category:e.target.value});});}} style={inp}>
+              {["Voli","Hotel","Auto/Noleggio","Parcheggio","Visti/Documenti","Trasferimenti","Altro"].map(function(c){return React.createElement("option",{key:c},c);})}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Importo (€)</label>
+            <input type="number" value={costForm.amount} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} placeholder="0.00" style={inp}/>
+          </div>
+          <div>
+            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Note</label>
+            <input value={costForm.notes} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{notes:e.target.value});});}} placeholder="es. 5 biglietti Ryanair" style={inp}/>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {editingCost && <button onClick={function(){setEditingCost(null);setCostForm({event:"",category:"Voli",amount:"",notes:""}); }} style={{flex:1,padding:9,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:7,cursor:"pointer"}}>Annulla</button>}
+          <button onClick={saveCost} disabled={!costForm.event||!costForm.amount}
+            style={{flex:2,padding:9,background:(costForm.event&&costForm.amount)?"#b45309":"#222",color:(costForm.event&&costForm.amount)?"#fff":"#555",border:"none",borderRadius:7,cursor:(costForm.event&&costForm.amount)?"pointer":"not-allowed",fontWeight:700}}>
+            {editingCost?"💾 Salva modifica":"➕ Aggiungi"}
+          </button>
+        </div>
+      </div>
+
+      {/* Totale */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#ff9800"}}>💶 Totale stagione</div>
+        <div style={{fontSize:18,fontWeight:800,color:"#4caf50"}}>€{totalCost.toFixed(2)}</div>
+      </div>
+
+      {/* Cost list per event */}
+      {EVENTS.filter(function(ev){return costs[ev.id]&&costs[ev.id].length>0;}).map(function(ev){
+        var evCosts = costs[ev.id]||[];
+        var evTotal = evCosts.reduce(function(s,c){return s+(c.amount||0);},0);
+        var byCat = {};
+        evCosts.forEach(function(c){if(!byCat[c.category])byCat[c.category]=0;byCat[c.category]+=c.amount||0;});
+        return(
+          <div key={ev.id} style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:12,border:"1px solid #ff980022"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontWeight:800,fontSize:13}}>{ev.label} <span style={{fontWeight:400,fontSize:11,color:"#7090c0"}}>{ev.dates}</span></div>
+              <div style={{fontSize:14,fontWeight:800,color:"#4caf50"}}>€{evTotal.toFixed(2)}</div>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+              {Object.keys(byCat).map(function(cat){return(
+                <span key={cat} style={{background:"#b4530922",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>
+                  {cat}: €{byCat[cat].toFixed(2)}
+                </span>
+              );})}
+            </div>
+            {evCosts.map(function(c){return(
+              <div key={c._id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12}}>
+                <span style={{background:"#b4530922",color:"#ff9800",borderRadius:4,padding:"1px 6px",fontSize:10,flexShrink:0}}>{c.category}</span>
+                <span style={{fontWeight:700,color:"#4caf50",flexShrink:0}}>€{(c.amount||0).toFixed(2)}</span>
+                {c.notes&&<span style={{color:"#7090c0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</span>}
+                <span style={{color:"#555",fontSize:10,flexShrink:0}}>{c.date}</span>
+                <button onClick={function(){setCostForm({event:c.event,category:c.category,amount:String(c.amount),notes:c.notes||""});setEditingCost(c._id);}}
+                  style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>✏️</button>
+                <button onClick={async function(){await db.collection("eventCosts").doc(c._id).delete();}}
+                  style={{background:"none",border:"1px solid #ff444433",color:"#ff6060",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
+              </div>
+            );})}
+          </div>
+        );
+      })}
+      {Object.keys(costs).length===0 && <div style={{textAlign:"center",color:"#7090c0",padding:24,fontSize:13}}>Nessuna spesa inserita ancora.</div>}
+    </div>
+  );
+}
+
+// ── ExportView ─────────────────────────────────────────────
+function ExportView({ bookings, people, eventNotes }) {
+  var [exporting, setExporting] = useState(false);
+  var [exported, setExported] = useState(false);
+
+  async function exportToExcel() {
+    setExporting(true);
+    try {
+      var XLSX = await import("xlsx");
+      var wb = XLSX.utils.book_new();
+      function setColWidths(ws, widths) { ws["!cols"] = widths.map(function(w){ return {wch: w}; }); }
+
+      var eventOrder = ["TEST1_BCN","TEST2_JEREZ","R1_BARCELLONA","R2_ESTORIL","R3_JEREZ","R4_MAGNY","TEST3_VALENCIA","R5_VALENCIA","R6_ARAGON","R7_MISANO"];
+      var typeOrder = {"volo":0,"hotel":1,"auto":2,"parcheggio":3};
+      var sorted = bookings.slice().sort(function(a,b){
+        var ea=eventOrder.indexOf(a.event),eb=eventOrder.indexOf(b.event);
+        if(ea!==eb) return ea-eb;
+        var ta=typeOrder[a.type]||99,tb=typeOrder[b.type]||99;
+        if(ta!==tb) return ta-tb;
+        var pa=people.find(function(p){return p.id===a.person;}),pb=people.find(function(p){return p.id===b.person;});
+        return (pa?pa.name:a.person).localeCompare(pb?pb.name:b.person);
+      });
+
+      var headers1=["Evento","Date","Persona","Tipo","Dir.","Volo","Compagnia","Partenza","Arrivo","Data","Bagaglio","N° Pren.","Hotel","Prenotazione","Stato","Note"];
+      var rows1=[headers1];
+      sorted.forEach(function(b){
+        var person=people.find(function(p){return p.id===b.person;});
+        var ev=EVENTS.find(function(e){return e.id===b.event;});
+        rows1.push([ev?ev.label:b.event,ev?ev.dates:"",person?person.name:b.person,b.type||"",b.dir==="andata"?"↗ Andata":b.dir==="ritorno"?"↙ Ritorno":"",b.flight||"",b.company||"",b.dep||"",b.arr||"",b.date||"",b.baggage||"",b.booking||"",b.hotel||"",b.booking||"",b.status==="cancellata"?"❌":b.status==="da_confermare"?"⏳":"✅",b.notes||""]);
+      });
+      var ws1=XLSX.utils.aoa_to_sheet(rows1);
+      setColWidths(ws1,[22,14,18,8,10,8,12,13,13,12,10,14,22,16,12,24]);
+      ws1["!autofilter"]={ref:"A1:P1"};
+      XLSX.utils.book_append_sheet(wb,ws1,"Piano Stagione");
+
+      var teamRows=[["Nome","Ruolo","Telefono","Email","Nazionalità","Aeroporto","Documento","N° Doc","Scadenza","T-Shirt","Giacca","Pantaloni","Felpa","Note"]];
+      people.forEach(function(p){ teamRows.push([p.name||"",p.role||"",p.phone||"",p.email||"",p.nationality||"",p.airport||"",p.docType||"",p.docNum||"",p.docExpiry||"",p.tshirt||"",p.jacket||"",p.pants||"",p.hoodie||"",p.notes||""]); });
+      var wsTeam=XLSX.utils.aoa_to_sheet(teamRows);
+      setColWidths(wsTeam,[20,22,14,24,12,8,14,12,10,8,8,10,8,24]);
+      XLSX.utils.book_append_sheet(wb,wsTeam,"Team");
+
+      var filename="PasiniRacing_"+new Date().toISOString().substring(0,10)+".xlsx";
+      XLSX.writeFile(wb,filename);
+      setExported(true);
+      setTimeout(function(){setExported(false);},3000);
+    } catch(e){ console.error(e); alert("Errore export: "+e.message); }
+    setExporting(false);
+  }
+
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:20}}>📥 Esporta Piano Stagione</div>
+      <div style={{background:"#12121f",borderRadius:12,padding:24,border:"1px solid #1e3a8a33",maxWidth:560}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:8}}>📊 Export Excel</div>
+        <div style={{fontSize:12,color:"#7090c0",marginBottom:20,lineHeight:1.8}}>
+          Include Piano Stagione completo + foglio Team con anagrafica.
+        </div>
+        <button onClick={exportToExcel} disabled={exporting}
+          style={{width:"100%",padding:14,background:exporting?"#222":exported?"#14532d":"#1e3a8a",color:exporting?"#555":exported?"#4caf50":"#fff",border:"none",borderRadius:10,cursor:exporting?"not-allowed":"pointer",fontWeight:700,fontSize:15}}>
+          {exporting?"⏳ Esportazione...":exported?"✅ Scaricato!":"📥 Scarica Excel"}
+        </button>
+        <div style={{marginTop:10,fontSize:11,color:"#7090c0",textAlign:"center"}}>{bookings.length} prenotazioni · {people.length} membri</div>
+      </div>
+    </div>
+  );
+}
+
+// ── FlightPlanner ──────────────────────────────────────────
+var AIRPORTS = {
+  BGY:{name:"Milano/Bergamo",code:"BGY",lat:45.67,lng:9.70},
+  MXP:{name:"Milano Malpensa",code:"MXP",lat:45.63,lng:8.72},
+  BLQ:{name:"Bologna",code:"BLQ",lat:44.53,lng:11.29},
+  FCO:{name:"Roma Fiumicino",code:"FCO",lat:41.80,lng:12.25},
+  VCE:{name:"Venezia",code:"VCE",lat:45.50,lng:12.35},
+  PSA:{name:"Pisa",code:"PSA",lat:43.68,lng:10.39},
+  TRN:{name:"Torino",code:"TRN",lat:45.20,lng:7.65},
+  NAP:{name:"Napoli",code:"NAP",lat:40.88,lng:14.29},
+};
+var EVENT_AIRPORTS = {
+  TEST1_BCN:{dest:"BCN",destName:"Barcellona"},
+  TEST2_JEREZ:{dest:"XRY",destName:"Jerez"},
+  R1_BARCELLONA:{dest:"BCN",destName:"Barcellona"},
+  R2_ESTORIL:{dest:"LIS",destName:"Lisbona"},
+  R3_JEREZ:{dest:"SVQ",destName:"Siviglia"},
+  R4_MAGNY:{dest:"CDG",destName:"Parigi"},
+  TEST3_VALENCIA:{dest:"VLC",destName:"Valencia"},
+  R5_VALENCIA:{dest:"VLC",destName:"Valencia"},
+  R6_ARAGON:{dest:"ZAZ",destName:"Zaragoza"},
+  R7_MISANO:{dest:"RMI",destName:"Rimini"},
+};
+
+function FlightPlanner({ people, bookings }) {
+  var [selEvent, setSelEvent] = useState("");
+  var [dateOut, setDateOut] = useState("");
+  var [timeOut, setTimeOut] = useState("");
+  var [dateBack, setDateBack] = useState("");
+  var [timeBack, setTimeBack] = useState("");
+  var [groups, setGroups] = useState(null);
+  var [editingGroup, setEditingGroup] = useState(null);
+
+  function buildGroups() {
+    if (!selEvent) return;
+    var eventPeople = bookings.filter(function(b){return b.event===selEvent;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+    if (eventPeople.length === 0) eventPeople = people.map(function(p){return p.id;});
+    var byAirport = {};
+    eventPeople.forEach(function(pid) {
+      var person = people.find(function(p){return p.id===pid;});
+      if (!person) return;
+      var airport = person.airport || "BGY";
+      if (!byAirport[airport]) byAirport[airport] = [];
+      byAirport[airport].push(person);
+    });
+    var result = [];
+    Object.keys(byAirport).forEach(function(airportCode) {
+      var pList = byAirport[airportCode];
+      var ap = AIRPORTS[airportCode] || {name:airportCode, code:airportCode};
+      var destInfo = EVENT_AIRPORTS[selEvent] || {dest:"???", destName:"Destinazione"};
+      for (var i=0; i<pList.length; i+=5) {
+        result.push({airport:ap,dest:destInfo,people:pList.slice(i,i+5).map(function(p){return p.id;}),groupNum:Math.floor(i/5)+1,customAirport:airportCode});
+      }
+    });
+    setGroups(result); setEditingGroup(null);
+  }
+
+  function togglePersonInGroup(groupIdx, personId) {
+    setGroups(function(prev){ return prev.map(function(g,i){ if(i!==groupIdx) return g; var inGroup=g.people.includes(personId); if(inGroup) return Object.assign({},g,{people:g.people.filter(function(id){return id!==personId;})}); if(g.people.length>=5) return g; return Object.assign({},g,{people:g.people.concat([personId])}); }); });
+  }
+  function addGroup() {
+    if(!selEvent) return;
+    var destInfo=EVENT_AIRPORTS[selEvent]||{dest:"???",destName:"Destinazione"};
+    var ap=AIRPORTS["BGY"]||{name:"BGY",code:"BGY"};
+    setGroups(function(prev){return(prev||[]).concat([{airport:ap,dest:destInfo,people:[],groupNum:(prev||[]).length+1,customAirport:"BGY"}]);});
+  }
+  function changeGroupAirport(groupIdx, airportCode) {
+    var ap=AIRPORTS[airportCode]||{name:airportCode,code:airportCode};
+    setGroups(function(prev){return prev.map(function(g,i){if(i!==groupIdx) return g; return Object.assign({},g,{airport:ap,customAirport:airportCode});});});
+  }
+  function removeGroup(groupIdx) { setGroups(function(prev){return prev.filter(function(_,i){return i!==groupIdx;});}); }
+  function unassigned() {
+    if(!groups) return [];
+    var assigned=[];
+    groups.forEach(function(g){g.people.forEach(function(id){assigned.push(id);});});
+    var eventPeople=bookings.filter(function(b){return b.event===selEvent;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+    if(eventPeople.length===0) eventPeople=people.map(function(p){return p.id;});
+    return eventPeople.filter(function(id){return !assigned.includes(id);});
+  }
+  function makeLinks(g) {
+    var ap=g.airport.code, dest=g.dest.dest, n=g.people.length;
+    return [
+      {label:"Google Flights",url:"https://www.google.com/travel/flights?q=Voli+"+ap+"+"+dest+"&hl=it",color:"#4285f4",icon:"🔍"},
+      {label:"Skyscanner",url:"https://www.skyscanner.it/transport/flights/"+ap.toLowerCase()+"/"+dest.toLowerCase()+"/"+(dateOut?dateOut.replace(/-/g,""):"")+"/"+(dateBack?dateBack.replace(/-/g,""):"")+"/",color:"#0770e3",icon:"🌐"},
+      {label:"Ryanair",url:"https://www.ryanair.com/it/it/trip/flights/select?ADT="+n+"&orig="+ap+"&dest="+dest+(dateOut?"&dateOut="+dateOut:"")+"&isConnectedFlight=false",color:"#073590",icon:"✈"},
+      {label:"Wizz Air",url:"https://wizzair.com/it-it/flights/timetable?departureStation="+ap+"&arrivalStation="+dest,color:"#c6007e",icon:"✈"},
+      {label:"Vueling",url:"https://www.vueling.com/it/cerca-il-tuo-volo#/?from="+ap+"&to="+dest,color:"#c8a800",icon:"✈"},
+    ];
+  }
+
+  var inp={padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,outline:"none",boxSizing:"border-box"};
+
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:6}}>🗺️ Pianificatore Voli</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:20}}>Organizza gruppi di max 5 persone</div>
+      <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #1e3a8a33",marginBottom:20}}>
+        <div style={{marginBottom:12}}>
+          <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:5,fontWeight:600}}>EVENTO</label>
+          <select value={selEvent} onChange={function(e){setSelEvent(e.target.value);setGroups(null);}} style={Object.assign({},inp,{width:"100%"})}>
+            <option value="">-- Seleziona evento --</option>
+            {EVENTS.map(function(ev){var dest=EVENT_AIRPORTS[ev.id];return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" → "+(dest?dest.destName:"?")+" ("+ev.dates+")");})}</select>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          <div><label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Data Andata</label><input type="date" value={dateOut} onChange={function(e){setDateOut(e.target.value);}} style={Object.assign({},inp,{width:"100%"})}/></div>
+          <div><label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Ora Andata</label><input type="time" value={timeOut} onChange={function(e){setTimeOut(e.target.value);}} style={Object.assign({},inp,{width:"100%"})}/></div>
+          <div><label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Data Ritorno</label><input type="date" value={dateBack} onChange={function(e){setDateBack(e.target.value);}} style={Object.assign({},inp,{width:"100%"})}/></div>
+          <div><label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Ora Ritorno</label><input type="time" value={timeBack} onChange={function(e){setTimeBack(e.target.value);}} style={Object.assign({},inp,{width:"100%"})}/></div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={buildGroups} disabled={!selEvent} style={{flex:2,padding:10,background:selEvent?"#1e3a8a":"#222",color:selEvent?"#fff":"#555",border:"none",borderRadius:8,cursor:selEvent?"pointer":"not-allowed",fontWeight:700,fontSize:13}}>🗺️ Genera gruppi</button>
+          {groups&&<button onClick={addGroup} style={{flex:1,padding:10,background:"#14532d",color:"#4caf50",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>➕</button>}
+        </div>
+      </div>
+
+      {groups&&unassigned().length>0&&(
+        <div style={{background:"#1a1a0d",borderRadius:10,padding:14,marginBottom:16,border:"1px solid #ffcc0033"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#ffcc00",marginBottom:8}}>⚠️ Non assegnati ({unassigned().length})</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{unassigned().map(function(pid){var p=people.find(function(x){return x.id===pid;});return <span key={pid} style={{background:"#2a2a00",color:"#ffcc00",borderRadius:6,padding:"4px 10px",fontSize:11}}>{p?p.name:pid}</span>;})}</div>
+        </div>
+      )}
+
+      {groups&&groups.map(function(g,gi){
+        var isEditing=editingGroup===gi;
+        var eventPeople=bookings.filter(function(b){return b.event===selEvent;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+        if(eventPeople.length===0) eventPeople=people.map(function(p){return p.id;});
+        return(
+          <div key={gi} style={{background:"#12121f",borderRadius:12,padding:20,marginBottom:16,border:"1px solid "+(isEditing?"#4a9eff":"#1e3a8a44")}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <div style={{flex:1}}>
+                {isEditing?(
+                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    <select value={g.customAirport||g.airport.code} onChange={function(e){changeGroupAirport(gi,e.target.value);}} style={{padding:"6px 10px",background:"#0d0d1a",border:"1px solid #4a9eff",borderRadius:6,color:"#e8e8f0",fontSize:13,outline:"none"}}>
+                      {Object.keys(AIRPORTS).map(function(a){return React.createElement("option",{key:a,value:a},AIRPORTS[a].code+" — "+AIRPORTS[a].name);})}
+                    </select>
+                    <span style={{color:"#4a9eff",fontSize:14,fontWeight:700}}>→ {g.dest.dest} — {g.dest.destName}</span>
+                  </div>
+                ):(
+                  <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>✈ {g.airport.code} → {g.dest.dest} <span style={{fontSize:11,color:"#7090c0",marginLeft:8}}>Gruppo {gi+1}</span></div>
+                )}
+                <div style={{fontSize:12,color:"#7090c0",marginTop:3}}>{g.airport.name} → {g.dest.destName} · {g.people.length}/5 persone</div>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={function(){setEditingGroup(isEditing?null:gi);}} style={{padding:"6px 12px",background:isEditing?"#4a9eff":"#1e3a8a22",color:isEditing?"#fff":"#4a9eff",border:"1px solid #1e3a8a44",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>{isEditing?"✓ Fatto":"✏️ Modifica"}</button>
+                <button onClick={function(){removeGroup(gi);}} style={{padding:"6px 10px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,cursor:"pointer",fontSize:12}}>🗑️</button>
+              </div>
+            </div>
+            {isEditing?(
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:11,color:"#7090c0",marginBottom:8,fontWeight:600}}>Seleziona persone (max 5):</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,maxHeight:220,overflowY:"auto"}}>
+                  {eventPeople.map(function(pid){
+                    var p=people.find(function(x){return x.id===pid;}); var inGroup=g.people.includes(pid); var canAdd=inGroup||(g.people.length<5);
+                    return(<div key={pid} onClick={function(){if(canAdd) togglePersonInGroup(gi,pid);}} style={{padding:"7px 10px",borderRadius:7,border:"2px solid "+(inGroup?"#4a9eff":canAdd?"#1e3a8a22":"#333"),background:inGroup?"#1e3a8a22":canAdd?"#0d0d1a":"#1a1a1a",cursor:canAdd?"pointer":"not-allowed",display:"flex",alignItems:"center",gap:6,opacity:canAdd?1:0.5}}>
+                      <div style={{width:24,height:24,borderRadius:"50%",background:inGroup?"#1e3a8a":"#1a1a2a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:inGroup?"#fff":"#4a6a9a",flexShrink:0}}>{p?p.name.charAt(0):"?"}</div>
+                      <div style={{minWidth:0}}><div style={{fontSize:11,fontWeight:700,color:inGroup?"#4a9eff":"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p?p.name:pid}</div><div style={{fontSize:9,color:"#7090c0"}}>{p?p.role:""}</div></div>
+                      {inGroup&&<span style={{marginLeft:"auto",color:"#4a9eff",fontSize:12}}>✓</span>}
+                    </div>);
+                  })}
+                </div>
+              </div>
+            ):(
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+                {g.people.length===0&&<span style={{color:"#7090c0",fontSize:12,fontStyle:"italic"}}>Nessuna persona — clicca Modifica</span>}
+                {g.people.map(function(pid){var p=people.find(function(x){return x.id===pid;});return(<div key={pid} style={{display:"flex",alignItems:"center",gap:6,background:"#0d0d1a",borderRadius:8,padding:"6px 10px",border:"1px solid #1e3a8a22"}}><div style={{width:26,height:26,borderRadius:"50%",background:"#1e3a8a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff",flexShrink:0}}>{p?p.name.charAt(0):"?"}</div><div><div style={{fontSize:12,fontWeight:700}}>{p?p.name:pid}</div><div style={{fontSize:10,color:"#7090c0"}}>{p?p.role:""}</div></div></div>);})}
+              </div>
+            )}
+            <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>🔍 Cerca voli</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8}}>
+              {makeLinks(g).map(function(link){return(<a key={link.label} href={link.url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"center",gap:6,padding:"9px 12px",background:"#0d0d1a",borderRadius:8,border:"2px solid "+link.color+"44",color:link.color,textDecoration:"none",fontSize:12,fontWeight:700}}><span>{link.icon}</span><span>{link.label}</span></a>);})}
+            </div>
+          </div>
+        );
+      })}
+      {groups&&groups.length===0&&<div style={{textAlign:"center",padding:24,color:"#7090c0",fontSize:13}}>Nessun gruppo. Clicca ➕ per aggiungere.</div>}
+    </div>
+  );
+}
+
+
 // ── GalleryView ────────────────────────────────────────────
 function GalleryView({ isAdmin }) {
   var [links, setLinks] = useState([]);
