@@ -1969,7 +1969,6 @@ export default function App() {
   );
 }
 
-
 // ── EventDocuments ────────────────────────────────────────
 function EventDocuments({ eventId, isAdmin }) {
   var [docs, setDocs] = useState([]);
@@ -2066,6 +2065,49 @@ function EventDocuments({ eventId, isAdmin }) {
   );
 }
 
+
+// ── PersonMealQR ───────────────────────────────────────────
+function PersonMealQR({ personId, eventId }) {
+  var [qrs, setQrs] = useState([]);
+  var MEAL_TYPES = [
+    {key:"breakfast", label:"☕ Colazione", color:"#ff9800"},
+    {key:"lunch",     label:"🍽️ Pranzo",    color:"#4caf50"},
+    {key:"dinner",    label:"🌙 Cena",       color:"#4a9eff"},
+  ];
+  useEffect(function(){
+    var unsub = db.collection("mealQR")
+      .where("event","==",eventId)
+      .where("personId","==",personId)
+      .onSnapshot(function(snap){
+        setQrs(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      }, function(e){console.error(e);});
+    return function(){unsub();};
+  },[personId,eventId]);
+  if (qrs.length === 0) return null;
+  function openQR(doc) {
+    try {
+      var ar=doc.fileData.split(",");
+      var mi=ar[0].match(/:(.*?);/)[1];
+      var bs=atob(ar[1]);var n=bs.length;
+      var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}
+      window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");
+    } catch(e){ window.open(doc.fileData,"_blank"); }
+  }
+  return (
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+      {MEAL_TYPES.map(function(mt){
+        var doc = qrs.find(function(q){return q.mealType===mt.key;});
+        if (!doc) return null;
+        return (
+          <button key={mt.key} onClick={function(){openQR(doc);}}
+            style={{padding:"4px 10px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700}}>
+            {mt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 // ── MealQRSection ─────────────────────────────────────────
 // Mapping numero file → person ID
