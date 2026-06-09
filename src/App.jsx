@@ -1726,8 +1726,60 @@ export default function App() {
 
       <div style={{maxWidth:1200,margin:"0 auto",padding:"20px 14px"}}>
 
-        {view==="overview" && (
+        {view==="overview" && (function(){
+          // ── Countdown helper ───────────────────────────────
+          var EVENT_START_DATES = {
+            "TEST1_BCN":    new Date(2026,3,19),
+            "TEST2_JEREZ":  new Date(2026,4,3),
+            "R1_BARCELLONA":new Date(2026,4,20),
+            "R2_ESTORIL":   new Date(2026,5,11),
+            "R3_JEREZ":     new Date(2026,6,2),
+            "R4_MAGNY":     new Date(2026,6,23),
+            "TEST3_VALENCIA":new Date(2026,7,17),
+            "R5_VALENCIA":  new Date(2026,8,3),
+            "R6_ARAGON":    new Date(2026,8,24),
+            "R7_MISANO":    new Date(2026,9,15),
+          };
+          function daysTo(evId) {
+            var start = EVENT_START_DATES[evId];
+            if (!start) return null;
+            var diff = Math.ceil((start - TODAY) / (1000*60*60*24));
+            return diff;
+          }
+          // ── Expiry warning (docs expiring within 90 days) ──
+          var expiringDocs = people.filter(function(p){
+            if (!p.docExpiry || p.docExpiry === "NaT") return false;
+            var parts = p.docExpiry.split("/");
+            if (parts.length !== 3) return false;
+            var d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+            var diff = Math.ceil((d - TODAY) / (1000*60*60*24));
+            return diff >= 0 && diff <= 90;
+          });
+          return (
           <div>
+            {/* Banner scadenze documenti */}
+            {expiringDocs.length > 0 && (
+              <div style={{background:"#1a0a00",border:"2px solid #ff980066",borderRadius:12,padding:"12px 16px",marginBottom:20,display:"flex",gap:12,alignItems:"flex-start"}}>
+                <div style={{fontSize:22,flexShrink:0}}>⚠️</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#ff9800",marginBottom:6}}>Documenti in scadenza nei prossimi 90 giorni</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {expiringDocs.map(function(p){
+                      var parts = p.docExpiry.split("/");
+                      var d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+                      var diff = Math.ceil((d - TODAY) / (1000*60*60*24));
+                      var color = diff <= 30 ? "#ff4444" : "#ff9800";
+                      return (
+                        <span key={p.id} onClick={function(){setView("person");setSelPerson(p.id);}}
+                          style={{background:color+"22",color:color,borderRadius:6,padding:"4px 10px",fontSize:12,fontWeight:700,cursor:"pointer",border:"1px solid "+color+"44"}}>
+                          {p.name.split(" ")[0]} — scade {p.docExpiry} ({diff}gg)
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:28}}>
               {[{label:"Persone",value:people.length,color:"#4a9eff",icon:"👥"},{label:"Eventi",value:EVENTS.length,color:"#4caf50",icon:"🏁"},{label:"Voli",value:bookings.filter(function(b){return b.type==="volo";}).length,color:"#ff9800",icon:"✈"},{label:"Hotel",value:bookings.filter(function(b){return b.type==="hotel";}).length,color:"#9c27b0",icon:"🏨"}].map(function(s){
                 return <div key={s.label} style={{background:"#12121f",borderRadius:10,padding:16,border:"1px solid "+s.color+"33",textAlign:"center"}}><div style={{fontSize:22}}>{s.icon}</div><div style={{fontSize:26,fontWeight:800,color:s.color}}>{s.value}</div><div style={{fontSize:11,color:"#7090c0",marginTop:2}}>{s.label}</div></div>;
@@ -1741,13 +1793,20 @@ export default function App() {
                     {showPast?"Nascondi passati":"Mostra tutti"}
                   </button>
                 </div>
-                {ACTIVE_EVENTS.map(function(ev){return(
+                {ACTIVE_EVENTS.map(function(ev){
+                  var days = daysTo(ev.id);
+                  var isPast = days !== null && days < 0;
+                  var isToday = days !== null && days === 0;
+                  var countdownColor = isPast ? "#555" : days <= 7 ? "#ff4444" : days <= 30 ? "#ff9800" : "#4caf50";
+                  var countdownLabel = isPast ? "passato" : isToday ? "OGGI!" : days === 1 ? "domani" : days+"gg";
+                  return(
                   <div key={ev.id} onClick={function(){setView("event");setSelEvent(ev.id);}}
                     style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 11px",borderRadius:8,marginBottom:5,background:"#0d0d1a",cursor:"pointer",border:"1px solid #ffffff11"}}
                     onMouseEnter={function(e){e.currentTarget.style.background="#1e3a8a22";}} onMouseLeave={function(e){e.currentTarget.style.background="#0d0d1a";}}>
                     <div><span style={{fontWeight:700,fontSize:12}}>{ev.label}</span><span style={{marginLeft:6,fontSize:10,color:"#7090c0"}}>{ev.circuit}</span></div>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{fontSize:10,color:"#7090c0"}}>{ev.dates}</span>
+                      {days !== null && <span style={{background:countdownColor+"22",color:countdownColor,borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}}>{countdownLabel}</span>}
                       <span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}}>{pCount(ev.id)}p</span>
                     </div>
                   </div>
@@ -1770,7 +1829,8 @@ export default function App() {
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {view==="person" && !selPerson && (
           <div>
@@ -1968,6 +2028,9 @@ export default function App() {
     </div>
   );
 }
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
 
 // ── EventDocuments ────────────────────────────────────────
 function EventDocuments({ eventId, isAdmin }) {
