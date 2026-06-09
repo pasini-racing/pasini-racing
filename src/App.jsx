@@ -598,9 +598,15 @@ function AIImportSection({ onImported, onSkip }) {
         "Struttura: {type, provider, booking, flight, company, dep, arr, date, dir, baggage, hotel, room, nights, checkin, checkout, car, notes}. ",
         "type = volo/hotel/auto/parcheggio. dep/arr = codice aeroporto + orario es BGY 11:51. Lascia vuoto ciò che non trovi."
       ].join("");
-      var resp = await fetch("/api/claude", {
+      var apiKey2 = (typeof process !== "undefined" && process.env && process.env.REACT_APP_ANTHROPIC_KEY)
+        || window._ak || "";
+      var resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey2,
+          "anthropic-version": "2023-06-01"
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
@@ -932,9 +938,15 @@ function ExcelImport({ onImport, onClose }) {
         "Per dir: andata o ritorno. " +
         "Un oggetto per ogni passeggero anche se stesso volo.";
 
-      var resp = await fetch("/api/claude", {
+      var apiKey = (typeof process !== "undefined" && process.env && process.env.REACT_APP_ANTHROPIC_KEY)
+        || window._ak || "";
+      var resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01"
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 2000,
@@ -1046,12 +1058,39 @@ function ExcelImport({ onImport, onClose }) {
 
   function confirmImport() {
     if (!preview || !preview.length) return;
-    // Fix event for all if selEvent provided
     var final = preview.map(function(b){
-      return Object.assign({}, b, {event: b.event||selEvent});
+      var item = Object.assign({}, b, {event: b.event||selEvent});
+      // Clean internal flags
+      delete item._nameRaw; delete item._matched;
+      return item;
     });
     onImport(final);
     onClose();
+  }
+
+  function updatePreviewItem(idx, field, value) {
+    setPreview(function(prev){
+      return prev.map(function(item, i){
+        if (i !== idx) return item;
+        return Object.assign({}, item, {[field]: value});
+      });
+    });
+  }
+
+  function removePreviewItem(idx) {
+    setPreview(function(prev){ return prev.filter(function(_,i){return i!==idx;}); });
+  }
+
+  async function attachFile(idx, file) {
+    if (!file) return;
+    var b64 = await new Promise(function(res,rej){
+      var r = new FileReader();
+      r.onload = function(e){ var result=e.target.result; res(result); };
+      r.onerror=rej; r.readAsDataURL(file);
+    });
+    var sizeMB = Math.round(b64.length*0.75/1024/1024*10)/10;
+    if (sizeMB > 3) { alert("File troppo grande (max 3MB)"); return; }
+    updatePreviewItem(idx, "attachment", {name:file.name, data:b64, size:sizeMB});
   }
 
   var isPDF = file && (file.type === "application/pdf" || file.name.endsWith(".pdf"));
@@ -1141,20 +1180,44 @@ function ExcelImport({ onImport, onClose }) {
                 var person = PEOPLE.find(function(p){return p.id===b.person;});
                 var tc = b.type==="volo"?"#4a9eff":b.type==="hotel"?"#4caf50":"#ff9800";
                 return (
-                  <div key={i} style={{display:"flex",gap:8,padding:"8px 10px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12,alignItems:"center",borderLeft:"3px solid "+(b._matched===false?"#ff6060":tc)}}>
-                    <span>✈</span>
-                    <span style={{color:b._matched===false?"#ff6060":"#e8e8f0",fontWeight:700,minWidth:60}}>
-                      {person ? person.name : b.person}
-                      {b._matched===false && <span style={{fontSize:9,color:"#ff6060",display:"block"}}>⚠ non trovato</span>}
-                    </span>
-                    {b.flight&&<span style={{color:tc}}>{b.flight}</span>}
-                    {b.dep&&<span style={{color:"#7090c0"}}>{b.dep}→{b.arr}</span>}
-                    <span style={{color:"#7090c0",fontSize:10}}>{b.date}</span>
-                    {b.booking&&<span style={{color:"#ff9800",fontFamily:"monospace"}}>#{b.booking}</span>}
+                  <div key={i} style={{background:"#0d0d1a",borderRadius:8,marginBottom:6,border:"1px solid #ffffff11",borderLeft:"3px solid "+(b._matched===false?"#ff6060":tc)}}>
+                    {/* Row summary */}
+                    <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontSize:14}}>{b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗"}</span>
+                      {/* Person selector */}
+                      <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
+                        style={{padding:"2px 6px",background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:5,color:b._matched===false?"#ff6060":"#e8e8f0",fontSize:11,fontWeight:700,maxWidth:110,outline:"none"}}>
+                        <option value="">-- Persona --</option>
+                        {PEOPLE.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
+                      </select>
+                      {b.flight&&<span style={{color:tc,fontSize:11}}>{b.flight}</span>}
+                      {b.dep&&<span style={{color:"#7090c0",fontSize:10}}>{b.dep}{b.arr&&"→"+b.arr}</span>}
+                      {b.date&&<span style={{color:"#7090c0",fontSize:10}}>{b.date}</span>}
+                      {b.booking&&<span style={{color:"#ff9800",fontSize:10,fontFamily:"monospace"}}>#{b.booking}</span>}
+                      <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+                        {/* Attach file */}
+                        <label title="Allega PDF/immagine" style={{cursor:"pointer",padding:"3px 7px",background:"#1e3a8a22",color:b.attachment?"#4caf50":"#4a9eff",borderRadius:5,fontSize:11}}>
+                          <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){attachFile(i,e.target.files[0]);e.target.value="";}}/>
+                          {b.attachment?"📎✓":"📎"}
+                        </label>
+                        {/* Delete row */}
+                        <button onClick={function(){removePreviewItem(i);}} title="Rimuovi" style={{padding:"3px 7px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,cursor:"pointer",fontSize:11}}>✕</button>
+                      </div>
+                    </div>
+                    {b.attachment&&(
+                      <div style={{padding:"4px 10px 8px",fontSize:10,color:"#4caf50",display:"flex",alignItems:"center",gap:6}}>
+                        📎 {b.attachment.name} ({b.attachment.size}MB)
+                        <button onClick={function(){updatePreviewItem(i,"attachment",null);}} style={{background:"none",border:"none",color:"#ff6060",cursor:"pointer",fontSize:10}}>✕</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+            <button onClick={function(){setPreview(function(p){return p.concat([{event:selEvent,person:"",type:"volo",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",notes:"",status:"confermata",_matched:false}]);});}}
+              style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4a9eff",border:"1px dashed #1e3a8a",borderRadius:6,cursor:"pointer",fontSize:12,marginBottom:8,fontWeight:700}}>
+              ➕ Aggiungi riga manualmente
+            </button>
             {preview.some(function(b){return b._matched===false;}) && (
               <div style={{background:"#2a1a00",border:"1px solid #ff980033",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#ff9800"}}>
                 ⚠️ Alcune persone non sono state riconosciute automaticamente. Puoi importare comunque e correggere manualmente.
@@ -1532,7 +1595,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"team",l:"⚙️",adminOnly:true}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -1787,7 +1850,7 @@ export default function App() {
                 );
               })}
               <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #4caf5022"}}>
-                <MealQRSection personId={selPerson} person={person} events={events}/>
+                <MealQRSection personId={selPerson} person={person} events={events} currentUserId={currentUser&&currentUser.id}/>
               </div>
             </div>
           );
@@ -1895,6 +1958,10 @@ export default function App() {
 
         {view==="team" && isAdmin && (
           <TeamManager people={people} setPeople={setPeople} setConfirmDeleteUser={setConfirmDeleteUser} showToast={showToast}/>
+        )}
+
+        {view==="gallery" && (
+          <GalleryView isAdmin={isAdmin}/>
         )}
 
       </div>
@@ -2009,7 +2076,7 @@ var MEAL_NUM_TO_ID = {
   15:"CASADEI", 16:"ERIK", 17:"MAURI", 18:"SIMONE"
 };
 
-function MealQRSection({ personId, person, events }) {
+function MealQRSection({ personId, person, events, currentUserId }) {
   var [expanded, setExpanded] = useState(false);
   var [mealDocs, setMealDocs] = useState({}); // { eventId: { breakfast, lunch, dinner } }
 
@@ -2029,6 +2096,8 @@ function MealQRSection({ personId, person, events }) {
   }, [personId]);
 
   if (!events || events.length === 0) return null;
+  // Only show QR to the person themselves or admin
+  if (currentUserId && currentUserId !== personId && currentUserId !== "LUCA" && currentUserId !== "ILARIO") return null;
 
   var meals = [
     {key:"breakfast", label:"Colazione", emoji:"☕", color:"#ff9800"},
@@ -2092,14 +2161,25 @@ function MealQRSection({ personId, person, events }) {
 }
 
 
+
 // ── MealQRUploader (admin) ─────────────────────────────────
-// Carica 3 cartelle: breakfast, lunch, dinner
-// Ogni cartella contiene i PDF numerati (es. "TEAM PASINI 1.pdf")
 function MealQRUploader({ eventId }) {
   var [uploading, setUploading] = useState(false);
   var [progress, setProgress] = useState("");
   var [done, setDone] = useState(false);
   var [counts, setCounts] = useState({breakfast:0,lunch:0,dinner:0});
+  var [mode, setMode] = useState("bulk"); // "bulk" or "manual"
+  var [manualPerson, setManualPerson] = useState("");
+  var [manualType, setManualType] = useState("breakfast");
+  var [existing, setExisting] = useState([]);
+
+  useEffect(function(){
+    var unsub = db.collection("mealQR").where("event","==",eventId)
+      .onSnapshot(function(snap){
+        setExisting(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      }, function(e){console.error(e);});
+    return function(){unsub();};
+  },[eventId]);
 
   var MEAL_TYPES = [
     {key:"breakfast", label:"☕ Colazione", color:"#ff9800"},
@@ -2109,8 +2189,7 @@ function MealQRUploader({ eventId }) {
 
   async function handleFolder(files, mealType) {
     if (!files || files.length === 0) return;
-    setUploading(true);
-    setDone(false);
+    setUploading(true); setDone(false);
     setProgress("Caricamento "+mealType+"...");
     var uploaded = 0;
     try {
@@ -2118,130 +2197,267 @@ function MealQRUploader({ eventId }) {
       for (var i = 0; i < arr.length; i++) {
         var file = arr[i];
         var fname = file.name;
-        // Skip macOS junk
         if (fname.startsWith("._") || fname === ".DS_Store") continue;
-        // Extract number from filename
         var numMatch = fname.match(/([0-9]+)/);
         if (!numMatch) continue;
         var num = parseInt(numMatch[1]);
         var personId = MEAL_NUM_TO_ID[num];
         if (!personId) continue;
-
         setProgress(mealType+" · "+fname+" ("+personId+") "+(i+1)+"/"+arr.length);
-
         var b64 = await new Promise(function(res,rej){
           var r = new FileReader();
-          r.onload = function(e){ res(e.target.result); };
-          r.onerror = rej;
-          r.readAsDataURL(file);
+          r.onload = function(e){ var result=e.target.result; var idx=result.indexOf(","); res(idx>=0?result.substring(idx+1):result); };
+          r.onerror=rej; r.readAsDataURL(file);
         });
-
-        var sizeMB = Math.round(b64.length * 0.75 / 1024 / 1024 * 10) / 10;
-        if (sizeMB > 5) { console.warn("Troppo grande:", fname); continue; }
-
-        // Upsert mealQR doc for event+person+mealType
-        var snap = await db.collection("mealQR")
-          .where("event","==",eventId)
-          .where("personId","==",personId)
-          .where("mealType","==",mealType)
-          .get();
-
-        var docData = {
-          event: eventId, personId: personId,
-          mealType: mealType, fileNum: num,
-          fileName: fname, fileData: b64,
-          uploadedAt: new Date().toISOString().substring(0,10),
-        };
-
-        if (!snap.empty) {
-          await snap.docs[0].ref.set(docData);
-        } else {
-          await db.collection("mealQR").add(docData);
-        }
+        var sizeMB = Math.round(b64.length*0.75/1024/1024*10)/10;
+        if (sizeMB > 5) continue;
+        var snap = await db.collection("mealQR").where("event","==",eventId).where("personId","==",personId).where("mealType","==",mealType).get();
+        var docData = {event:eventId,personId:personId,mealType:mealType,fileNum:num,fileName:fname,fileData:"data:application/pdf;base64,"+b64,uploadedAt:new Date().toISOString().substring(0,10)};
+        if (!snap.empty) await snap.docs[0].ref.set(docData);
+        else await db.collection("mealQR").add(docData);
         uploaded++;
       }
-      setCounts(function(prev){ var n=Object.assign({},prev); n[mealType]=uploaded; return n; });
+      setCounts(function(prev){var n=Object.assign({},prev);n[mealType]=uploaded;return n;});
       setProgress("✅ "+mealType+": "+uploaded+" PDF caricati");
       setDone(true);
-    } catch(err) {
-      console.error(err);
-      setProgress("❌ Errore: " + err.message);
-    }
+    } catch(err){ setProgress("❌ Errore: "+err.message); }
     setUploading(false);
+  }
+
+  async function handleManual(file) {
+    if (!file || !manualPerson) return;
+    setUploading(true);
+    try {
+      var b64 = await new Promise(function(res,rej){
+        var r = new FileReader();
+        r.onload = function(e){ var result=e.target.result; var idx=result.indexOf(","); res(idx>=0?result.substring(idx+1):result); };
+        r.onerror=rej; r.readAsDataURL(file);
+      });
+      var mime = file.type||"application/pdf";
+      var snap = await db.collection("mealQR").where("event","==",eventId).where("personId","==",manualPerson).where("mealType","==",manualType).get();
+      var docData = {event:eventId,personId:manualPerson,mealType:manualType,fileName:file.name,fileData:"data:"+mime+";base64,"+b64,uploadedAt:new Date().toISOString().substring(0,10)};
+      if (!snap.empty) await snap.docs[0].ref.set(docData);
+      else await db.collection("mealQR").add(docData);
+      setProgress("✅ QR caricato per "+manualPerson+" — "+manualType);
+      setDone(true);
+    } catch(err){ setProgress("❌ "+err.message); }
+    setUploading(false);
+  }
+
+  async function deleteQR(id) {
+    await db.collection("mealQR").doc(id).delete();
   }
 
   return (
     <div style={{background:"#0d1a0d",borderRadius:8,padding:14,border:"1px solid #4caf5033",marginBottom:12}}>
-      <div style={{fontSize:12,fontWeight:700,color:"#4caf50",marginBottom:6}}>📂 Carica QR Code Pasti — {(EVENTS.find(function(e){return e.id===eventId;})||{label:eventId}).label}</div>
-      <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>
-        Seleziona i file di ogni pasto (PDF numerati: 1=Ilario, 2=Luca, ecc.)
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#4caf50"}}>📂 QR Code Pasti — {(EVENTS.find(function(e){return e.id===eventId;})||{label:eventId}).label}</div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={function(){setMode("bulk");}} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="bulk"?"#14532d":"#0d0d1a",color:mode==="bulk"?"#4caf50":"#7090c0"}}>📦 Bulk</button>
+          <button onClick={function(){setMode("manual");}} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="manual"?"#14532d":"#0d0d1a",color:mode==="manual"?"#4caf50":"#7090c0"}}>✏️ Manuale</button>
+          <button onClick={function(){setMode("manage");}} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="manage"?"#14532d":"#0d0d1a",color:mode==="manage"?"#4caf50":"#7090c0"}}>🗂️ Gestisci</button>
+        </div>
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {MEAL_TYPES.map(function(mt){
-          return (
-            <label key={mt.key} style={{display:"flex",alignItems:"center",gap:10,background:"#0d0d1a",border:"2px dashed "+mt.color+"44",borderRadius:8,padding:"10px 12px",cursor:uploading?"not-allowed":"pointer",opacity:uploading?0.6:1}}>
-              <input type="file" accept=".pdf" multiple style={{display:"none"}} disabled={uploading}
-                onChange={function(e){handleFolder(e.target.files,mt.key);e.target.value="";}}/>
-              <span style={{fontSize:14}}>{mt.label.split(" ")[0]}</span>
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:700,color:mt.color}}>{mt.label}</div>
-                <div style={{fontSize:10,color:"#7090c0"}}>
-                  {counts[mt.key]>0?"✅ "+counts[mt.key]+" file caricati":"Seleziona tutti i PDF (multi-selezione)"}
+
+      {mode==="bulk" && (
+        <div>
+          <div style={{fontSize:11,color:"#7090c0",marginBottom:8}}>Carica PDF numerati per tutti i membri in una volta</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {MEAL_TYPES.map(function(mt){return(
+              <label key={mt.key} style={{display:"flex",alignItems:"center",gap:10,background:"#0d0d1a",border:"2px dashed "+mt.color+"44",borderRadius:8,padding:"10px 12px",cursor:uploading?"not-allowed":"pointer"}}>
+                <input type="file" accept=".pdf,image/*" multiple style={{display:"none"}} disabled={uploading} onChange={function(e){handleFolder(e.target.files,mt.key);e.target.value="";}}/>
+                <span style={{fontSize:14}}>{mt.label.split(" ")[0]}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:700,color:mt.color}}>{mt.label}</div>
+                  <div style={{fontSize:10,color:"#7090c0"}}>{counts[mt.key]>0?"✅ "+counts[mt.key]+" caricati":"Multi-selezione PDF numerati"}</div>
                 </div>
+                <span style={{fontSize:11,color:mt.color,fontWeight:700}}>Sfoglia →</span>
+              </label>
+            );})}
+          </div>
+        </div>
+      )}
+
+      {mode==="manual" && (
+        <div>
+          <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>Carica o sostituisci il QR di un singolo membro</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Membro</label>
+              <select value={manualPerson} onChange={function(e){setManualPerson(e.target.value);}}
+                style={{width:"100%",padding:"8px",background:"#0d0d1a",border:"1px solid #4caf5033",borderRadius:6,color:manualPerson?"#e8e8f0":"#7090c0",fontSize:12,outline:"none"}}>
+                <option value="">-- Seleziona --</option>
+                {Object.entries(MEAL_NUM_TO_ID).map(function(e){
+                  var p=PEOPLE.find(function(p){return p.id===e[1];});
+                  return React.createElement("option",{key:e[0],value:e[1]},e[0]+" — "+(p?p.name:e[1]));
+                })}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Tipo pasto</label>
+              <select value={manualType} onChange={function(e){setManualType(e.target.value);}}
+                style={{width:"100%",padding:"8px",background:"#0d0d1a",border:"1px solid #4caf5033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none"}}>
+                {MEAL_TYPES.map(function(mt){return React.createElement("option",{key:mt.key,value:mt.key},mt.label);})}
+              </select>
+            </div>
+          </div>
+          <label style={{display:"block",background:"#0d0d1a",border:"2px dashed #4caf5044",borderRadius:8,padding:12,textAlign:"center",cursor:(uploading||!manualPerson)?"not-allowed":"pointer",opacity:(uploading||!manualPerson)?0.5:1}}>
+            <input type="file" accept=".pdf,image/*" style={{display:"none"}} disabled={uploading||!manualPerson} onChange={function(e){handleManual(e.target.files[0]);e.target.value="";}}/>
+            <span style={{fontSize:12,color:"#4caf50"}}>{uploading?"⏳ Caricamento...":"📄 Seleziona PDF o immagine"}</span>
+          </label>
+        </div>
+      )}
+
+      {mode==="manage" && (
+        <div style={{maxHeight:240,overflowY:"auto"}}>
+          {existing.length===0 && <div style={{fontSize:12,color:"#7090c0",textAlign:"center",padding:16}}>Nessun QR caricato per questo evento</div>}
+          {existing.map(function(doc){
+            var p=PEOPLE.find(function(x){return x.id===doc.personId;});
+            var mt=MEAL_TYPES.find(function(m){return m.key===doc.mealType;})||{label:doc.mealType||"?",color:"#7090c0"};
+            return(
+              <div key={doc._id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:11}}>
+                <span style={{background:mt.color+"22",color:mt.color,borderRadius:4,padding:"2px 6px",fontSize:10,fontWeight:700,flexShrink:0}}>{mt.label}</span>
+                <span style={{flex:1,color:"#e8e8f0",fontWeight:700}}>{p?p.name:doc.personId}</span>
+                <span style={{color:"#555",fontSize:10}}>{doc.uploadedAt}</span>
+                <button onClick={function(){
+                  try{var ar=doc.fileData.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(doc.fileData,"_blank");}
+                }} style={{background:"#1e3a8a22",color:"#4a9eff",border:"none",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:10,flexShrink:0}}>👁️</button>
+                <button onClick={function(){if(window.confirm("Eliminare QR di "+(p?p.name:doc.personId)+"?")) deleteQR(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
               </div>
-              <span style={{fontSize:11,color:mt.color,fontWeight:700}}>Sfoglia →</span>
-            </label>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
       {progress && <div style={{marginTop:8,fontSize:11,color:done?"#4caf50":"#ff9800",padding:"6px 8px",background:"#0d0d1a",borderRadius:6}}>{progress}</div>}
     </div>
   );
 }
 
 
-// ── PersonMealQR (inline in event view) ───────────────────
-function PersonMealQR({ personId, eventId }) {
-  var [docs, setDocs] = useState(null); // null=loading, {}=loaded
+// ── GalleryView ────────────────────────────────────────────
+function GalleryView({ isAdmin }) {
+  var [links, setLinks] = useState([]);
+  var [editing, setEditing] = useState(false);
+  var [form, setForm] = useState({title:"", url:"", description:""});
+  var [saving, setSaving] = useState(false);
 
   useEffect(function(){
-    var unsub = db.collection("mealQR")
-      .where("personId","==",personId)
-      .where("event","==",eventId)
+    var unsub = db.collection("galleryLinks").orderBy("createdAt","desc")
       .onSnapshot(function(snap){
-        var obj = {};
-        snap.docs.forEach(function(d){
-          var data = d.data();
-          obj[data.mealType||"breakfast"] = { data: data.fileData, name: data.fileName };
+        setLinks(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      }, function(e){
+        // orderBy may fail without index - fallback
+        db.collection("galleryLinks").onSnapshot(function(snap){
+          setLinks(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
         });
-        setDocs(obj);
-      }, function(e){ console.error(e); });
-    return function(){ unsub(); };
-  }, [personId, eventId]);
+      });
+    return function(){unsub();};
+  },[]);
 
-  if (!docs || Object.keys(docs).length === 0) return null;
+  async function saveLink() {
+    if (!form.title || !form.url) return;
+    setSaving(true);
+    var data = {title:form.title, url:form.url, description:form.description, createdAt:new Date().toISOString()};
+    if (form._id) await db.collection("galleryLinks").doc(form._id).set(data);
+    else await db.collection("galleryLinks").add(data);
+    setForm({title:"",url:"",description:""}); setEditing(false); setSaving(false);
+  }
 
-  var meals = [
-    {key:"breakfast",emoji:"☕",label:"Col.",color:"#ff9800"},
-    {key:"lunch",    emoji:"🍽️",label:"Pranzo",color:"#4caf50"},
-    {key:"dinner",   emoji:"🌙",label:"Cena",color:"#4a9eff"},
-  ];
+  async function deleteLink(id) {
+    if (window.confirm("Eliminare questo link?")) await db.collection("galleryLinks").doc(id).delete();
+  }
+
+  function openLink(url) {
+    var u = url.startsWith("http") ? url : "https://"+url;
+    window.open(u, "_blank");
+  }
 
   return (
-    <div style={{marginTop:8,display:"flex",gap:6}}>
-      {meals.map(function(m){
-        var doc = docs[m.key];
-        if (!doc) return null;
-        return (
-          <button key={m.key} onClick={function(){
-              try{var ar=doc.data.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(doc.data,"_blank");}
-            }}
-            style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:m.color+"22",color:m.color,borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700}}>
-            {m.emoji} {m.label}
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:800,color:"#4a9eff"}}>🖼️ Gallery</div>
+          <div style={{fontSize:12,color:"#7090c0",marginTop:2}}>Foto, video e album del team</div>
+        </div>
+        {isAdmin && (
+          <button onClick={function(){setForm({title:"",url:"",description:""});setEditing(true);}}
+            style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontWeight:700,fontSize:13}}>
+            ➕ Aggiungi link
           </button>
-        );
-      })}
+        )}
+      </div>
+
+      {editing && (
+        <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #4a9eff33",marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#4a9eff",marginBottom:14}}>{form._id?"✏️ Modifica link":"➕ Nuovo link"}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div>
+              <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>Titolo</label>
+              <input value={form.title} onChange={function(e){setForm(function(f){return Object.assign({},f,{title:e.target.value});});}}
+                placeholder="es. Album R1 Barcellona" style={{width:"100%",padding:"9px 12px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"}}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>Link Google Drive / URL</label>
+              <input value={form.url} onChange={function(e){setForm(function(f){return Object.assign({},f,{url:e.target.value});});}}
+                placeholder="https://drive.google.com/drive/folders/..." style={{width:"100%",padding:"9px 12px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"}}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>Descrizione (opzionale)</label>
+              <input value={form.description} onChange={function(e){setForm(function(f){return Object.assign({},f,{description:e.target.value});});}}
+                placeholder="es. Foto gara, paddock, festeggiamenti..." style={{width:"100%",padding:"9px 12px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"}}/>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={function(){setEditing(false);}} style={{flex:1,padding:10,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>Annulla</button>
+              <button onClick={saveLink} disabled={!form.title||!form.url||saving}
+                style={{flex:2,padding:10,background:(form.title&&form.url&&!saving)?"#1e3a8a":"#1a1a2a",color:(form.title&&form.url&&!saving)?"#fff":"#444",border:"none",borderRadius:8,cursor:(form.title&&form.url&&!saving)?"pointer":"not-allowed",fontWeight:700}}>
+                {saving?"💾 Salvataggio...":"💾 Salva"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {links.length === 0 && !editing && (
+        <div style={{textAlign:"center",padding:"40px 20px",color:"#7090c0"}}>
+          <div style={{fontSize:48,marginBottom:12}}>🖼️</div>
+          <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>Nessun album ancora</div>
+          {isAdmin && <div style={{fontSize:12}}>Aggiungi il link Google Drive con le foto del team</div>}
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {links.map(function(link){
+          return (
+            <div key={link._id} style={{background:"#12121f",borderRadius:12,padding:18,border:"1px solid #1e3a8a33",display:"flex",gap:14,alignItems:"center"}}>
+              <div style={{width:48,height:48,borderRadius:10,background:"linear-gradient(135deg,#1e3a8a,#4a9eff22)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>
+                {link.url.includes("drive.google")?"📁":link.url.includes("photo")?"📸":link.url.includes("video")?"🎥":"🔗"}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:800,color:"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{link.title}</div>
+                {link.description && <div style={{fontSize:12,color:"#7090c0",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{link.description}</div>}
+                <div style={{fontSize:10,color:"#555",marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{link.url}</div>
+              </div>
+              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button onClick={function(){openLink(link.url);}}
+                  style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:7,padding:"8px 14px",cursor:"pointer",fontWeight:700,fontSize:12}}>
+                  🔗 Apri
+                </button>
+                {isAdmin && (
+                  <button onClick={function(){setForm(Object.assign({},link));setEditing(true);}}
+                    style={{background:"#0d0d1a",color:"#4a9eff",border:"1px solid #1e3a8a44",borderRadius:7,padding:"8px 10px",cursor:"pointer",fontSize:12}}>✏️</button>
+                )}
+                {isAdmin && (
+                  <button onClick={function(){deleteLink(link._id);}}
+                    style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:7,padding:"8px 10px",cursor:"pointer",fontSize:12}}>🗑️</button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
+
 
