@@ -928,6 +928,7 @@ function AddBookingForm({ defaultEvent, onSave }) {
 
 // ── HotelRoomAssigner ─────────────────────────────────────
 function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
+  var [tab, setTab] = useState("excel"); // "excel" | "manual"
   var [hotel, setHotel] = useState("");
   var [address, setAddress] = useState("");
   var [booking, setBooking] = useState("");
@@ -937,64 +938,45 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
   var [selEvent, setSelEvent] = useState(defaultEvent||"");
   var [rooms, setRooms] = useState([{id:1, type:"Matrimoniale", people:[]}]);
   var [nextId, setNextId] = useState(2);
-  var [extracting, setExtracting] = useState(false);
-  var [extractError, setExtractError] = useState("");
+  var [xlsError, setXlsError] = useState("");
+  var [xlsLoaded, setXlsLoaded] = useState(false);
 
-  async function handlePDF(file) {
+  async function handleExcel(file) {
     if (!file) return;
-    setExtracting(true);
-    setExtractError("");
+    setXlsError(""); setXlsLoaded(false);
     try {
-      var b64 = await new Promise(function(res, rej) {
-        var r = new FileReader();
-        r.onload = function(e){ res(e.target.result.split(",")[1]); };
-        r.onerror = rej;
-        r.readAsDataURL(file);
+      var XLSX = await import("xlsx");
+      var data = await file.arrayBuffer();
+      var wb = XLSX.read(data, {type:"array"});
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:""});
+      // Find header row (skip instruction rows)
+      var headerIdx = rows.findIndex(function(r){ return String(r[0]).trim()==="Evento"; });
+      if (headerIdx === -1) throw new Error("Formato non riconosciuto. Usa l'Excel generato dalla chat.");
+      var dataRows = rows.slice(headerIdx+1).filter(function(r){ return r[1]||r[3]; });
+      if (dataRows.length === 0) throw new Error("Nessuna riga trovata nel file.");
+
+      // Extract hotel info from first row
+      var first = dataRows[0];
+      setSelEvent(first[0]||defaultEvent||"");
+      setHotel(first[4]||"");
+      setAddress(first[5]||"");
+      setCheckin(first[6]||"");
+      setCheckout(first[7]||"");
+      setNights(String(first[8]||""));
+      setBooking(String(first[9]||""));
+
+      // Group rows by camera type — each unique camera type becomes a room
+      var roomMap = {};
+      var roomOrder = [];
+      dataRows.forEach(function(r) {
+        var camType = String(r[3]||"Camera");
+        if (!roomMap[camType]) { roomMap[camType] = {type:camType, people:[]}; roomOrder.push(camType); }
       });
-
-      var sizeMB = (b64.length * 0.75) / 1024 / 1024;
-      if (sizeMB > 4) {
-        throw new Error("PDF troppo grande (max 4MB). Comprimi il file prima di caricarlo.");
-      }
-
-      var resp = await fetch("/api/claude", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
-              { type: "text", text: "Sei un estrattore di dati da prenotazioni hotel. Dal documento estrai SOLO questi campi e rispondi ESCLUSIVAMENTE con un oggetto JSON valido su una sola riga, senza markdown, senza spiegazioni, senza testo prima o dopo:\n{\"hotel\":\"nome hotel\",\"address\":\"indirizzo completo con città\",\"booking\":\"numero conferma senza punti\",\"checkin\":\"giorno e mese es. 11 Giu\",\"checkout\":\"giorno e mese es. 14 Giu\",\"nights\":\"numero notti come stringa\",\"rooms\":[{\"type\":\"tipo camera esatto\"}]}" }
-            ]
-          }]
-        })
-      });
-
-      var data = await resp.json();
-      var text = (data.content||[]).map(function(c){ return c.text||""; }).join("");
-      var clean = text.replace(/```json|```/g,"").trim();
-      var parsed = JSON.parse(clean);
-
-      if (parsed.hotel) setHotel(parsed.hotel);
-      if (parsed.address) setAddress(parsed.address);
-      if (parsed.booking) setBooking(parsed.booking.replace(/\./g,""));
-      if (parsed.checkin) setCheckin(parsed.checkin);
-      if (parsed.checkout) setCheckout(parsed.checkout);
-      if (parsed.nights) setNights(String(parsed.nights));
-      if (parsed.rooms && parsed.rooms.length > 0) {
-        var newRooms = parsed.rooms.map(function(r, i){
-          return {id: i+1, type: r.type||"Camera", people:[]};
-        });
-        setRooms(newRooms);
-        setNextId(newRooms.length + 1);
-      }
-    } catch(e) {
-      setExtractError("Errore estrazione: " + (e.message||"riprova"));
-    }
-    setExtracting(false);
+      var newRooms = roomOrder.map(function(t, i){ return {id:i+1, type:t, people:[]}; });
+      setRooms(newRooms);
+      setNextId(newRooms.length+1);
+      setXlsLoaded(true);
+    } catch(e) { setXlsError("Errore: "+(e.message||"Riprova")); }
   }
 
   function addRoom() {
@@ -1014,54 +996,63 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
   function updateRoom(id, key, val) {
     setRooms(function(rs){ return rs.map(function(r){ return r.id===id ? Object.assign({},r,{[key]:val}) : r; }); });
   }
-
   function handleSave() {
     if (!hotel || !selEvent) { alert("Inserisci nome hotel ed evento"); return; }
     var bookings = [];
     rooms.forEach(function(room) {
       room.people.forEach(function(pid) {
-        bookings.push({
-          type: "hotel", event: selEvent, person: pid,
-          hotel: hotel, address: address, booking: booking,
-          room: room.type, nights: nights,
-          checkin: checkin, checkout: checkout,
-          status: "confermata",
-        });
+        bookings.push({ type:"hotel", event:selEvent, person:pid, hotel:hotel, address:address,
+          booking:booking, room:room.type, nights:nights, checkin:checkin, checkout:checkout, status:"confermata" });
       });
     });
     if (bookings.length === 0) { alert("Assegna almeno una persona a una camera"); return; }
-    onSave(bookings);
-    onClose();
+    onSave(bookings); onClose();
   }
 
   var allAssigned = rooms.reduce(function(acc,r){ return acc.concat(r.people); }, []);
   var inp = {width:"100%",padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:6,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
+  var totalAssigned = rooms.reduce(function(n,r){return n+r.people.length;},0);
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3000,overflowY:"auto",padding:"20px 16px"}}>
       <div style={{maxWidth:560,margin:"0 auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <div style={{fontSize:16,fontWeight:800,color:"#4caf50"}}>🏨 Assegna Camere Hotel</div>
           <button onClick={onClose} style={{background:"#3a1a1a",color:"#ff6060",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontWeight:700}}>✕</button>
         </div>
 
-        {/* PDF Import */}
-        <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #4a9eff33"}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#4a9eff",marginBottom:8}}>🤖 Importa da PDF Booking</div>
-          <label style={{display:"block",background:"#0d1a2a",border:"2px dashed #1e3a8a",borderRadius:8,padding:"12px",textAlign:"center",cursor:extracting?"not-allowed":"pointer"}}>
-            <input type="file" accept=".pdf" style={{display:"none"}} disabled={extracting}
-              onChange={function(e){ handlePDF(e.target.files[0]); e.target.value=""; }}/>
-            {extracting
-              ? <span style={{fontSize:12,color:"#4a9eff"}}>⏳ Estrazione dati in corso...</span>
-              : <span style={{fontSize:12,color:"#4a9eff"}}>📄 Tocca per caricare il PDF di Booking.com</span>
-            }
-          </label>
-          {extractError && <div style={{marginTop:6,fontSize:11,color:"#ff6060"}}>{extractError}</div>}
+        {/* Tabs */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:14}}>
+          {[{id:"excel",label:"📊 Da Excel",color:"#4caf50"},{id:"manual",label:"✏️ Manuale",color:"#4a9eff"}].map(function(t){
+            var sel = tab===t.id;
+            return <button key={t.id} onClick={function(){setTab(t.id);}}
+              style={{padding:"10px",borderRadius:8,border:"2px solid "+(sel?t.color:"#1e3a8a22"),background:sel?t.color+"22":"#0d0d1a",
+                color:sel?t.color:"#7090c0",fontWeight:sel?800:400,fontSize:13,cursor:"pointer"}}>
+              {t.label}
+            </button>;
+          })}
         </div>
 
-        {/* Dati hotel */}
-        <div style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#4a9eff",marginBottom:10}}>📋 Dati Hotel</div>
+        {/* Excel tab */}
+        {tab==="excel" && (
+          <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #4caf5033"}}>
+            <div style={{fontSize:12,color:"#7090c0",marginBottom:10}}>
+              Carica l'Excel generato dalla chat di Claude — le camere vengono create automaticamente.
+            </div>
+            <label style={{display:"block",background:"#0d1a2a",border:"2px dashed "+(xlsLoaded?"#4caf50":"#1e3a8a"),borderRadius:8,padding:"14px",textAlign:"center",cursor:"pointer"}}>
+              <input type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={function(e){handleExcel(e.target.files[0]); e.target.value="";}}/>
+              {xlsLoaded
+                ? <span style={{fontSize:12,color:"#4caf50",fontWeight:700}}>✅ Excel caricato — {rooms.length} camere trovate</span>
+                : <span style={{fontSize:12,color:"#4a9eff"}}>📊 Tocca per caricare il file Excel</span>
+              }
+            </label>
+            {xlsError && <div style={{marginTop:8,fontSize:11,color:"#ff6060"}}>{xlsError}</div>}
+          </div>
+        )}
+
+        {/* Dati hotel — sempre visibili */}
+        <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #1e3a8a33"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#4a9eff",marginBottom:10}}>📋 Dati Hotel</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
             <div>
               <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Evento</label>
@@ -1072,7 +1063,7 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
             </div>
             <div>
               <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>N° Conferma</label>
-              <input value={booking} onChange={function(e){setBooking(e.target.value);}} placeholder="es. 6370734724" style={Object.assign({},inp,{fontSize:12})}/>
+              <input value={booking} onChange={function(e){setBooking(e.target.value);}} placeholder="6370734724" style={Object.assign({},inp,{fontSize:12})}/>
             </div>
           </div>
           <div style={{marginBottom:8}}>
@@ -1084,18 +1075,12 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
             <input value={address} onChange={function(e){setAddress(e.target.value);}} placeholder="es. Rua do Alentejo 12, Estoril" style={inp}/>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Check-in</label>
-              <input value={checkin} onChange={function(e){setCheckin(e.target.value);}} placeholder="11 Giu" style={Object.assign({},inp,{fontSize:12})}/>
-            </div>
-            <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Check-out</label>
-              <input value={checkout} onChange={function(e){setCheckout(e.target.value);}} placeholder="14 Giu" style={Object.assign({},inp,{fontSize:12})}/>
-            </div>
-            <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Notti</label>
-              <input value={nights} onChange={function(e){setNights(e.target.value);}} placeholder="3" style={Object.assign({},inp,{fontSize:12})}/>
-            </div>
+            {[["checkin","Check-in","11 Giu",checkin,setCheckin],["checkout","Check-out","14 Giu",checkout,setCheckout],["nights","Notti","3",nights,setNights]].map(function(f){
+              return <div key={f[0]}>
+                <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>{f[1]}</label>
+                <input value={f[3]} onChange={function(e){f[4](e.target.value);}} placeholder={f[2]} style={Object.assign({},inp,{fontSize:12})}/>
+              </div>;
+            })}
           </div>
         </div>
 
@@ -1131,12 +1116,12 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
           );
         })}
 
-        <button onClick={addRoom} style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4caf50",border:"1px dashed #4caf5044",borderRadius:8,cursor:"pointer",fontSize:12,marginBottom:16}}>
+        <button onClick={addRoom} style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4caf50",border:"1px dashed #4caf5044",borderRadius:8,cursor:"pointer",fontSize:12,marginBottom:12}}>
           ➕ Aggiungi Camera
         </button>
 
-        <button onClick={handleSave} style={{width:"100%",padding:"12px",background:"#1a4a1a",color:"#4caf50",border:"2px solid #4caf5044",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:700}}>
-          💾 Salva {rooms.reduce(function(n,r){return n+r.people.length;},0)} prenotazioni hotel
+        <button onClick={handleSave} style={{width:"100%",padding:"13px",background:totalAssigned>0?"#1a4a1a":"#1a1a2a",color:totalAssigned>0?"#4caf50":"#444",border:"2px solid "+(totalAssigned>0?"#4caf5044":"transparent"),borderRadius:8,cursor:totalAssigned>0?"pointer":"not-allowed",fontSize:14,fontWeight:700}}>
+          💾 Salva {totalAssigned>0?"("+totalAssigned+" prenotazioni)":""}
         </button>
       </div>
     </div>
