@@ -452,7 +452,13 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
       )}
       {b.type === "hotel" && (
         <span style={{display:"contents"}}>
-          <span style={{fontWeight:700,fontSize:12}}>{b.hotel}</span>
+          {b.address
+            ? <span onClick={function(e){e.stopPropagation(); window.open("https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((b.hotel||"")+" "+b.address),"_blank");}}
+                style={{fontWeight:700,fontSize:12,cursor:"pointer",color:"#4caf50",textDecoration:"underline dotted"}}>
+                📍 {b.hotel}
+              </span>
+            : <span style={{fontWeight:700,fontSize:12}}>{b.hotel}</span>
+          }
           {b.room && <span style={{fontSize:11,color:"#7090c0"}}>Camera {b.room}</span>}
           {b.nights && <span style={{fontSize:11,color:"#7090c0"}}>{b.nights} notti</span>}
           {b.booking && <span style={{fontSize:10,color:"#ff9800",fontFamily:"monospace"}}>#{b.booking}</span>}
@@ -491,7 +497,7 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
   var fields = booking.type === "volo"
     ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["notes","Note"]]
     : booking.type === "hotel"
-    ? [["hotel","Hotel"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["notes","Note"]]
+    ? [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["notes","Note"]]
     : [["car","Veicolo"],["booking","N° Prenotazione"],["notes","Note"]];
   var statusOptions = [{v:"confermata",l:"✅ Confermata"},{v:"da_confermare",l:"⏳ Da confermare"},{v:"cancellata",l:"❌ Cancellata"}];
   var ev = EVENTS.find(function(e) { return e.id === booking.event; });
@@ -896,6 +902,160 @@ function AddBookingForm({ defaultEvent, onSave }) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── HotelRoomAssigner ─────────────────────────────────────
+function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
+  var [hotel, setHotel] = useState("");
+  var [address, setAddress] = useState("");
+  var [booking, setBooking] = useState("");
+  var [checkin, setCheckin] = useState("");
+  var [checkout, setCheckout] = useState("");
+  var [nights, setNights] = useState("");
+  var [selEvent, setSelEvent] = useState(defaultEvent||"");
+  var [rooms, setRooms] = useState([{id:1, type:"Matrimoniale", people:[]}]);
+  var [nextId, setNextId] = useState(2);
+
+  function addRoom() {
+    setRooms(function(r){ return r.concat([{id:nextId, type:"Camera", people:[]}]); });
+    setNextId(function(n){ return n+1; });
+  }
+  function removeRoom(id) {
+    setRooms(function(r){ return r.filter(function(x){ return x.id!==id; }); });
+  }
+  function togglePerson(roomId, pid) {
+    setRooms(function(rs){ return rs.map(function(r){
+      if (r.id !== roomId) return r;
+      var has = r.people.includes(pid);
+      return Object.assign({}, r, {people: has ? r.people.filter(function(p){return p!==pid;}) : r.people.concat([pid])});
+    });});
+  }
+  function updateRoom(id, key, val) {
+    setRooms(function(rs){ return rs.map(function(r){ return r.id===id ? Object.assign({},r,{[key]:val}) : r; }); });
+  }
+
+  function handleSave() {
+    if (!hotel || !selEvent) { alert("Inserisci nome hotel ed evento"); return; }
+    var bookings = [];
+    rooms.forEach(function(room) {
+      room.people.forEach(function(pid) {
+        bookings.push({
+          type: "hotel",
+          event: selEvent,
+          person: pid,
+          hotel: hotel,
+          address: address,
+          booking: booking,
+          room: room.type,
+          nights: nights,
+          checkin: checkin,
+          checkout: checkout,
+          status: "confermata",
+        });
+      });
+    });
+    if (bookings.length === 0) { alert("Assegna almeno una persona a una camera"); return; }
+    onSave(bookings);
+    onClose();
+  }
+
+  var allAssigned = rooms.reduce(function(acc,r){ return acc.concat(r.people); }, []);
+  var inp = {width:"100%",padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:6,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3000,overflowY:"auto",padding:"20px 16px"}}>
+      <div style={{maxWidth:560,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div style={{fontSize:16,fontWeight:800,color:"#4caf50"}}>🏨 Assegna Camere Hotel</div>
+          <button onClick={onClose} style={{background:"#3a1a1a",color:"#ff6060",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontWeight:700}}>✕</button>
+        </div>
+
+        {/* Dati hotel */}
+        <div style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#4a9eff",marginBottom:10}}>📋 Dati Hotel</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Evento</label>
+              <select value={selEvent} onChange={function(e){setSelEvent(e.target.value);}} style={Object.assign({},inp,{fontSize:12})}>
+                <option value="">-- Seleziona --</option>
+                {EVENTS.map(function(ev){ return React.createElement("option",{key:ev.id,value:ev.id},ev.label); })}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>N° Conferma Booking</label>
+              <input value={booking} onChange={function(e){setBooking(e.target.value);}} placeholder="es. 6370.734.724" style={Object.assign({},inp,{fontSize:12})}/>
+            </div>
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Nome Hotel</label>
+            <input value={hotel} onChange={function(e){setHotel(e.target.value);}} placeholder="es. Hotel Lido" style={inp}/>
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Indirizzo (per Google Maps)</label>
+            <input value={address} onChange={function(e){setAddress(e.target.value);}} placeholder="es. Rua do Alentejo 12, Estoril" style={inp}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Check-in</label>
+              <input value={checkin} onChange={function(e){setCheckin(e.target.value);}} placeholder="es. 11 Giu" style={Object.assign({},inp,{fontSize:12})}/>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Check-out</label>
+              <input value={checkout} onChange={function(e){setCheckout(e.target.value);}} placeholder="es. 14 Giu" style={Object.assign({},inp,{fontSize:12})}/>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Notti</label>
+              <input value={nights} onChange={function(e){setNights(e.target.value);}} placeholder="3" style={Object.assign({},inp,{fontSize:12})}/>
+            </div>
+          </div>
+        </div>
+
+        {/* Camere */}
+        {rooms.map(function(room, ri){
+          return (
+            <div key={room.id} style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:10,border:"1px solid #4caf5033"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:6,padding:"2px 10px",fontSize:11,fontWeight:700}}>Camera {ri+1}</span>
+                <input value={room.type} onChange={function(e){updateRoom(room.id,"type",e.target.value);}}
+                  placeholder="Tipo camera" style={{flex:1,padding:"5px 8px",background:"#0d0d1a",border:"1px solid #1e3a8a33",borderRadius:5,color:"#e8e8f0",fontSize:11,outline:"none"}}/>
+                {rooms.length > 1 && <button onClick={function(){removeRoom(room.id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:11}}>✕</button>}
+              </div>
+              <div style={{fontSize:10,color:"#7090c0",marginBottom:6}}>Seleziona persone per questa camera:</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                {PEOPLE.map(function(p){
+                  var sel = room.people.includes(p.id);
+                  var inOther = !sel && allAssigned.includes(p.id);
+                  return (
+                    <div key={p.id} onClick={function(){if(!inOther) togglePerson(room.id, p.id);}}
+                      style={{padding:"5px 8px",borderRadius:6,border:"1px solid "+(sel?"#4caf50":inOther?"#333":"#1e3a8a22"),
+                        background:sel?"#1a4a1a":inOther?"#111":"#0d0d1a",
+                        cursor:inOther?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:5,opacity:inOther?0.4:1}}>
+                      <div style={{width:20,height:20,borderRadius:"50%",background:sel?"#4caf50":"#1a1a2a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff",flexShrink:0}}>{p.name.charAt(0)}</div>
+                      <div style={{fontSize:10,fontWeight:sel?700:400,color:sel?"#4caf50":"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name.split(" ")[0]}</div>
+                      {sel && <span style={{marginLeft:"auto",fontSize:10,color:"#4caf50"}}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              {room.people.length > 0 && (
+                <div style={{marginTop:6,fontSize:10,color:"#4caf50"}}>
+                  {room.people.length} {room.people.length===1?"persona":"persone"} assegnate
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <button onClick={addRoom} style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4caf50",border:"1px dashed #4caf5044",borderRadius:8,cursor:"pointer",fontSize:12,marginBottom:16}}>
+          ➕ Aggiungi Camera
+        </button>
+
+        <button onClick={handleSave} style={{width:"100%",padding:"12px",background:"#1a4a1a",color:"#4caf50",border:"2px solid #4caf5044",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:700}}>
+          💾 Salva {rooms.reduce(function(n,r){return n+r.people.length;},0)} prenotazioni hotel
+        </button>
       </div>
     </div>
   );
@@ -1529,6 +1689,7 @@ export default function App() {
   var [fbLoaded, setFbLoaded] = useState(false);
   var [personEventFilter, setPersonEventFilter] = useState(null);
   var [docViewer, setDocViewer] = useState(null); // {fileData, fileName}
+  var [hotelModal, setHotelModal] = useState(null); // null | eventId
 
   // Register global doc opener for iOS-compatible inline viewer
   useEffect(function(){
@@ -1696,6 +1857,11 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      {hotelModal !== null && <HotelRoomAssigner
+        defaultEvent={hotelModal||undefined}
+        onSave={function(bs){ bs.forEach(function(b){ fbAdd("bookings",b).then(function(ref){ if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}); }); showToast("Salvate "+bs.length+" prenotazioni hotel ✓"); }}
+        onClose={function(){setHotelModal(null);}}
+      />}
       {docViewer && <DocViewer fileData={docViewer.fileData} fileName={docViewer.fileName} onClose={function(){setDocViewer(null);}}/>}
       {editB && <EditModal booking={editB} onSave={handleSave} onClose={function(){setEditB(null); setEditIdx(null);}} onDelete={function(){setConfirmDelete(editB);setEditB(null);}}
         onDuplicate={function(b, peopleIds) {
@@ -2043,6 +2209,7 @@ export default function App() {
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
                 <button onClick={function(){setSelEvent(null);}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>← Eventi</button>
+                {isAdmin && <button onClick={function(){setHotelModal(selEvent);}} style={{background:"#0d2a1a",color:"#4caf50",border:"1px solid #4caf5033",padding:"8px 12px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>🏨 Camere</button>}
                 {isAdmin && <button onClick={function(){setAddModal(selEvent);}} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"8px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>➕ Aggiungi</button>}
               </div>
               <div style={{background:"#12121f",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #1e3a8a",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
