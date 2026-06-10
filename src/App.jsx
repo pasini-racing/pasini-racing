@@ -368,10 +368,10 @@ const COMPANY_COLORS = {
 
 const COMPANY_URLS = {
   "Ryanair":    "https://www.ryanair.com/it/it/manage-my-booking",
-  "EasyJet":    "https://www.easyjet.com/it/flight/manage",
+  "EasyJet":    "https://www.easyjet.com/it",
   "Wizz":       "https://wizzair.com/it-it/bookings/manage-booking",
   "Vueling":    "https://www.vueling.com/it/servizi-per-i-viaggiatori/gestisci-il-tuo-volo",
-  "TAP":        "https://www.tapairportugal.com/it/gestisci-prenotazione",
+  "TAP":        "https://www.tapairportugal.com/it",
   "Air Europa": "https://www.aireuropa.com/it/voli/gestisci-la-tua-prenotazione",
   "Iberia":     "https://www.iberia.com/it/gestisci/",
   "Transavia":  "https://www.transavia.com/it-IT/manage-your-booking/",
