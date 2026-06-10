@@ -933,17 +933,22 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
         r.readAsDataURL(file);
       });
 
+      var sizeMB = (b64.length * 0.75) / 1024 / 1024;
+      if (sizeMB > 4) {
+        throw new Error("PDF troppo grande (max 4MB). Comprimi il file prima di caricarlo.");
+      }
+
       var resp = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
+          max_tokens: 2000,
           messages: [{
             role: "user",
             content: [
               { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
-              { type: "text", text: "Estrai dal documento di prenotazione hotel i seguenti dati e rispondi SOLO con un oggetto JSON valido, senza markdown:\n{\"hotel\": \"nome hotel\", \"address\": \"indirizzo completo\", \"booking\": \"numero conferma\", \"checkin\": \"data check-in es. 11 Giu\", \"checkout\": \"data check-out es. 14 Giu\", \"nights\": \"numero notti\", \"rooms\": [{\"type\": \"tipo camera es. Camera Matrimoniale Superior\"}, ...]}" }
+              { type: "text", text: "Sei un estrattore di dati da prenotazioni hotel. Dal documento estrai SOLO questi campi e rispondi ESCLUSIVAMENTE con un oggetto JSON valido su una sola riga, senza markdown, senza spiegazioni, senza testo prima o dopo:\n{\"hotel\":\"nome hotel\",\"address\":\"indirizzo completo con città\",\"booking\":\"numero conferma senza punti\",\"checkin\":\"giorno e mese es. 11 Giu\",\"checkout\":\"giorno e mese es. 14 Giu\",\"nights\":\"numero notti come stringa\",\"rooms\":[{\"type\":\"tipo camera esatto\"}]}" }
             ]
           }]
         })
