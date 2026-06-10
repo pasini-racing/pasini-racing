@@ -17,20 +17,39 @@ async function fbDel(col, id) { try { await db.collection(col).doc(id).delete();
 async function fbAdd(col, data) { try { return await db.collection(col).add(data); } catch(e) { console.error(e); return null; } }
 
 // ── iOS-compatible document opener ───────────────────────
+// Components call window.__showDoc(fileData, fileName) to open inline viewer
 function openDoc(fileData, fileName) {
-  try {
-    // Build a data URL anchor and click it — works on iOS Safari
-    var a = document.createElement("a");
-    a.href = fileData;
-    a.target = "_blank";
-    a.rel = "noopener";
-    if (fileName) a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ document.body.removeChild(a); }, 200);
-  } catch(e) {
-    window.open(fileData, "_blank");
+  if (typeof window.__showDoc === "function") {
+    window.__showDoc(fileData, fileName);
+  } else {
+    try {
+      var a = document.createElement("a");
+      a.href = fileData; a.target = "_blank"; a.rel = "noopener";
+      if (fileName) a.download = fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ document.body.removeChild(a); }, 200);
+    } catch(e) { window.open(fileData, "_blank"); }
   }
+}
+
+// ── DocViewer: inline modal per iOS ──────────────────────
+function DocViewer({ fileData, fileName, onClose }) {
+  var isImage = fileData && (fileData.startsWith("data:image") || /\.(png|jpg|jpeg|gif|webp)/i.test(fileName||""));
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:9000,display:"flex",flexDirection:"column"}} onClick={function(e){if(e.target===e.currentTarget) onClose();}}>
+      <div style={{background:"#12121f",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,borderBottom:"1px solid #1e3a8a"}}>
+        <span style={{color:"#e8e8f0",fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{fileName||"Documento"}</span>
+        <button onClick={onClose} style={{background:"#ff444433",color:"#ff6060",border:"none",borderRadius:6,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,flexShrink:0,marginLeft:8}}>✕ Chiudi</button>
+      </div>
+      <div style={{flex:1,overflow:"auto",display:"flex",alignItems:"center",justifyContent:"center",padding:8}}>
+        {isImage ? (
+          <img src={fileData} alt={fileName} style={{maxWidth:"100%",maxHeight:"100%",borderRadius:8,objectFit:"contain"}}/>
+        ) : (
+          <iframe src={fileData} title={fileName} style={{width:"100%",height:"100%",border:"none",borderRadius:8,minHeight:"70vh"}}/>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Data ──────────────────────────────────────────────────
@@ -1464,6 +1483,13 @@ export default function App() {
   var [toast, setToast] = useState(null);
   var [fbLoaded, setFbLoaded] = useState(false);
   var [personEventFilter, setPersonEventFilter] = useState(null);
+  var [docViewer, setDocViewer] = useState(null); // {fileData, fileName}
+
+  // Register global doc opener for iOS-compatible inline viewer
+  useEffect(function(){
+    window.__showDoc = function(fileData, fileName) { setDocViewer({fileData:fileData, fileName:fileName}); };
+    return function(){ window.__showDoc = null; };
+  }, []);
 
   // Firebase sync
   useEffect(function() {
@@ -1625,6 +1651,7 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      {docViewer && <DocViewer fileData={docViewer.fileData} fileName={docViewer.fileName} onClose={function(){setDocViewer(null);}}/>}
       {editB && <EditModal booking={editB} onSave={handleSave} onClose={function(){setEditB(null); setEditIdx(null);}} onDelete={function(){setConfirmDelete(editB);setEditB(null);}}
         onDuplicate={function(b, peopleIds) {
           peopleIds.forEach(function(pid) {
