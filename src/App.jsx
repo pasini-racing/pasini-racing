@@ -428,9 +428,25 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
   var tc = TYPE_COLORS[b.type] || TYPE_COLORS.volo;
   var cc = b.company ? COMPANY_COLORS[b.company] : null;
   var person = showPerson ? PEOPLE.find(function(p) { return p.id === b.person; }) : null;
+
+  // Check if flight has already landed
+  var flightPast = false;
+  if (b.type === "volo" && b.arr) {
+    try {
+      // Parse arr time like "BCN 13:35" → extract HH:MM
+      var arrMatch = b.arr.match(/(\d{1,2}):(\d{2})$/);
+      if (arrMatch) {
+        var now = new Date();
+        var arrTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(arrMatch[1]), parseInt(arrMatch[2]));
+        // If date field contains day info, try to use it
+        // Simple check: if current time > arr time today, mark as past
+        flightPast = now > arrTime;
+      }
+    } catch(e) {}
+  }
   return (
-    <div style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+tc.accent,borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative"}}>
-      <span style={{fontSize:16}}>{tc.icon}</span>
+    <div style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+(flightPast?"#444":tc.accent),borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative",opacity:flightPast?0.5:1}}>
+      <span style={{fontSize:16}}>{tc.icon}{flightPast?" ✓":""}</span>
       {showPerson && person && <span style={{fontWeight:700,fontSize:12,color:tc.accent,minWidth:80}}>{person.name}</span>}
       {b.type === "volo" && (
         <span style={{display:"contents"}}>
@@ -443,7 +459,7 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
               : <span style={{background:cc||"#333",color:"#fff",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.company}</span>
           )}
           {b.flight && <span style={{fontWeight:700,fontSize:12}}>{b.flight}</span>}
-          {(b.dep||b.arr) && <span style={{fontSize:12,color:"#b0c0e0"}}>{b.dep} → {b.arr}</span>}
+          {(b.dep||b.arr) && <span style={{fontSize:12,color:"#b0c0e0"}}>{b.dep}{!flightPast && b.arr ? " → "+b.arr : ""}</span>}
           {b.date && <span style={{fontSize:11,color:"#7090c0"}}>{b.date}</span>}
           {b.dir && <span style={{background:b.dir==="andata"?"#1e3a8a":"#1a4a1a",color:b.dir==="andata"?"#4a9eff":"#4caf50",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.dir==="andata"?"↗ ANDATA":"↙ RITORNO"}</span>}
           {b.baggage && <span style={{fontSize:10,color:"#7090c0"}}>🧳 {b.baggage}</span>}
@@ -1895,6 +1911,15 @@ export default function App() {
     if(!selEvent) return [];
     var b=bookings.filter(function(b){return b.event===selEvent;});
     if(filterType!=="all") b=b.filter(function(b){return b.type===filterType;});
+    // Sort: andata first, then ritorno; within each group by date/time
+    b.sort(function(a,b2){
+      if(a.type==="volo" && b2.type==="volo"){
+        var dirA = (a.dir||"").toLowerCase().includes("ritorno") ? 1 : 0;
+        var dirB = (b2.dir||"").toLowerCase().includes("ritorno") ? 1 : 0;
+        return dirA - dirB;
+      }
+      return 0;
+    });
     return b;
   },[selEvent,filterType,bookings]);
   var filteredPeople = useMemo(function(){
@@ -2061,7 +2086,6 @@ export default function App() {
       <div style={{maxWidth:1200,margin:"0 auto",padding:"20px 14px"}}>
 
         {view==="overview" && (function(){
-          // ── Countdown helper ───────────────────────────────
           var EVENT_START_DATES = {
             "TEST1_BCN":    new Date(2026,3,19),
             "TEST2_JEREZ":  new Date(2026,4,3),
@@ -2077,10 +2101,27 @@ export default function App() {
           function daysTo(evId) {
             var start = EVENT_START_DATES[evId];
             if (!start) return null;
-            var diff = Math.ceil((start - TODAY) / (1000*60*60*24));
-            return diff;
+            return Math.ceil((start - TODAY) / (1000*60*60*24));
           }
-          // ── Expiry warning (docs expiring within 90 days) ──
+
+          // Next upcoming event
+          var nextEv = EVENTS.find(function(ev){
+            var d = daysTo(ev.id);
+            return d !== null && d >= 0;
+          });
+          var nextDays = nextEv ? daysTo(nextEv.id) : null;
+
+          // My bookings for next event
+          var myNextBs = nextEv && currentUser ? bookings.filter(function(b){
+            return b.event === nextEv.id && b.person === currentUser.id;
+          }).sort(function(a,b2){
+            if(a.type==="volo" && b2.type==="volo"){
+              return ((a.dir||"").includes("ritorno")?1:0) - ((b2.dir||"").includes("ritorno")?1:0);
+            }
+            return 0;
+          }) : [];
+
+          // Expiry warning
           var expiringDocs = people.filter(function(p){
             if (!p.docExpiry || p.docExpiry === "NaT") return false;
             var parts = p.docExpiry.split("/");
@@ -2089,14 +2130,26 @@ export default function App() {
             var diff = Math.ceil((d - TODAY) / (1000*60*60*24));
             return diff >= 0 && diff <= 90;
           });
+
+          var CITY_WEATHER = {
+            "Barcellona":"Barcelona","Estoril":"Estoril","Jerez":"Jerez de la Frontera",
+            "Magny-Cours":"Magny-Cours","Valencia":"Valencia","Aragon":"Alcañiz","Misano":"Misano Adriatico",
+          };
+
           return (
           <div>
-            {/* Banner scadenze documenti */}
+            {/* Logo header */}
+            <div style={{textAlign:"center",marginBottom:16,paddingTop:4}}>
+              <div style={{fontSize:11,color:"#7090c0",letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>FIM Junior GP 2026</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#fff",letterSpacing:1}}>TEAM ECHOVIT PASINI RACING</div>
+            </div>
+
+            {/* Banner scadenze */}
             {expiringDocs.length > 0 && (
-              <div style={{background:"#1a0a00",border:"2px solid #ff980066",borderRadius:12,padding:"12px 16px",marginBottom:20,display:"flex",gap:12,alignItems:"flex-start"}}>
-                <div style={{fontSize:22,flexShrink:0}}>⚠️</div>
+              <div style={{background:"#1a0a00",border:"2px solid #ff980066",borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start"}}>
+                <div style={{fontSize:20,flexShrink:0}}>⚠️</div>
                 <div>
-                  <div style={{fontSize:13,fontWeight:800,color:"#ff9800",marginBottom:6}}>Documenti in scadenza nei prossimi 90 giorni</div>
+                  <div style={{fontSize:12,fontWeight:800,color:"#ff9800",marginBottom:6}}>Documenti in scadenza entro 90 giorni</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {expiringDocs.map(function(p){
                       var parts = p.docExpiry.split("/");
@@ -2105,8 +2158,8 @@ export default function App() {
                       var color = diff <= 30 ? "#ff4444" : "#ff9800";
                       return (
                         <span key={p.id} onClick={function(){setView("person");setSelPerson(p.id);}}
-                          style={{background:color+"22",color:color,borderRadius:6,padding:"4px 10px",fontSize:12,fontWeight:700,cursor:"pointer",border:"1px solid "+color+"44"}}>
-                          {p.name.split(" ")[0]} — scade {p.docExpiry} ({diff}gg)
+                          style={{background:color+"22",color:color,borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,cursor:"pointer",border:"1px solid "+color+"44"}}>
+                          {p.name.split(" ")[0]} — {p.docExpiry} ({diff}gg)
                         </span>
                       );
                     })}
@@ -2114,52 +2167,107 @@ export default function App() {
                 </div>
               </div>
             )}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:28}}>
-              {[{label:"Persone",value:people.length,color:"#4a9eff",icon:"👥"},{label:"Eventi",value:EVENTS.length,color:"#4caf50",icon:"🏁"},{label:"Voli",value:bookings.filter(function(b){return b.type==="volo";}).length,color:"#ff9800",icon:"✈"},{label:"Hotel",value:bookings.filter(function(b){return b.type==="hotel";}).length,color:"#9c27b0",icon:"🏨"}].map(function(s){
-                return <div key={s.label} style={{background:"#12121f",borderRadius:10,padding:16,border:"1px solid "+s.color+"33",textAlign:"center"}}><div style={{fontSize:22}}>{s.icon}</div><div style={{fontSize:26,fontWeight:800,color:s.color}}>{s.value}</div><div style={{fontSize:11,color:"#7090c0",marginTop:2}}>{s.label}</div></div>;
+
+            {/* Prossimo evento HERO */}
+            {nextEv && (
+              <div onClick={function(){setView("event");setSelEvent(nextEv.id);}}
+                style={{background:"linear-gradient(135deg,#0d1b4b,#1e3a8a22)",border:"2px solid #1e3a8a",borderRadius:16,padding:"20px 18px",marginBottom:16,cursor:"pointer",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",top:0,right:0,width:80,height:80,background:"#4a9eff08",borderRadius:"0 16px 0 80px"}}/>
+                <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>🏁 Prossimo Evento</div>
+                <div style={{fontSize:22,fontWeight:900,color:"#fff",marginBottom:4}}>{nextEv.label}</div>
+                <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>📍 {nextEv.circuit} · 📅 {nextEv.dates}</div>
+                <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                  <div style={{background: nextDays<=7?"#ff444422":nextDays<=30?"#ff980022":"#4a9eff22",
+                    border:"1px solid "+(nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff")+"44",
+                    borderRadius:10,padding:"8px 16px",textAlign:"center"}}>
+                    <div style={{fontSize:28,fontWeight:900,color:nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff",lineHeight:1}}>{nextDays===0?"OGGI":nextDays===1?"1":nextDays}</div>
+                    <div style={{fontSize:10,color:"#7090c0"}}>{nextDays===0?"":nextDays===1?"giorno":"giorni"}</div>
+                  </div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>👥 {pCount(nextEv.id)} persone</span>
+                    <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>✈️ {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="volo";}).length} voli</span>
+                    <span style={{background:"#14532d33",color:"#4caf50",borderRadius:6,padding:"4px 10px",fontSize:11}}>🏨 {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="hotel";}).length} hotel</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Le mie prenotazioni per il prossimo evento */}
+            {myNextBs.length > 0 && (
+              <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:16,border:"1px solid #4caf5033"}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#4caf50",marginBottom:10}}>🎒 Le mie prenotazioni — {nextEv?nextEv.label:""}</div>
+                {myNextBs.map(function(b,i){ return <BookingCard key={i} b={b} compact/>; })}
+              </div>
+            )}
+
+            {/* Stats row */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
+              {[
+                {label:"Persone",value:people.length,color:"#4a9eff",icon:"👥",view:"person"},
+                {label:"Eventi",value:EVENTS.length,color:"#4caf50",icon:"🏁",view:"event"},
+                {label:"Voli",value:bookings.filter(function(b){return b.type==="volo";}).length,color:"#ff9800",icon:"✈️",view:null},
+                {label:"Hotel",value:bookings.filter(function(b){return b.type==="hotel";}).length,color:"#9c27b0",icon:"🏨",view:null},
+              ].map(function(s){
+                return <div key={s.label} onClick={s.view?function(){setView(s.view);}:null}
+                  style={{background:"#12121f",borderRadius:10,padding:"12px 8px",border:"1px solid "+s.color+"33",textAlign:"center",cursor:s.view?"pointer":"default"}}>
+                  <div style={{fontSize:18}}>{s.icon}</div>
+                  <div style={{fontSize:22,fontWeight:800,color:s.color}}>{s.value}</div>
+                  <div style={{fontSize:10,color:"#7090c0",marginTop:1}}>{s.label}</div>
+                </div>;
               })}
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-              <div style={{background:"#12121f",borderRadius:12,padding:18,border:"1px solid #1e3a8a33"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#4a9eff"}}>📅 Calendario</div>
-                  <button onClick={function(){setShowPast(function(v){return !v;});}} style={{fontSize:10,padding:"3px 8px",background:showPast?"#1e3a8a":"#1a2a1a",color:showPast?"#4a9eff":"#4caf50",border:"none",borderRadius:4,cursor:"pointer"}}>
-                    {showPast?"Nascondi passati":"Mostra tutti"}
+
+            {/* Calendario + Staff */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={{background:"#12121f",borderRadius:12,padding:14,border:"1px solid #1e3a8a33"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#4a9eff"}}>📅 Calendario</div>
+                  <button onClick={function(){setShowPast(function(v){return !v;});}} style={{fontSize:9,padding:"2px 6px",background:showPast?"#1e3a8a":"#1a2a1a",color:showPast?"#4a9eff":"#4caf50",border:"none",borderRadius:4,cursor:"pointer"}}>
+                    {showPast?"↑ Passa":"↓ Tutti"}
                   </button>
                 </div>
                 {ACTIVE_EVENTS.map(function(ev){
                   var days = daysTo(ev.id);
                   var isPast = days !== null && days < 0;
-                  var isToday = days !== null && days === 0;
-                  var countdownColor = isPast ? "#555" : days <= 7 ? "#ff4444" : days <= 30 ? "#ff9800" : "#4caf50";
-                  var countdownLabel = isPast ? "passato" : isToday ? "OGGI!" : days === 1 ? "domani" : days+"gg";
+                  var isNext = nextEv && ev.id === nextEv.id;
+                  var countdownColor = isPast?"#555":days<=7?"#ff4444":days<=30?"#ff9800":"#4caf50";
+                  var countdownLabel = isPast?"✓":days===0?"OGGI!":days===1?"domani":days+"gg";
                   return(
                   <div key={ev.id} onClick={function(){setView("event");setSelEvent(ev.id);}}
-                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 11px",borderRadius:8,marginBottom:5,background:"#0d0d1a",cursor:"pointer",border:"1px solid #ffffff11"}}
-                    onMouseEnter={function(e){e.currentTarget.style.background="#1e3a8a22";}} onMouseLeave={function(e){e.currentTarget.style.background="#0d0d1a";}}>
-                    <div><span style={{fontWeight:700,fontSize:12}}>{ev.label}</span><span style={{marginLeft:6,fontSize:10,color:"#7090c0"}}>{ev.circuit}</span></div>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{fontSize:10,color:"#7090c0"}}>{ev.dates}</span>
-                      {days !== null && <span style={{background:countdownColor+"22",color:countdownColor,borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}}>{countdownLabel}</span>}
-                      <span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}}>{pCount(ev.id)}p</span>
+                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 9px",borderRadius:7,marginBottom:4,
+                      background:isNext?"#1e3a8a22":"#0d0d1a",cursor:"pointer",
+                      border:"1px solid "+(isNext?"#1e3a8a55":"#ffffff11"),opacity:isPast?0.5:1}}
+                    onMouseEnter={function(e){e.currentTarget.style.background="#1e3a8a22";}}
+                    onMouseLeave={function(e){e.currentTarget.style.background=isNext?"#1e3a8a22":"#0d0d1a";}}>
+                    <div style={{overflow:"hidden"}}>
+                      <div style={{fontWeight:700,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ev.label}</div>
+                      <div style={{fontSize:9,color:"#7090c0"}}>{ev.dates}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                      {days !== null && <span style={{background:countdownColor+"22",color:countdownColor,borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700}}>{countdownLabel}</span>}
+                      <span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700}}>{pCount(ev.id)}p</span>
                     </div>
                   </div>
                 );})}
               </div>
-              <div style={{background:"#12121f",borderRadius:12,padding:18,border:"1px solid #1e3a8a33"}}>
-                <div style={{fontSize:13,fontWeight:700,marginBottom:14,color:"#4caf50"}}>👥 Staff & Piloti</div>
-                {people.slice(0,11).map(function(p){return(
+
+              <div style={{background:"#12121f",borderRadius:12,padding:14,border:"1px solid #1e3a8a33"}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:12,color:"#4caf50"}}>👥 Staff</div>
+                {people.slice(0,10).map(function(p){return(
                   <div key={p.id} onClick={function(){setView("person");setSelPerson(p.id);}}
-                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 11px",borderRadius:8,marginBottom:4,background:"#0d0d1a",cursor:"pointer",border:"1px solid #ffffff11"}}
-                    onMouseEnter={function(e){e.currentTarget.style.background="#1a4a1a33";}} onMouseLeave={function(e){e.currentTarget.style.background="#0d0d1a";}}>
-                    <span style={{fontWeight:700,fontSize:12}}>{p.name}</span>
-                    <div style={{display:"flex",alignItems:"center",gap:5}}>
-                      <span style={{fontSize:10,color:"#7090c0"}}>{p.role}</span>
-                      <span style={{background:"#1a4a1a",color:"#4caf50",borderRadius:4,padding:"1px 5px",fontSize:10,fontWeight:700}}>{evCount(p.id)}ev</span>
+                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px",borderRadius:6,marginBottom:3,background:"#0d0d1a",cursor:"pointer",border:"1px solid #ffffff11"}}
+                    onMouseEnter={function(e){e.currentTarget.style.background="#1a4a1a33";}}
+                    onMouseLeave={function(e){e.currentTarget.style.background="#0d0d1a";}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{width:22,height:22,borderRadius:"50%",background:"#1e3a8a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#4a9eff",flexShrink:0}}>{p.name.charAt(0)}</div>
+                      <span style={{fontWeight:600,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:70}}>{p.name.split(" ")[0]}</span>
                     </div>
+                    <span style={{background:"#1a4a1a",color:"#4caf50",borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700}}>{evCount(p.id)}ev</span>
                   </div>
                 );})}
-                <div style={{textAlign:"center",marginTop:8}}><button onClick={function(){setView("person");}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"5px 14px",borderRadius:6,cursor:"pointer",fontSize:11}}>Vedi tutti →</button></div>
+                <div style={{textAlign:"center",marginTop:6}}>
+                  <button onClick={function(){setView("person");}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:10}}>Tutti →</button>
+                </div>
               </div>
             </div>
           </div>
