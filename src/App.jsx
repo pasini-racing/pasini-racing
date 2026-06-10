@@ -918,6 +918,60 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
   var [selEvent, setSelEvent] = useState(defaultEvent||"");
   var [rooms, setRooms] = useState([{id:1, type:"Matrimoniale", people:[]}]);
   var [nextId, setNextId] = useState(2);
+  var [extracting, setExtracting] = useState(false);
+  var [extractError, setExtractError] = useState("");
+
+  async function handlePDF(file) {
+    if (!file) return;
+    setExtracting(true);
+    setExtractError("");
+    try {
+      var b64 = await new Promise(function(res, rej) {
+        var r = new FileReader();
+        r.onload = function(e){ res(e.target.result.split(",")[1]); };
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+
+      var resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+              { type: "text", text: "Estrai dal documento di prenotazione hotel i seguenti dati e rispondi SOLO con un oggetto JSON valido, senza markdown:\n{\"hotel\": \"nome hotel\", \"address\": \"indirizzo completo\", \"booking\": \"numero conferma\", \"checkin\": \"data check-in es. 11 Giu\", \"checkout\": \"data check-out es. 14 Giu\", \"nights\": \"numero notti\", \"rooms\": [{\"type\": \"tipo camera es. Camera Matrimoniale Superior\"}, ...]}" }
+            ]
+          }]
+        })
+      });
+
+      var data = await resp.json();
+      var text = (data.content||[]).map(function(c){ return c.text||""; }).join("");
+      var clean = text.replace(/```json|```/g,"").trim();
+      var parsed = JSON.parse(clean);
+
+      if (parsed.hotel) setHotel(parsed.hotel);
+      if (parsed.address) setAddress(parsed.address);
+      if (parsed.booking) setBooking(parsed.booking.replace(/\./g,""));
+      if (parsed.checkin) setCheckin(parsed.checkin);
+      if (parsed.checkout) setCheckout(parsed.checkout);
+      if (parsed.nights) setNights(String(parsed.nights));
+      if (parsed.rooms && parsed.rooms.length > 0) {
+        var newRooms = parsed.rooms.map(function(r, i){
+          return {id: i+1, type: r.type||"Camera", people:[]};
+        });
+        setRooms(newRooms);
+        setNextId(newRooms.length + 1);
+      }
+    } catch(e) {
+      setExtractError("Errore estrazione: " + (e.message||"riprova"));
+    }
+    setExtracting(false);
+  }
 
   function addRoom() {
     setRooms(function(r){ return r.concat([{id:nextId, type:"Camera", people:[]}]); });
@@ -943,16 +997,10 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
     rooms.forEach(function(room) {
       room.people.forEach(function(pid) {
         bookings.push({
-          type: "hotel",
-          event: selEvent,
-          person: pid,
-          hotel: hotel,
-          address: address,
-          booking: booking,
-          room: room.type,
-          nights: nights,
-          checkin: checkin,
-          checkout: checkout,
+          type: "hotel", event: selEvent, person: pid,
+          hotel: hotel, address: address, booking: booking,
+          room: room.type, nights: nights,
+          checkin: checkin, checkout: checkout,
           status: "confermata",
         });
       });
@@ -973,6 +1021,20 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
           <button onClick={onClose} style={{background:"#3a1a1a",color:"#ff6060",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontWeight:700}}>✕</button>
         </div>
 
+        {/* PDF Import */}
+        <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #4a9eff33"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#4a9eff",marginBottom:8}}>🤖 Importa da PDF Booking</div>
+          <label style={{display:"block",background:"#0d1a2a",border:"2px dashed #1e3a8a",borderRadius:8,padding:"12px",textAlign:"center",cursor:extracting?"not-allowed":"pointer"}}>
+            <input type="file" accept=".pdf" style={{display:"none"}} disabled={extracting}
+              onChange={function(e){ handlePDF(e.target.files[0]); e.target.value=""; }}/>
+            {extracting
+              ? <span style={{fontSize:12,color:"#4a9eff"}}>⏳ Estrazione dati in corso...</span>
+              : <span style={{fontSize:12,color:"#4a9eff"}}>📄 Tocca per caricare il PDF di Booking.com</span>
+            }
+          </label>
+          {extractError && <div style={{marginTop:6,fontSize:11,color:"#ff6060"}}>{extractError}</div>}
+        </div>
+
         {/* Dati hotel */}
         <div style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
           <div style={{fontSize:12,fontWeight:700,color:"#4a9eff",marginBottom:10}}>📋 Dati Hotel</div>
@@ -985,8 +1047,8 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
               </select>
             </div>
             <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>N° Conferma Booking</label>
-              <input value={booking} onChange={function(e){setBooking(e.target.value);}} placeholder="es. 6370.734.724" style={Object.assign({},inp,{fontSize:12})}/>
+              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>N° Conferma</label>
+              <input value={booking} onChange={function(e){setBooking(e.target.value);}} placeholder="es. 6370734724" style={Object.assign({},inp,{fontSize:12})}/>
             </div>
           </div>
           <div style={{marginBottom:8}}>
@@ -1000,11 +1062,11 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
             <div>
               <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Check-in</label>
-              <input value={checkin} onChange={function(e){setCheckin(e.target.value);}} placeholder="es. 11 Giu" style={Object.assign({},inp,{fontSize:12})}/>
+              <input value={checkin} onChange={function(e){setCheckin(e.target.value);}} placeholder="11 Giu" style={Object.assign({},inp,{fontSize:12})}/>
             </div>
             <div>
               <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Check-out</label>
-              <input value={checkout} onChange={function(e){setCheckout(e.target.value);}} placeholder="es. 14 Giu" style={Object.assign({},inp,{fontSize:12})}/>
+              <input value={checkout} onChange={function(e){setCheckout(e.target.value);}} placeholder="14 Giu" style={Object.assign({},inp,{fontSize:12})}/>
             </div>
             <div>
               <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Notti</label>
@@ -1018,12 +1080,12 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
           return (
             <div key={room.id} style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:10,border:"1px solid #4caf5033"}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:6,padding:"2px 10px",fontSize:11,fontWeight:700}}>Camera {ri+1}</span>
+                <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:6,padding:"2px 10px",fontSize:11,fontWeight:700,flexShrink:0}}>Camera {ri+1}</span>
                 <input value={room.type} onChange={function(e){updateRoom(room.id,"type",e.target.value);}}
                   placeholder="Tipo camera" style={{flex:1,padding:"5px 8px",background:"#0d0d1a",border:"1px solid #1e3a8a33",borderRadius:5,color:"#e8e8f0",fontSize:11,outline:"none"}}/>
-                {rooms.length > 1 && <button onClick={function(){removeRoom(room.id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:11}}>✕</button>}
+                {rooms.length > 1 && <button onClick={function(){removeRoom(room.id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>✕</button>}
               </div>
-              <div style={{fontSize:10,color:"#7090c0",marginBottom:6}}>Seleziona persone per questa camera:</div>
+              <div style={{fontSize:10,color:"#7090c0",marginBottom:6}}>Seleziona persone:</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
                 {PEOPLE.map(function(p){
                   var sel = room.people.includes(p.id);
@@ -1040,11 +1102,7 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
                   );
                 })}
               </div>
-              {room.people.length > 0 && (
-                <div style={{marginTop:6,fontSize:10,color:"#4caf50"}}>
-                  {room.people.length} {room.people.length===1?"persona":"persone"} assegnate
-                </div>
-              )}
+              {room.people.length > 0 && <div style={{marginTop:6,fontSize:10,color:"#4caf50"}}>{room.people.length} {room.people.length===1?"persona":"persone"} assegnate</div>}
             </div>
           );
         })}
