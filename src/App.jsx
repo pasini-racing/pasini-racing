@@ -1938,7 +1938,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -2368,6 +2368,10 @@ export default function App() {
 
         {view==="team" && isAdmin && (
           <TeamManager people={people} setPeople={setPeople} setConfirmDeleteUser={setConfirmDeleteUser} showToast={showToast}/>
+        )}
+
+        {view==="pdf2xls" && isAdmin && (
+          <PDF2Excel />
         )}
 
         {view==="gallery" && (
@@ -3145,6 +3149,167 @@ function FlightPlanner({ people, bookings }) {
   );
 }
 
+
+// ── PDF2Excel ──────────────────────────────────────────────
+function PDF2Excel() {
+  var [file, setFile] = useState(null);
+  var [docType, setDocType] = useState("");
+  var [evento, setEvento] = useState("");
+  var [loading, setLoading] = useState(false);
+  var [error, setError] = useState("");
+  var [rows, setRows] = useState(null);
+
+  var DOC_TYPES = [
+    {id:"volo",color:"#4a9eff",label:"✈️ Volo"},
+    {id:"hotel",color:"#4caf50",label:"🏨 Hotel"},
+    {id:"noleggio",color:"#ff9800",label:"🚗 Noleggio"},
+    {id:"parcheggio",color:"#9c27b0",label:"🅿️ Parcheggio"},
+  ];
+
+  function handleFile(f) {
+    if (!f) return;
+    setFile(f); setError(""); setRows(null);
+    if (!docType) {
+      var n = f.name.toLowerCase();
+      if (n.includes("booking")||n.includes("hotel")) setDocType("hotel");
+      else if (n.includes("goldcar")||n.includes("noleggio")||n.includes("car")) setDocType("noleggio");
+      else if (n.includes("park")) setDocType("parcheggio");
+      else setDocType("volo");
+    }
+  }
+
+  async function extract() {
+    if (!file||!docType||!evento) { setError("Seleziona tipo, evento e carica il file"); return; }
+    setLoading(true); setError(""); setRows(null);
+    try {
+      var b64 = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result.split(",")[1]);}; r.onerror=rej; r.readAsDataURL(file); });
+      var isPDF = file.name.toLowerCase().endsWith(".pdf")||file.type==="application/pdf";
+      var block = isPDF
+        ? {type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
+        : {type:"image",source:{type:"base64",media_type:file.type||"image/jpeg",data:b64}};
+
+      var prompts = {
+        volo: "Analizza questa conferma volo. Estrai TUTTI i passeggeri. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"persona\":\"COGNOME NOME\",\"volo\":\"FR1234\",\"compagnia\":\"Ryanair\",\"partenza\":\"BGY 11:55\",\"arrivo\":\"BCN 13:35\",\"data\":\"19 Apr\",\"direzione\":\"andata\",\"bagaglio\":\"1 mano\",\"prenotazione\":\"ABC123\"}]",
+        hotel: "Analizza questa conferma hotel. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"camera\":\"Camera Matrimoniale Superior\",\"hotel\":\"Nome Hotel\",\"checkin\":\"11 Giu\",\"checkout\":\"14 Giu\",\"notti\":\"3\",\"prenotazione\":\"6370734724\",\"indirizzo\":\"indirizzo completo\"}]",
+        noleggio: "Analizza questa conferma noleggio auto. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"conducente\":\"COGNOME NOME\",\"compagnia\":\"Goldcar\",\"auto\":\"Opel Corsa\",\"ritiro\":\"Aeroporto BCN\",\"consegna\":\"Aeroporto BCN\",\"data_ritiro\":\"19 Apr 10:00\",\"data_consegna\":\"23 Apr\",\"prenotazione\":\"ABC123\"}]",
+        parcheggio: "Analizza questa conferma parcheggio. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"parcheggio\":\"nome\",\"indirizzo\":\"indirizzo\",\"entrata\":\"19 Apr 06:00\",\"uscita\":\"23 Apr 14:00\",\"targa\":\"AA000BB\",\"prenotazione\":\"ABC123\",\"prezzo\":\"€120\"}]",
+      };
+
+      var resp = await fetch("/api/claude", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({model:"claude-sonnet-4-20250514", max_tokens:2000, messages:[{role:"user",content:[block,{type:"text",text:prompts[docType]}]}]})
+      });
+      if (!resp.ok) throw new Error("API "+resp.status);
+      var data = await resp.json();
+      var text = (data.content||[]).filter(function(i){return i.type==="text";}).map(function(i){return i.text;}).join("");
+      var s=text.indexOf("["),e=text.lastIndexOf("]");
+      if (s===-1) throw new Error("Nessun dato trovato nel documento");
+      var parsed = JSON.parse(text.substring(s,e+1));
+
+      // Build rows based on type — same columns as ExcelImport expects
+      var result = [];
+      if (docType==="volo") {
+        result.push(["Evento","Persona","Tipo","Dir.","Volo","Compagnia","Partenza","Arrivo","Data","Bagaglio","N° Pren.","Note","Stato"]);
+        parsed.forEach(function(r){ result.push([evento,r.persona||"","volo",r.direzione||"andata",r.volo||"",r.compagnia||"",r.partenza||"",r.arrivo||"",r.data||"",r.bagaglio||"1 mano",r.prenotazione||"","","confermata"]); });
+      } else if (docType==="hotel") {
+        result.push(["Evento","Persona","Tipo","Camera","Hotel","Indirizzo","Check-in","Check-out","Notti","N° Pren.","Note","Stato"]);
+        parsed.forEach(function(r){ result.push([evento,"","hotel",r.camera||"",r.hotel||"",r.indirizzo||"",r.checkin||"",r.checkout||"",r.notti||"",r.prenotazione||"","","confermata"]); });
+      } else if (docType==="noleggio") {
+        result.push(["Evento","Persona","Tipo","Compagnia","Auto","Ritiro","Consegna","Data Ritiro","Data Consegna","N° Pren.","Note","Stato"]);
+        parsed.forEach(function(r){ result.push([evento,r.conducente||"","noleggio",r.compagnia||"",r.auto||"",r.ritiro||"",r.consegna||"",r.data_ritiro||"",r.data_consegna||"",r.prenotazione||"","","confermata"]); });
+      } else {
+        result.push(["Evento","Persona","Tipo","Parcheggio","Indirizzo","Entrata","Uscita","Targa","N° Pren.","Prezzo","Note","Stato"]);
+        parsed.forEach(function(r){ result.push([evento,"","parcheggio",r.parcheggio||"",r.indirizzo||"",r.entrata||"",r.uscita||"",r.targa||"",r.prenotazione||"",r.prezzo||"","","confermata"]); });
+      }
+      setRows(result);
+    } catch(e) { setError("Errore: "+(e.message||"Riprova")); }
+    setLoading(false);
+  }
+
+  function downloadExcel() {
+    if (!rows) return;
+    import("xlsx").then(function(XLSX){
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = rows[0].map(function(){ return {wch:18}; });
+      XLSX.utils.book_append_sheet(wb, ws, "Prenotazioni");
+      XLSX.writeFile(wb, "Import_"+docType+"_"+evento.replace(/\s+/g,"_")+".xlsx");
+    });
+  }
+
+  var inp = {width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
+
+  return (
+    <div style={{maxWidth:600,margin:"0 auto",padding:"0 0 40px"}}>
+      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:4}}>🤖 PDF → Excel</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:20}}>Carica il PDF, l'AI estrae i dati e genera un Excel pronto per l'import</div>
+
+      {/* Tipo */}
+      <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>Tipo documento</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {DOC_TYPES.map(function(dt){
+            var sel=docType===dt.id;
+            return <div key={dt.id} onClick={function(){setDocType(dt.id);}}
+              style={{padding:"10px",borderRadius:8,border:"2px solid "+(sel?dt.color:"#1e3a8a22"),background:sel?dt.color+"22":"#0d0d1a",cursor:"pointer",textAlign:"center",fontSize:13,fontWeight:sel?800:400,color:sel?dt.color:"#7090c0"}}>
+              {dt.label}
+            </div>;
+          })}
+        </div>
+      </div>
+
+      {/* Evento */}
+      <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>Evento</div>
+        <select value={evento} onChange={function(e){setEvento(e.target.value);}} style={inp}>
+          <option value="">-- Seleziona evento --</option>
+          {EVENTS.map(function(ev){ return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" ("+ev.dates+")"); })}
+        </select>
+      </div>
+
+      {/* Upload */}
+      <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>Documento</div>
+        <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:10,padding:"20px",textAlign:"center",cursor:"pointer"}}>
+          <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){handleFile(e.target.files[0]);}}/>
+          {file
+            ? <div><div style={{fontSize:18,marginBottom:4}}>✅</div><div style={{fontSize:12,color:"#4caf50",fontWeight:700}}>{file.name}</div><div style={{fontSize:10,color:"#7090c0",marginTop:2}}>Tocca per cambiare</div></div>
+            : <div><div style={{fontSize:28,marginBottom:6}}>📄</div><div style={{fontSize:13,color:"#4a9eff"}}>Tocca per caricare PDF o immagine</div></div>
+          }
+        </label>
+      </div>
+
+      {error && <div style={{background:"#1a0a0a",border:"1px solid #ff444433",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#ff6060",marginBottom:12}}>{error}</div>}
+
+      <button onClick={extract} disabled={!file||!docType||!evento||loading}
+        style={{width:"100%",padding:13,background:(!file||!docType||!evento||loading)?"#1a1a2a":"#1e3a8a",color:(!file||!docType||!evento||loading)?"#444":"#4a9eff",border:"none",borderRadius:10,cursor:(!file||!docType||!evento||loading)?"not-allowed":"pointer",fontWeight:700,fontSize:14,marginBottom:14}}>
+        {loading?"⏳ Estrazione in corso...":"🤖 Estrai dati con AI"}
+      </button>
+
+      {rows && (
+        <div style={{background:"#12121f",borderRadius:12,padding:16,border:"1px solid #4caf5033"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#4caf50",marginBottom:10}}>✅ {rows.length-1} righe estratte</div>
+          <div style={{overflowX:"auto",marginBottom:14}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+              <thead>
+                <tr>{rows[0].map(function(h,i){ return <th key={i} style={{background:"#1e3a8a",color:"#4a9eff",padding:"5px 8px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>; })}</tr>
+              </thead>
+              <tbody>
+                {rows.slice(1).map(function(row,ri){ return (
+                  <tr key={ri}>{row.map(function(cell,ci){ return <td key={ci} style={{padding:"5px 8px",borderBottom:"1px solid #1e3a8a22",whiteSpace:"nowrap",background:ri%2===0?"#0d0d1a":"transparent"}}>{cell}</td>; })}</tr>
+                );})}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={downloadExcel} style={{width:"100%",padding:12,background:"#14532d",color:"#4caf50",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+            📥 Scarica Excel
+          </button>
+          <div style={{fontSize:11,color:"#7090c0",marginTop:8,textAlign:"center"}}>Importa il file scaricato nella sezione 📥 → File Excel</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── GalleryView ────────────────────────────────────────────
 function GalleryView({ isAdmin }) {
