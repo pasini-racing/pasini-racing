@@ -933,7 +933,7 @@ function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
         r.readAsDataURL(file);
       });
 
-      var resp = await fetch("https://api.anthropic.com/v1/messages", {
+      var resp = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
