@@ -2193,10 +2193,14 @@ export default function App() {
             )}
 
             {/* Le mie prenotazioni per il prossimo evento */}
-            {myNextBs.length > 0 && (
+            {nextEv && currentUser && (
               <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:16,border:"1px solid #4caf5033"}}>
-                <div style={{fontSize:12,fontWeight:800,color:"#4caf50",marginBottom:10}}>🎒 Le mie prenotazioni — {nextEv?nextEv.label:""}</div>
-                {myNextBs.map(function(b,i){ return <BookingCard key={i} b={b} compact/>; })}
+                <div style={{fontSize:12,fontWeight:800,color:"#4caf50",marginBottom:10}}>🎒 Le mie prenotazioni — {nextEv.label}</div>
+                {myNextBs.length > 0
+                  ? myNextBs.map(function(b,i){ return <BookingCard key={i} b={b} compact/>; })
+                  : <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessuna prenotazione per questo evento</div>
+                }
+                <PersonMealQR personId={currentUser.id} eventId={nextEv.id}/>
               </div>
             )}
 
@@ -2593,18 +2597,36 @@ function PersonMealQR({ personId, eventId }) {
   function openQR(doc) {
     openDoc(doc.fileData, doc.fileName || "qr-pasto.pdf");
   }
+  // If single QR (all meals together), show one prominent button
+  var hasSingle = qrs.length === 1 && !qrs[0].mealType || (qrs.length === 1);
+  if (hasSingle && qrs[0]) {
+    var doc = qrs[0];
+    var mt = MEAL_TYPES.find(function(m){return m.key===doc.mealType;}) || {label:"🍽️ QR Pasti", color:"#4caf50"};
+    return (
+      <div style={{marginTop:10}}>
+        <button onClick={function(){openQR(doc);}}
+          style={{width:"100%",padding:"10px",borderRadius:8,border:"2px solid #4caf5044",background:"#1a4a1a",color:"#4caf50",cursor:"pointer",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          🍽️ QR Code Pasti — Tocca per aprire
+        </button>
+      </div>
+    );
+  }
+  // Multiple QRs (one per meal type)
   return (
-    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
-      {MEAL_TYPES.map(function(mt){
-        var doc = qrs.find(function(q){return q.mealType===mt.key;});
-        if (!doc) return null;
-        return (
-          <button key={mt.key} onClick={function(){openQR(doc);}}
-            style={{padding:"4px 10px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700}}>
-            {mt.label}
-          </button>
-        );
-      })}
+    <div style={{marginTop:10}}>
+      <div style={{fontSize:10,color:"#7090c0",marginBottom:6,fontWeight:700}}>🍽️ QR PASTI</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {MEAL_TYPES.map(function(mt){
+          var doc = qrs.find(function(q){return q.mealType===mt.key;});
+          if (!doc) return null;
+          return (
+            <button key={mt.key} onClick={function(){openQR(doc);}}
+              style={{flex:1,padding:"8px 6px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700}}>
+              {mt.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
