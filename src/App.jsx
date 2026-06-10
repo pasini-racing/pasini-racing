@@ -363,7 +363,45 @@ const TYPE_COLORS = {
 const COMPANY_COLORS = {
   "Ryanair":"#073590","EasyJet":"#ff6600","Wizz":"#c6007e",
   "Vueling":"#c8a800","TAP":"#006600","Air Europa":"#003087",
+  "Iberia":"#d4001a","Transavia":"#00a0c8",
 };
+
+const COMPANY_URLS = {
+  "Ryanair":    "https://www.ryanair.com/it/it/manage-my-booking",
+  "EasyJet":    "https://www.easyjet.com/it/manage-bookings",
+  "Wizz":       "https://wizzair.com/#/booking/manage-booking",
+  "Vueling":    "https://www.vueling.com/it/servizi-per-i-viaggiatori/gestisci-il-tuo-volo",
+  "TAP":        "https://www.tapairportugal.com/it/manage",
+  "Air Europa": "https://www.aireuropa.com/it/voli/gestisci-la-tua-prenotazione",
+  "Iberia":     "https://www.iberia.com/it/gestisci/",
+  "Transavia":  "https://www.transavia.com/it-IT/manage-your-booking/",
+};
+
+// Deep link: apre l'app se installata, altrimenti il sito web
+const COMPANY_DEEPLINKS = {
+  "Ryanair":    "ryanair://",
+  "EasyJet":    "easyjet://",
+  "Wizz":       "wizzair://",
+  "Vueling":    "vueling://",
+  "Iberia":     "iberia://",
+};
+
+function openAirlineApp(company) {
+  var deeplink = COMPANY_DEEPLINKS[company];
+  var weburl = COMPANY_URLS[company];
+  if (deeplink) {
+    // Prova ad aprire l'app, se fallisce dopo 500ms apre il sito
+    var start = Date.now();
+    window.location.href = deeplink;
+    setTimeout(function() {
+      if (Date.now() - start < 1000 && weburl) {
+        window.open(weburl, "_blank");
+      }
+    }, 500);
+  } else if (weburl) {
+    window.open(weburl, "_blank");
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────
 function buildPDFData(personId, allBookings, eventNotes) {
@@ -396,7 +434,14 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
       {showPerson && person && <span style={{fontWeight:700,fontSize:12,color:tc.accent,minWidth:80}}>{person.name}</span>}
       {b.type === "volo" && (
         <span style={{display:"contents"}}>
-          {b.company && <span style={{background:cc||"#333",color:"#fff",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.company}</span>}
+          {b.company && (
+            (COMPANY_URLS[b.company] || COMPANY_DEEPLINKS[b.company])
+              ? <span onClick={function(e){e.stopPropagation(); openAirlineApp(b.company);}}
+                  style={{background:cc||"#333",color:"#fff",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                  🌐 {b.company}
+                </span>
+              : <span style={{background:cc||"#333",color:"#fff",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.company}</span>
+          )}
           {b.flight && <span style={{fontWeight:700,fontSize:12}}>{b.flight}</span>}
           {(b.dep||b.arr) && <span style={{fontSize:12,color:"#b0c0e0"}}>{b.dep} → {b.arr}</span>}
           {b.date && <span style={{fontSize:11,color:"#7090c0"}}>{b.date}</span>}
@@ -2120,10 +2165,7 @@ function EventDocuments({ eventId, isAdmin }) {
   }
 
   function download(doc) {
-    var a = document.createElement("a");
-    a.href = doc.data;
-    a.download = doc.name;
-    a.click();
+    openDoc(doc.data, doc.name);
   }
 
   async function deleteDoc(id) {
@@ -2151,7 +2193,7 @@ function EventDocuments({ eventId, isAdmin }) {
                 <div style={{fontSize:12,fontWeight:700,color:"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
                 <div style={{fontSize:10,color:"#7090c0"}}>{doc.size} MB · {doc.uploadedAt?doc.uploadedAt.substring(0,10):""}</div>
               </div>
-              <button onClick={function(){download(doc);}} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>⬇ Scarica</button>
+              <button onClick={function(){download(doc);}} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>👁️ Apri</button>
               {isAdmin&&<button onClick={function(){if(window.confirm("Eliminare "+doc.name+"?")) deleteDoc(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>🗑️</button>}
             </div>
           );})}
