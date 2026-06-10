@@ -652,20 +652,31 @@ function PDFPreview({ data, name, onClose }) {
 // ── AI Import ─────────────────────────────────────────────
 function AIImportSection({ onImported, onSkip }) {
   var [file, setFile] = useState(null);
-  var [preview, setPreview] = useState(null);
+  var [docType, setDocType] = useState("");
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
+
+  var DOC_TYPES = [
+    {id:"volo",      label:"✈️ Volo",        color:"#4a9eff"},
+    {id:"hotel",     label:"🏨 Hotel",       color:"#4caf50"},
+    {id:"noleggio",  label:"🚗 Noleggio",    color:"#ff9800"},
+    {id:"parcheggio",label:"🅿️ Parcheggio",  color:"#9c27b0"},
+  ];
 
   function handleFile(f) {
     if (!f) return;
     setFile(f); setError("");
-    var reader = new FileReader();
-    reader.onload = function(e) { setPreview({url:e.target.result, type:f.type}); };
-    reader.readAsDataURL(f);
+    if (!docType) {
+      var n = f.name.toLowerCase();
+      if (n.includes("booking") || n.includes("hotel")) setDocType("hotel");
+      else if (n.includes("goldcar") || n.includes("noleggio") || n.includes("car")) setDocType("noleggio");
+      else if (n.includes("park") || n.includes("parcheggio")) setDocType("parcheggio");
+      else setDocType("volo");
+    }
   }
 
   async function extract() {
-    if (!file) return;
+    if (!file || !docType) { setError("Seleziona il tipo di documento"); return; }
     setLoading(true); setError("");
     try {
       var b64 = await new Promise(function(res, rej) {
@@ -674,72 +685,80 @@ function AIImportSection({ onImported, onSkip }) {
         r.onerror = rej;
         r.readAsDataURL(file);
       });
-      var isPDF = file.type === "application/pdf";
+      var isPDF = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
       var mediaType = isPDF ? "application/pdf" : (file.type || "image/jpeg");
       var block = isPDF
         ? {type:"document",source:{type:"base64",media_type:mediaType,data:b64}}
         : {type:"image",source:{type:"base64",media_type:mediaType,data:b64}};
-      var promptText = [
-        "Analizza questa conferma di prenotazione (volo Ryanair/Vueling/TAP/EasyJet/Wizz, hotel Booking.com, parcheggio ParkinGO, noleggio Gold Car). ",
-        "Rispondi SOLO con JSON valido senza markdown. ",
-        "Struttura: {type, provider, booking, flight, company, dep, arr, date, dir, baggage, hotel, room, nights, checkin, checkout, car, notes}. ",
-        "type = volo/hotel/auto/parcheggio. dep/arr = codice aeroporto + orario es BGY 11:51. Lascia vuoto ciò che non trovi."
-      ].join("");
-      var apiKey2 = (typeof process !== "undefined" && process.env && process.env.REACT_APP_ANTHROPIC_KEY)
-        || window._ak || "";
-      var resp = await fetch("https://api.anthropic.com/v1/messages", {
+
+      var prompts = {
+        volo: "Analizza questa conferma volo. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"volo\",\"provider\":\"compagnia\",\"booking\":\"codice\",\"flight\":\"FR1234\",\"company\":\"Ryanair\",\"dep\":\"BGY 11:55\",\"arr\":\"BCN 13:35\",\"date\":\"19 Apr\",\"dir\":\"andata\",\"baggage\":\"1 mano\",\"notes\":\"\"}",
+        hotel: "Analizza questa conferma hotel. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"hotel\",\"hotel\":\"Nome Hotel\",\"address\":\"indirizzo completo\",\"booking\":\"numero\",\"checkin\":\"11 Giu\",\"checkout\":\"14 Giu\",\"nights\":\"3\",\"room\":\"Camera Matrimoniale\",\"notes\":\"\"}",
+        noleggio: "Analizza questa conferma noleggio auto. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"noleggio\",\"company\":\"Goldcar\",\"booking\":\"codice\",\"car\":\"Opel Corsa\",\"pickup\":\"Aeroporto BCN\",\"pickupDate\":\"19 Apr 10:00\",\"dropoff\":\"Aeroporto BCN\",\"dropoffDate\":\"23 Apr\",\"driver\":\"COGNOME NOME\",\"notes\":\"\"}",
+        parcheggio: "Analizza questa conferma parcheggio. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"parcheggio\",\"company\":\"nome\",\"booking\":\"codice\",\"location\":\"indirizzo\",\"entry\":\"19 Apr 06:00\",\"exit\":\"23 Apr 14:00\",\"plate\":\"targa\",\"price\":\"totale\",\"notes\":\"\"}",
+      };
+
+      var resp = await fetch("/api/claude", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey2,
-          "anthropic-version": "2023-06-01"
-        },
+        headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{role:"user", content:[block, {type:"text",text:promptText}]}]
+          max_tokens: 1500,
+          messages: [{role:"user", content:[block, {type:"text", text:prompts[docType]}]}]
         })
       });
       if (!resp.ok) throw new Error("API " + resp.status);
       var data = await resp.json();
-      var text = data.content.filter(function(i){return i.type==="text";}).map(function(i){return i.text;}).join("");
+      var text = (data.content||[]).filter(function(i){return i.type==="text";}).map(function(i){return i.text;}).join("");
       var start = text.indexOf("{"), end = text.lastIndexOf("}");
-      if (start === -1 || end === -1) throw new Error("Nessun JSON trovato");
-      var parsed = JSON.parse(text.substring(start, end + 1));
+      if (start === -1) throw new Error("Nessun dato trovato nel documento");
+      var parsed = JSON.parse(text.substring(start, end+1));
       onImported(parsed);
     } catch(err) {
-      setError("Errore: " + (err.message||"Connessione fallita. Verifica di essere connesso a internet."));
+      setError("Errore: " + (err.message||"Riprova"));
     }
     setLoading(false);
   }
 
   return (
     <div style={{padding:20}}>
-      <div style={{fontSize:16,fontWeight:800,color:"#4a9eff",marginBottom:6}}>🤖 Importa da conferma</div>
-      <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>Carica PDF o screenshot — Ryanair, Vueling, TAP, EasyJet, Wizz, ParkinGO, Booking.com, Gold Car</div>
-      <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:12,padding:"24px 16px",textAlign:"center",cursor:"pointer",marginBottom:14}}>
+      <div style={{fontSize:16,fontWeight:800,color:"#4a9eff",marginBottom:4}}>🤖 Importa da conferma</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>Carica PDF o screenshot della prenotazione</div>
+
+      <div style={{fontSize:11,color:"#7090c0",marginBottom:6,fontWeight:700}}>Tipo documento:</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+        {DOC_TYPES.map(function(dt){
+          var sel = docType === dt.id;
+          return (
+            <div key={dt.id} onClick={function(){setDocType(dt.id);}}
+              style={{padding:"10px 8px",borderRadius:8,border:"2px solid "+(sel?dt.color:"#1e3a8a22"),
+                background:sel?dt.color+"22":"#0d0d1a",cursor:"pointer",textAlign:"center",
+                fontSize:13,fontWeight:sel?800:400,color:sel?dt.color:"#7090c0"}}>
+              {dt.label}
+            </div>
+          );
+        })}
+      </div>
+
+      <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:12,padding:"20px 16px",textAlign:"center",cursor:"pointer",marginBottom:14}}>
         <input type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={function(e){handleFile(e.target.files[0]);}}/>
-        {file ? (
-          <div>
-            {preview && preview.type.startsWith("image/") && <img src={preview.url} style={{maxHeight:140,maxWidth:"100%",borderRadius:8,marginBottom:10}}/>}
-            {preview && preview.type==="application/pdf" && <div style={{fontSize:40,marginBottom:8}}>📄</div>}
-            <div style={{fontSize:13,color:"#4caf50",fontWeight:700}}>{file.name}</div>
-            <div style={{fontSize:11,color:"#7090c0",marginTop:4}}>Tocca per cambiare</div>
-          </div>
-        ) : (
-          <div>
-            <div style={{fontSize:40,marginBottom:10}}>📎</div>
-            <div style={{fontSize:14,color:"#4a9eff",fontWeight:700}}>Tocca per caricare</div>
-            <div style={{fontSize:11,color:"#7090c0",marginTop:6}}>PDF o immagine</div>
-          </div>
-        )}
+        {file
+          ? <div><div style={{fontSize:20,marginBottom:4}}>✅</div><div style={{fontSize:12,color:"#4caf50",fontWeight:700}}>{file.name}</div></div>
+          : <div><div style={{fontSize:28,marginBottom:4}}>📎</div><div style={{fontSize:12,color:"#4a9eff"}}>Tocca per caricare PDF o immagine</div></div>
+        }
       </label>
-      {error && <div style={{color:"#ff6060",fontSize:12,marginBottom:12,padding:"8px 12px",background:"#3a1a1a",borderRadius:8}}>{error}</div>}
-      <button onClick={extract} disabled={!file||loading}
-        style={{width:"100%",padding:13,background:file&&!loading?"#1e3a8a":"#1a1a2a",color:file&&!loading?"#fff":"#444",border:"none",borderRadius:10,cursor:file&&!loading?"pointer":"not-allowed",fontWeight:700,fontSize:14,marginBottom:10}}>
-        {loading ? "⏳ Estrazione..." : "🤖 Estrai automaticamente"}
-      </button>
-      <button onClick={onSkip} style={{width:"100%",padding:11,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:10,cursor:"pointer",fontSize:13}}>✍️ Inserisci manualmente</button>
+
+      {error && <div style={{background:"#1a0a0a",border:"1px solid #ff444433",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#ff6060",marginBottom:12}}>{error}</div>}
+
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onSkip} style={{flex:1,padding:11,background:"#1a1a2a",color:"#7090c0",border:"1px solid #1e3a8a33",borderRadius:8,cursor:"pointer",fontSize:13}}>
+          ✍️ Manuale
+        </button>
+        <button onClick={extract} disabled={!file||!docType||loading}
+          style={{flex:2,padding:11,background:(!file||!docType||loading)?"#1a1a2a":"#1e3a8a",color:(!file||!docType||loading)?"#555":"#4a9eff",border:"none",borderRadius:8,cursor:(!file||!docType||loading)?"not-allowed":"pointer",fontWeight:700,fontSize:13}}>
+          {loading ? "⏳ Estrazione..." : "🤖 Estrai dati"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1233,24 +1252,36 @@ function ExcelImport({ onImport, onClose }) {
         ? {type:"document", source:{type:"base64", media_type:"application/pdf", data:b64}}
         : {type:"image", source:{type:"base64", media_type:(file.type&&file.type.startsWith("image/")?file.type:"image/jpeg"), data:b64}};
 
-      var prompt = "Analizza questa conferma di prenotazione volo (Ryanair, Wizz, EasyJet, Vueling, TAP, Iberia). " +
-        "Estrai TUTTI i passeggeri. " +
-        "Rispondi SOLO con array JSON valido senza markdown. " +
-        "Formato: [{person:COGNOME NOME, flight:FR1234, company:Ryanair, dep:BGY 11:55, arr:BCN 13:35, date:19 Apr, dir:andata, baggage:1 mano, booking:ABC123}] " +
-        "Per person usa COGNOME NOME maiuscolo. " +
-        "Per dep e arr usa CODICE HH:MM. " +
-        "Per dir: andata o ritorno. " +
-        "Un oggetto per ogni passeggero anche se stesso volo.";
+      var prompt;
+      var bookingType = file.name.toLowerCase().includes("hotel") || file.name.toLowerCase().includes("booking") ? "hotel"
+        : file.name.toLowerCase().includes("park") || file.name.toLowerCase().includes("parcheggio") ? "parcheggio"
+        : file.name.toLowerCase().includes("car") || file.name.toLowerCase().includes("noleggio") || file.name.toLowerCase().includes("goldcar") ? "noleggio"
+        : "volo";
 
-      var apiKey = (typeof process !== "undefined" && process.env && process.env.REACT_APP_ANTHROPIC_KEY)
-        || window._ak || "";
-      var resp = await fetch("https://api.anthropic.com/v1/messages", {
+      if (bookingType === "volo") {
+        prompt = "Analizza questa conferma di prenotazione volo (Ryanair, Wizz, EasyJet, Vueling, TAP, Iberia). " +
+          "Estrai TUTTI i passeggeri. " +
+          "Rispondi SOLO con array JSON valido senza markdown, senza testo prima o dopo. " +
+          "Formato: [{person:\"COGNOME NOME\", flight:\"FR1234\", company:\"Ryanair\", dep:\"BGY 11:55\", arr:\"BCN 13:35\", date:\"19 Apr\", dir:\"andata\", baggage:\"1 mano\", booking:\"ABC123\"}] " +
+          "Per person usa COGNOME NOME maiuscolo. Per dep e arr usa CODICE HH:MM. Per dir: andata o ritorno. Un oggetto per ogni passeggero.";
+      } else if (bookingType === "hotel") {
+        prompt = "Analizza questa conferma di prenotazione hotel (Booking.com o simili). " +
+          "Rispondi SOLO con array JSON valido senza markdown, senza testo prima o dopo. " +
+          "Formato: [{hotel:\"Nome Hotel\", address:\"Indirizzo completo\", booking:\"numero conferma\", checkin:\"11 Giu\", checkout:\"14 Giu\", nights:\"3\", room:\"tipo camera\"}] " +
+          "Un oggetto per ogni camera. Se ci sono più camere dello stesso tipo creane uno per ognuna.";
+      } else if (bookingType === "noleggio") {
+        prompt = "Analizza questa conferma di noleggio auto. " +
+          "Rispondi SOLO con un array JSON valido senza markdown, senza testo prima o dopo. " +
+          "Formato: [{company:\"Goldcar\", pickup:\"Aeroporto Barcellona\", dropoff:\"Aeroporto Barcellona\", pickupDate:\"19 Apr\", dropoffDate:\"23 Apr\", car:\"Opel Corsa o simile\", booking:\"ABC123\", driver:\"COGNOME NOME\"}]";
+      } else {
+        prompt = "Analizza questa conferma di parcheggio. " +
+          "Rispondi SOLO con un array JSON valido senza markdown, senza testo prima o dopo. " +
+          "Formato: [{company:\"nome parcheggio\", location:\"indirizzo\", entry:\"19 Apr 06:00\", exit:\"23 Apr 14:00\", plate:\"targa\", booking:\"numero conferma\", price:\"totale\"}]";
+      }
+
+      var resp = await fetch("/api/claude", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01"
-        },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 2000,
