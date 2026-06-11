@@ -445,7 +445,8 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
     } catch(e) {}
   }
   return (
-    <div style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+(flightPast?"#444":tc.accent),borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative",opacity:flightPast?0.5:1}}>
+    <div onClick={b.type==="volo" ? function(e){if(!e.target.closest("button")&&!e.target.closest("a")){if(typeof window.__showFlightDetail==="function") window.__showFlightDetail(b);}} : undefined}
+      style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+(flightPast?"#444":tc.accent),borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative",opacity:flightPast?0.5:1,cursor:b.type==="volo"?"pointer":"default"}}>
       <span style={{fontSize:16}}>{tc.icon}{flightPast?" ✓":""}</span>
       {showPerson && person && <span style={{fontWeight:700,fontSize:12,color:tc.accent,minWidth:80}}>{person.name}</span>}
       {b.type === "volo" && (
@@ -1785,12 +1786,14 @@ export default function App() {
   var [personEventFilter, setPersonEventFilter] = useState(null);
   var [docViewer, setDocViewer] = useState(null); // {fileData, fileName}
   var [hotelModal, setHotelModal] = useState(null); // null | eventId
-  var [viewAll, setViewAll] = useState(false); // toggle for admins to see all members
+  var [viewAll, setViewAll] = useState(false);
+  var [flightDetail, setFlightDetail] = useState(null); // toggle for admins to see all members
 
   // Register global doc opener for iOS-compatible inline viewer
   useEffect(function(){
     window.__showDoc = function(fileData, fileName) { setDocViewer({fileData:fileData, fileName:fileName}); };
-    return function(){ window.__showDoc = null; };
+    window.__showFlightDetail = function(b) { setFlightDetail(b); };
+    return function(){ window.__showDoc = null; window.__showFlightDetail = null; };
   }, []);
 
   // Firebase sync
@@ -1858,10 +1861,15 @@ export default function App() {
   }
 
   function deleteBooking(b) {
-    if (b._id) fbDel("bookings", b._id);
-    setBookings(function(prev){return prev.filter(function(x){return x!==b;});});
+    // Delete all bookings with same booking number AND same event+type (linked bookings)
+    var toDelete = bookings.filter(function(x){
+      if (b.booking && x.booking && b.booking !== "-" && x.booking === b.booking && x.event === b.event && x.type === b.type) return true;
+      return x === b;
+    });
+    toDelete.forEach(function(x){ if (x._id) fbDel("bookings", x._id); });
+    setBookings(function(prev){return prev.filter(function(x){ return !toDelete.includes(x); });});
     setConfirmDelete(null);
-    showToast("Prenotazione eliminata");
+    showToast("Eliminate " + toDelete.length + " prenotazioni ✓");
   }
 
   var handleEdit = useCallback(function(b){setEditIdx(bookings.indexOf(b));setEditB(b);}, [bookings]);
@@ -1962,6 +1970,10 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      {flightDetail && <FlightDetailModal b={flightDetail} onClose={function(){setFlightDetail(null);}}
+        onEdit={isAdmin?handleEdit:null}
+        onDelete={isAdmin?function(b){setConfirmDelete(b);}:null}
+      />}
       {hotelModal !== null && <HotelRoomAssigner
         defaultEvent={hotelModal||undefined}
         onSave={function(bs){ bs.forEach(function(b){ fbAdd("bookings",b).then(function(ref){ if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}); }); showToast("Salvate "+bs.length+" prenotazioni hotel ✓"); }}
@@ -1983,36 +1995,60 @@ export default function App() {
       />}
       {pdfPreview && <PDFPreview data={pdfPreview.data} name={pdfPreview.name} onClose={function(){setPdfPreview(null);}}/>}
       {showExcelImport && <ExcelImport
-        onImport={function(bookings) {
-          bookings.forEach(function(b) {
+        onImport={function(importedBs) {
+          importedBs.forEach(function(b) {
             fbAdd("bookings", b).then(function(ref) {
               if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});
+              // Auto-save cost if price field present
+              if (b.price && parseFloat(b.price) > 0) {
+                var cat = b.type==="volo"?"Voli":b.type==="hotel"?"Hotel":b.type==="auto"?"Auto/Noleggio":"Parcheggio";
+                fbAdd("eventCosts", {
+                  event: b.event,
+                  category: cat,
+                  amount: parseFloat(b.price),
+                  notes: (b.flight||b.hotel||b.car||"") + (b.person?" — "+b.person:""),
+                  date: new Date().toISOString().substring(0,10),
+                  manual: false,
+                  bookingRef: ref ? ref.id : "",
+                });
+              }
             }).catch(function(e){console.error(e);});
           });
-          showToast("Importate " + bookings.length + " prenotazioni ✓");
+          showToast("Importate " + importedBs.length + " prenotazioni ✓");
         }}
         onClose={function(){setShowExcelImport(false);}}
       />}
       {addModal!==null && <AddBookingModal defaultEvent={addModal||undefined}
         onSave={function(bs){bs.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat(bs);});});});}}
         onClose={function(){setAddModal(null);}}/>}
-      {confirmDelete && (
+      {confirmDelete && (function(){
+        var linked = bookings.filter(function(x){
+          if (confirmDelete.booking && x.booking && confirmDelete.booking !== "-" && x.booking === confirmDelete.booking && x.event === confirmDelete.event && x.type === confirmDelete.type) return true;
+          return x === confirmDelete;
+        });
+        return (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"#1a0a0a",borderRadius:14,padding:28,maxWidth:380,width:"100%",border:"2px solid #ff4444",textAlign:"center"}}>
             <div style={{fontSize:32,marginBottom:12}}>🗑️</div>
             <div style={{fontWeight:800,fontSize:16,marginBottom:8,color:"#ff6060"}}>Elimina prenotazione?</div>
-            <div style={{fontSize:13,color:"#b0b0c0",marginBottom:20}}>
+            <div style={{fontSize:13,color:"#b0b0c0",marginBottom:8}}>
               {confirmDelete.type==="volo"&&(confirmDelete.flight+" "+confirmDelete.dep+" → "+confirmDelete.arr)}
               {confirmDelete.type==="hotel"&&confirmDelete.hotel}
               {(confirmDelete.type==="auto"||confirmDelete.type==="parcheggio")&&confirmDelete.car}
             </div>
+            {linked.length > 1 && (
+              <div style={{background:"#3a0a0a",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#ff9800"}}>
+                ⚠️ Verranno eliminate <b>{linked.length} prenotazioni</b> collegate (stesso N° prenotazione)
+              </div>
+            )}
             <div style={{display:"flex",gap:10}}>
               <button onClick={function(){setConfirmDelete(null);}} style={{flex:1,padding:11,background:"#0d0d1a",color:"#aaa",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>Annulla</button>
-              <button onClick={function(){deleteBooking(confirmDelete);}} style={{flex:1,padding:11,background:"#7f1d1d",color:"#ff6060",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>🗑️ Elimina</button>
+              <button onClick={function(){deleteBooking(confirmDelete);}} style={{flex:1,padding:11,background:"#7f1d1d",color:"#ff6060",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>🗑️ Elimina {linked.length>1?"("+linked.length+")":""}</button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
       {confirmDeleteUser && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"#1a0a0a",borderRadius:14,padding:28,maxWidth:360,width:"100%",border:"2px solid #ff4444",textAlign:"center"}}>
@@ -3558,6 +3594,88 @@ function PDF2Excel() {
           <div style={{fontSize:11,color:"#7090c0",marginTop:8,textAlign:"center"}}>Importa il file scaricato nella sezione 📥 → File Excel</div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── FlightDetailModal ──────────────────────────────────────
+function FlightDetailModal({ b, onClose, onEdit, onDelete }) {
+  var tc = TYPE_COLORS[b.type] || TYPE_COLORS.volo;
+  var cc = b.company ? COMPANY_COLORS[b.company] : null;
+  var isAndata = !b.dir || b.dir !== "ritorno";
+  var dirColor = isAndata ? "#4a9eff" : "#4caf50";
+  var row = function(label, value, color) {
+    if (!value) return null;
+    return (
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #1e3a8a22"}}>
+        <span style={{fontSize:11,color:"#7090c0",fontWeight:600}}>{label}</span>
+        <span style={{fontSize:13,fontWeight:700,color:color||"#e8e8f0",textAlign:"right",maxWidth:"65%"}}>{value}</span>
+      </div>
+    );
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:4500,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(e){if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"#12121f",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:560,border:"1px solid #1e3a8a",maxHeight:"85vh",overflowY:"auto"}}>
+        {/* Handle */}
+        <div style={{width:40,height:4,background:"#333",borderRadius:2,margin:"0 auto 16px"}}/>
+
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <span style={{background:dirColor+"22",color:dirColor,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>
+                {isAndata?"↗ ANDATA":"↙ RITORNO"}
+              </span>
+              {b.company && <span style={{background:cc||"#333",color:"#fff",borderRadius:5,padding:"3px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={function(){openAirlineApp(b.company);}}>🌐 {b.company}</span>}
+            </div>
+            <div style={{fontSize:28,fontWeight:900,color:"#fff",letterSpacing:1}}>{b.flight||"—"}</div>
+          </div>
+          <button onClick={onClose} style={{background:"#1a1a2a",border:"none",color:"#7090c0",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:18}}>✕</button>
+        </div>
+
+        {/* Route big display */}
+        <div style={{background:"#0d0d1a",borderRadius:12,padding:16,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{textAlign:"center",flex:1}}>
+            <div style={{fontSize:28,fontWeight:900,color:"#4a9eff"}}>{b.dep ? b.dep.split(" ")[0] : "—"}</div>
+            <div style={{fontSize:16,color:"#7090c0"}}>{b.dep ? b.dep.split(" ").slice(1).join(" ") : ""}</div>
+            <div style={{fontSize:11,color:"#555",marginTop:2}}>Partenza</div>
+          </div>
+          <div style={{flex:1,textAlign:"center"}}>
+            <div style={{fontSize:20}}>✈️</div>
+            <div style={{height:2,background:"#1e3a8a",margin:"4px 0"}}/>
+            <div style={{fontSize:10,color:"#7090c0"}}>{b.date||""}</div>
+          </div>
+          <div style={{textAlign:"center",flex:1}}>
+            <div style={{fontSize:28,fontWeight:900,color:"#4caf50"}}>{b.arr ? b.arr.split(" ")[0] : "—"}</div>
+            <div style={{fontSize:16,color:"#7090c0"}}>{b.arr ? b.arr.split(" ").slice(1).join(" ") : ""}</div>
+            <div style={{fontSize:11,color:"#555",marginTop:2}}>Arrivo</div>
+          </div>
+        </div>
+
+        {/* Details */}
+        <div style={{marginBottom:16}}>
+          {row("Data", b.date)}
+          {row("Bagaglio", b.baggage, "#ff9800")}
+          {row("N° Prenotazione", b.booking ? "#"+b.booking : null, "#ff9800")}
+          {row("Stato", b.status==="confermata"?"✅ Confermata":b.status==="da_confermare"?"⏳ Da confermare":"❌ Cancellata")}
+          {row("Prezzo", b.price ? "€"+b.price : null, "#4caf50")}
+          {b.notes && row("Note", "📌 "+b.notes, "#c0a060")}
+        </div>
+
+        {/* Actions */}
+        <div style={{display:"flex",gap:10}}>
+          {b.company && (COMPANY_URLS[b.company]||COMPANY_DEEPLINKS[b.company]) && (
+            <button onClick={function(){openAirlineApp(b.company);}}
+              style={{flex:2,padding:12,background:"#1e3a8a",color:"#4a9eff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>
+              🌐 Apri {b.company}
+            </button>
+          )}
+          {onEdit && <button onClick={function(){onEdit(b);onClose();}}
+            style={{flex:1,padding:12,background:"#1a2a4a",color:"#4a9eff",border:"1px solid #1e3a8a",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>✏️</button>}
+          {onDelete && <button onClick={function(){onDelete(b);onClose();}}
+            style={{flex:1,padding:12,background:"#2a0a0a",color:"#ff6060",border:"1px solid #ff444433",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>🗑️</button>}
+        </div>
+      </div>
     </div>
   );
 }
