@@ -3061,7 +3061,6 @@ function CostsDashboard({ bookings, people }) {
         var manualTotal = evManual.reduce(function(s,c){return s+(c.amount||0);},0);
         var receiptsTotal = evReceipts.reduce(function(s,r){return s+(r.amount||0);},0);
         var evTotal = autoTotal+manualTotal+receiptsTotal;
-        if (evTotal===0 && evReceipts.length===0) return null;
         return(
           <div key={ev.id} style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:14,border:"1px solid #ff980022"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
