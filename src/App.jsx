@@ -1785,6 +1785,7 @@ export default function App() {
   var [personEventFilter, setPersonEventFilter] = useState(null);
   var [docViewer, setDocViewer] = useState(null); // {fileData, fileName}
   var [hotelModal, setHotelModal] = useState(null); // null | eventId
+  var [viewAll, setViewAll] = useState(false); // toggle for admins to see all members
 
   // Register global doc opener for iOS-compatible inline viewer
   useEffect(function(){
@@ -2405,15 +2406,27 @@ export default function App() {
         {view==="event" && selEvent && (function(){
           var ev=EVENTS.find(function(e){return e.id===selEvent;});
           var types=["all","volo","hotel","auto","parcheggio"];
+          var canViewAll = currentUser && (currentUser.id==="LUCA" || currentUser.id==="ILARIO" || isAdmin);
+          var showingAll = canViewAll && viewAll;
+          // Filter bookings: if viewAll → everyone, else → only current user
+          var visibleBs = showingAll ? eventBs : eventBs.filter(function(b){ return currentUser && b.person===currentUser.id; });
           var people2=[];
-          eventBs.forEach(function(b){if(!people2.includes(b.person)) people2.push(b.person);});
+          visibleBs.forEach(function(b){if(!people2.includes(b.person)) people2.push(b.person);});
           var evNK="event_"+selEvent;
           return(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
                 <button onClick={function(){setSelEvent(null);}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>← Eventi</button>
-                {isAdmin && <button onClick={function(){setHotelModal(selEvent);}} style={{background:"#0d2a1a",color:"#4caf50",border:"1px solid #4caf5033",padding:"8px 12px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>🏨 Camere</button>}
-                {isAdmin && <button onClick={function(){setAddModal(selEvent);}} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"8px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>➕ Aggiungi</button>}
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  {canViewAll && (
+                    <button onClick={function(){setViewAll(function(v){return !v;});}}
+                      style={{background:showingAll?"#1e3a8a":"#12121f",color:showingAll?"#4a9eff":"#7090c0",border:"1px solid "+(showingAll?"#1e3a8a":"#333"),padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>
+                      {showingAll?"👁️ Tutti":"👤 Solo io"}
+                    </button>
+                  )}
+                  {isAdmin && <button onClick={function(){setHotelModal(selEvent);}} style={{background:"#0d2a1a",color:"#4caf50",border:"1px solid #4caf5033",padding:"8px 12px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>🏨 Camere</button>}
+                  {isAdmin && <button onClick={function(){setAddModal(selEvent);}} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"8px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>➕ Aggiungi</button>}
+                </div>
               </div>
               <div style={{background:"#12121f",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #1e3a8a",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
                 <div>
@@ -2424,28 +2437,33 @@ export default function App() {
                   {types.map(function(t){return <button key={t} onClick={function(){setFilterType(t);}} style={{padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:filterType===t?"#1e3a8a":"#0d0d1a",color:filterType===t?"#fff":"#7090c0"}}>{t==="all"?"Tutti":t==="volo"?"✈":t==="hotel"?"🏨":t==="auto"?"🚗":"🅿️"}</button>;})}
                 </div>
               </div>
-              {isAdmin && <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #f0c04033"}}>
+              {isAdmin && showingAll && <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #f0c04033"}}>
                 <div style={{fontSize:11,color:"#c0a060",fontWeight:700,marginBottom:5}}>📋 Note generali evento</div>
                 <textarea value={eventNotes[evNK]||""} onChange={function(e){setNote(evNK,e.target.value);}} placeholder="Note logistiche..." style={{width:"100%",background:"#0d0d1a",border:"1px solid #f0c04022",borderRadius:6,color:"#e8c87a",fontSize:12,resize:"vertical",minHeight:48,padding:"7px 9px",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
               </div>}
-              <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
-              {isAdmin && <div style={{marginBottom:12}}><MealQRUploader eventId={selEvent}/></div>}
+              {showingAll && <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>}
+              {isAdmin && showingAll && <div style={{marginBottom:12}}><MealQRUploader eventId={selEvent}/></div>}
               {filterType==="all" ? people2.map(function(pid){
                 var person2=people.find(function(p){return p.id===pid;});
-                var pBs=eventBs.filter(function(b){return b.person===pid;});
+                var pBs=visibleBs.filter(function(b){return b.person===pid;});
                 var nk=pid+"_"+selEvent;
                 return(
                   <div key={pid} style={{background:"#0d0d1a",borderRadius:10,padding:14,marginBottom:10,border:"1px solid #ffffff11"}}>
-                    <div style={{fontWeight:800,fontSize:13,marginBottom:8,color:"#4a9eff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    {showingAll && <div style={{fontWeight:800,fontSize:13,marginBottom:8,color:"#4a9eff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <span>{person2?person2.name:pid} <span style={{fontWeight:400,color:"#7090c0",fontSize:11}}>{person2?person2.role:""}</span></span>
                       <button onClick={function(){setPdfPreview({data:buildPDFData(pid,bookings,eventNotes),name:person2?person2.name:pid});}} style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",padding:"2px 8px",borderRadius:4,cursor:"pointer",fontSize:11}}>📄</button>
-                    </div>
-                    {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
-                    {eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
+                    </div>}
+                    {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
+                    {showingAll && eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
                     <PersonMealQR personId={pid} eventId={selEvent}/>
                   </div>
                 );
-              }) : eventBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
+              }) : visibleBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
+              {people2.length===0 && (
+                <div style={{textAlign:"center",padding:"40px 20px",color:"#7090c0",fontSize:13}}>
+                  Nessuna prenotazione per questo evento
+                </div>
+              )}
             </div>
           );
         })()}
