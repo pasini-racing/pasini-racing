@@ -511,10 +511,10 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
   var [showDuplicate, setShowDuplicate] = useState(false);
   var [dupPeople, setDupPeople] = useState([]);
   var fields = booking.type === "volo"
-    ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["notes","Note"]]
+    ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]]
     : booking.type === "hotel"
-    ? [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["notes","Note"]]
-    : [["car","Veicolo"],["booking","N° Prenotazione"],["notes","Note"]];
+    ? [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]]
+    : [["car","Veicolo"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]];
   var statusOptions = [{v:"confermata",l:"✅ Confermata"},{v:"da_confermare",l:"⏳ Da confermare"},{v:"cancellata",l:"❌ Cancellata"}];
   var ev = EVENTS.find(function(e) { return e.id === booking.event; });
   var inp = {width:"100%",padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:6,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
@@ -780,7 +780,7 @@ function AIImportSection({ onImported, onSkip }) {
 }
 
 // ── AddBookingForm ────────────────────────────────────────
-var EMPTY_FORM = {type:"volo",event:"",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",notes:"",hotel:"",room:"",nights:"",car:"",people:[],status:"confermata"};
+var EMPTY_FORM = {type:"volo",event:"",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",price:"",notes:"",hotel:"",room:"",nights:"",car:"",people:[],status:"confermata"};
 
 function AddBookingForm({ defaultEvent, onSave }) {
   var [mode, setMode] = useState(defaultEvent ? "manual" : "ai");
@@ -2931,10 +2931,12 @@ function MealQRUploader({ eventId }) {
 
 // ── CostsDashboard ────────────────────────────────────────
 function CostsDashboard({ bookings, people }) {
-  var [selEvent, setSelEvent] = useState("all");
-  var [costs, setCosts] = useState({});
+  var [manualCosts, setManualCosts] = useState({});
   var [editingCost, setEditingCost] = useState(null);
   var [costForm, setCostForm] = useState({event:"",category:"Voli",amount:"",notes:""});
+  var [receipts, setReceipts] = useState({});
+  var [uploadingEvent, setUploadingEvent] = useState(null);
+  var [receiptForm, setReceiptForm] = useState({name:"",amount:""});
 
   useEffect(function(){
     var unsub = db.collection("eventCosts").onSnapshot(function(snap){
@@ -2944,14 +2946,23 @@ function CostsDashboard({ bookings, people }) {
         if (!obj[data.event]) obj[data.event] = [];
         obj[data.event].push(Object.assign({_id:d.id},data));
       });
-      setCosts(obj);
+      setManualCosts(obj);
     }, function(e){console.error(e);});
-    return function(){unsub();};
+    var unsub2 = db.collection("receipts").onSnapshot(function(snap){
+      var obj = {};
+      snap.docs.forEach(function(d){
+        var data = d.data();
+        if (!obj[data.event]) obj[data.event] = [];
+        obj[data.event].push(Object.assign({_id:d.id},data));
+      });
+      setReceipts(obj);
+    }, function(e){console.error(e);});
+    return function(){unsub(); unsub2();};
   },[]);
 
   async function saveCost() {
     if (!costForm.event || !costForm.amount) return;
-    var data = {event:costForm.event, category:costForm.category, amount:parseFloat(costForm.amount)||0, notes:costForm.notes, date:new Date().toISOString().substring(0,10)};
+    var data = {event:costForm.event, category:costForm.category, amount:parseFloat(costForm.amount)||0, notes:costForm.notes, date:new Date().toISOString().substring(0,10), manual:true};
     if (editingCost) {
       await db.collection("eventCosts").doc(editingCost).set(data,{merge:true});
     } else {
@@ -2961,17 +2972,56 @@ function CostsDashboard({ bookings, people }) {
     setCostForm({event:"",category:"Voli",amount:"",notes:""});
   }
 
-  var totalCost = Object.values(costs).flat().reduce(function(s,c){return s+(c.amount||0);},0);
+  async function uploadReceipt(evId, file) {
+    if (!file) return;
+    var b64 = await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result);};r.onerror=rej;r.readAsDataURL(file);});
+    await db.collection("receipts").add({
+      event: evId,
+      name: receiptForm.name || file.name,
+      amount: parseFloat(receiptForm.amount)||0,
+      fileData: b64,
+      date: new Date().toISOString().substring(0,10),
+    });
+    setUploadingEvent(null);
+    setReceiptForm({name:"",amount:""});
+  }
+
+  function getAutoCosts(evId) {
+    var evBs = bookings.filter(function(b){ return b.event===evId && b.price && parseFloat(b.price)>0; });
+    var byCat = {};
+    evBs.forEach(function(b){
+      var cat = b.type==="volo"?"Voli":b.type==="hotel"?"Hotel":b.type==="auto"?"Auto/Noleggio":"Parcheggio";
+      if(!byCat[cat]) byCat[cat]={total:0, items:[]};
+      var p=parseFloat(b.price)||0;
+      byCat[cat].total+=p;
+      var person = people.find(function(p2){return p2.id===b.person;});
+      byCat[cat].items.push({label:(person?person.name.split(" ")[0]:b.person)+" — "+(b.flight||b.hotel||b.car||b.type), amount:p});
+    });
+    return byCat;
+  }
+
   var inp = {width:"100%",padding:"7px 9px",background:"#0d0d1a",border:"1px solid #ff980033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none",boxSizing:"border-box"};
+
+  var grandTotal = EVENTS.reduce(function(tot, ev){
+    var auto = Object.values(getAutoCosts(ev.id)).reduce(function(s,c){return s+c.total;},0);
+    var manual = (manualCosts[ev.id]||[]).reduce(function(s,c){return s+(c.amount||0);},0);
+    var rec = (receipts[ev.id]||[]).reduce(function(s,r){return s+(r.amount||0);},0);
+    return tot+auto+manual+rec;
+  },0);
 
   return (
     <div>
-      <div style={{fontSize:18,fontWeight:800,color:"#ff9800",marginBottom:6}}>💰 Dashboard Costi</div>
+      <div style={{fontSize:18,fontWeight:800,color:"#ff9800",marginBottom:4}}>💰 Dashboard Costi</div>
+      <div style={{fontSize:11,color:"#7090c0",marginBottom:14}}>Prezzi automatici dalle prenotazioni + spese extra + scontrini per evento.</div>
 
-      {/* Add cost form */}
-      <div style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:16,border:"1px solid #ff980033"}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#ff9800",marginBottom:10}}>➕ {editingCost?"Modifica spesa":"Aggiungi spesa"}</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+      <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #4caf5033",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#ff9800"}}>💶 Totale stagione</div>
+        <div style={{fontSize:22,fontWeight:900,color:"#4caf50"}}>€{grandTotal.toFixed(2)}</div>
+      </div>
+
+      <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #ff980033"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#ff9800",marginBottom:10}}>➕ {editingCost?"Modifica spesa":"Aggiungi spesa extra"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
           <div>
             <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Evento</label>
             <select value={costForm.event} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{event:e.target.value});});}} style={inp}>
@@ -2982,7 +3032,7 @@ function CostsDashboard({ bookings, people }) {
           <div>
             <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Categoria</label>
             <select value={costForm.category} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{category:e.target.value});});}} style={inp}>
-              {["Voli","Hotel","Auto/Noleggio","Parcheggio","Visti/Documenti","Trasferimenti","Altro"].map(function(c){return React.createElement("option",{key:c},c);})}
+              {["Voli","Hotel","Auto/Noleggio","Parcheggio","Visti/Documenti","Trasferimenti","Pasti","Altro"].map(function(c){return React.createElement("option",{key:c},c);})}
             </select>
           </div>
           <div>
@@ -2991,59 +3041,116 @@ function CostsDashboard({ bookings, people }) {
           </div>
           <div>
             <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Note</label>
-            <input value={costForm.notes} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{notes:e.target.value});});}} placeholder="es. 5 biglietti Ryanair" style={inp}/>
+            <input value={costForm.notes} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{notes:e.target.value});});}} placeholder="es. taxi aeroporto" style={inp}/>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
-          {editingCost && <button onClick={function(){setEditingCost(null);setCostForm({event:"",category:"Voli",amount:"",notes:""}); }} style={{flex:1,padding:9,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:7,cursor:"pointer"}}>Annulla</button>}
+          {editingCost && <button onClick={function(){setEditingCost(null);setCostForm({event:"",category:"Voli",amount:"",notes:""}); }} style={{flex:1,padding:8,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:7,cursor:"pointer"}}>Annulla</button>}
           <button onClick={saveCost} disabled={!costForm.event||!costForm.amount}
-            style={{flex:2,padding:9,background:(costForm.event&&costForm.amount)?"#b45309":"#222",color:(costForm.event&&costForm.amount)?"#fff":"#555",border:"none",borderRadius:7,cursor:(costForm.event&&costForm.amount)?"pointer":"not-allowed",fontWeight:700}}>
-            {editingCost?"💾 Salva modifica":"➕ Aggiungi"}
+            style={{flex:2,padding:8,background:(costForm.event&&costForm.amount)?"#b45309":"#222",color:(costForm.event&&costForm.amount)?"#fff":"#555",border:"none",borderRadius:7,cursor:(costForm.event&&costForm.amount)?"pointer":"not-allowed",fontWeight:700}}>
+            {editingCost?"💾 Salva":"➕ Aggiungi"}
           </button>
         </div>
       </div>
 
-      {/* Totale */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#ff9800"}}>💶 Totale stagione</div>
-        <div style={{fontSize:18,fontWeight:800,color:"#4caf50"}}>€{totalCost.toFixed(2)}</div>
-      </div>
-
-      {/* Cost list per event */}
-      {EVENTS.filter(function(ev){return costs[ev.id]&&costs[ev.id].length>0;}).map(function(ev){
-        var evCosts = costs[ev.id]||[];
-        var evTotal = evCosts.reduce(function(s,c){return s+(c.amount||0);},0);
-        var byCat = {};
-        evCosts.forEach(function(c){if(!byCat[c.category])byCat[c.category]=0;byCat[c.category]+=c.amount||0;});
+      {EVENTS.map(function(ev){
+        var autoCosts = getAutoCosts(ev.id);
+        var evManual = manualCosts[ev.id]||[];
+        var evReceipts = receipts[ev.id]||[];
+        var autoTotal = Object.values(autoCosts).reduce(function(s,c){return s+c.total;},0);
+        var manualTotal = evManual.reduce(function(s,c){return s+(c.amount||0);},0);
+        var receiptsTotal = evReceipts.reduce(function(s,r){return s+(r.amount||0);},0);
+        var evTotal = autoTotal+manualTotal+receiptsTotal;
+        if (evTotal===0 && evReceipts.length===0) return null;
         return(
-          <div key={ev.id} style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:12,border:"1px solid #ff980022"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{fontWeight:800,fontSize:13}}>{ev.label} <span style={{fontWeight:400,fontSize:11,color:"#7090c0"}}>{ev.dates}</span></div>
-              <div style={{fontSize:14,fontWeight:800,color:"#4caf50"}}>€{evTotal.toFixed(2)}</div>
+          <div key={ev.id} style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:14,border:"1px solid #ff980022"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontWeight:800,fontSize:14}}>{ev.label} <span style={{fontWeight:400,fontSize:11,color:"#7090c0"}}>{ev.dates}</span></div>
+              <div style={{fontSize:16,fontWeight:900,color:"#4caf50"}}>€{evTotal.toFixed(2)}</div>
             </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
-              {Object.keys(byCat).map(function(cat){return(
-                <span key={cat} style={{background:"#b4530922",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>
-                  {cat}: €{byCat[cat].toFixed(2)}
-                </span>
-              );})}
-            </div>
-            {evCosts.map(function(c){return(
-              <div key={c._id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12}}>
-                <span style={{background:"#b4530922",color:"#ff9800",borderRadius:4,padding:"1px 6px",fontSize:10,flexShrink:0}}>{c.category}</span>
-                <span style={{fontWeight:700,color:"#4caf50",flexShrink:0}}>€{(c.amount||0).toFixed(2)}</span>
-                {c.notes&&<span style={{color:"#7090c0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</span>}
-                <span style={{color:"#555",fontSize:10,flexShrink:0}}>{c.date}</span>
-                <button onClick={function(){setCostForm({event:c.event,category:c.category,amount:String(c.amount),notes:c.notes||""});setEditingCost(c._id);}}
-                  style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>✏️</button>
-                <button onClick={async function(){await db.collection("eventCosts").doc(c._id).delete();}}
-                  style={{background:"none",border:"1px solid #ff444433",color:"#ff6060",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
+            {Object.keys(autoCosts).length>0 && (
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>📋 Dalle prenotazioni</div>
+                {Object.keys(autoCosts).map(function(cat){
+                  var catData = autoCosts[cat];
+                  return(
+                    <div key={cat} style={{marginBottom:5}}>
+                      <div style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:"#0d1a2a",borderRadius:6,marginBottom:2}}>
+                        <span style={{fontSize:11,fontWeight:700,color:"#4a9eff"}}>{cat}</span>
+                        <span style={{fontSize:11,fontWeight:700,color:"#4caf50"}}>€{catData.total.toFixed(2)}</span>
+                      </div>
+                      {catData.items.map(function(item,i){
+                        return <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"2px 12px",fontSize:10,color:"#7090c0"}}>
+                          <span>{item.label}</span><span>€{item.amount.toFixed(2)}</span>
+                        </div>;
+                      })}
+                    </div>
+                  );
+                })}
               </div>
-            );})}
+            )}
+            {evManual.length>0 && (
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:10,color:"#ff9800",fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>✏️ Spese extra</div>
+                {evManual.map(function(c){return(
+                  <div key={c._id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:3,fontSize:11}}>
+                    <span style={{background:"#b4530922",color:"#ff9800",borderRadius:4,padding:"1px 5px",fontSize:10,flexShrink:0}}>{c.category}</span>
+                    <span style={{fontWeight:700,color:"#4caf50",flexShrink:0}}>€{(c.amount||0).toFixed(2)}</span>
+                    {c.notes&&<span style={{color:"#7090c0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</span>}
+                    <button onClick={function(){setCostForm({event:c.event,category:c.category,amount:String(c.amount),notes:c.notes||""});setEditingCost(c._id);}} style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:10,flexShrink:0}}>✏️</button>
+                    <button onClick={async function(){await db.collection("eventCosts").doc(c._id).delete();}} style={{background:"none",border:"1px solid #ff444433",color:"#ff6060",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
+                  </div>
+                );})}
+              </div>
+            )}
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <div style={{fontSize:10,color:"#9c27b0",fontWeight:700,textTransform:"uppercase"}}>
+                  🧾 Scontrini {evReceipts.length>0&&<span style={{color:"#4caf50"}}> — €{receiptsTotal.toFixed(2)}</span>}
+                </div>
+                <button onClick={function(){setUploadingEvent(ev.id);setReceiptForm({name:"",amount:""}); }}
+                  style={{background:"#2a0a3a",color:"#9c27b0",border:"1px solid #9c27b033",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                  ➕ Carica
+                </button>
+              </div>
+              {uploadingEvent===ev.id && (
+                <div style={{background:"#0d0d1a",borderRadius:8,padding:10,marginBottom:8,border:"1px solid #9c27b033"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+                    <input value={receiptForm.name} onChange={function(e){setReceiptForm(function(f){return Object.assign({},f,{name:e.target.value});});}} placeholder="Descrizione" style={Object.assign({},inp,{borderColor:"#9c27b033"})}/>
+                    <input type="number" value={receiptForm.amount} onChange={function(e){setReceiptForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} placeholder="Importo €" style={Object.assign({},inp,{borderColor:"#9c27b033"})}/>
+                  </div>
+                  <label style={{display:"block",background:"#12121f",border:"2px dashed #9c27b044",borderRadius:6,padding:"10px",textAlign:"center",cursor:"pointer",marginBottom:6}}>
+                    <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={function(e){uploadReceipt(ev.id,e.target.files[0]);}}/>
+                    <span style={{fontSize:11,color:"#9c27b0"}}>📷 Tocca per foto o PDF</span>
+                  </label>
+                  <button onClick={function(){setUploadingEvent(null);}} style={{width:"100%",padding:"6px",background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:5,cursor:"pointer",fontSize:11}}>Annulla</button>
+                </div>
+              )}
+              {evReceipts.length>0 && (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {evReceipts.map(function(r){
+                    var isImg = r.fileData && r.fileData.startsWith("data:image");
+                    return(
+                      <div key={r._id} onClick={function(){openDoc(r.fileData, r.name||"scontrino");}}
+                        style={{background:"#0d0d1a",borderRadius:8,padding:8,border:"1px solid #9c27b022",cursor:"pointer",position:"relative"}}>
+                        {isImg
+                          ? <img src={r.fileData} style={{width:"100%",height:60,objectFit:"cover",borderRadius:4,marginBottom:4}} alt="scontrino"/>
+                          : <div style={{height:60,background:"#1a0a2a",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:4,fontSize:24}}>📄</div>
+                        }
+                        <div style={{fontSize:10,color:"#e8e8f0",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"Scontrino"}</div>
+                        {r.amount>0 && <div style={{fontSize:10,color:"#4caf50",fontWeight:700}}>€{r.amount.toFixed(2)}</div>}
+                        <div style={{fontSize:9,color:"#555"}}>{r.date}</div>
+                        <button onClick={async function(e){e.stopPropagation();await db.collection("receipts").doc(r._id).delete();}}
+                          style={{position:"absolute",top:4,right:4,background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:9}}>✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
-      {Object.keys(costs).length===0 && <div style={{textAlign:"center",color:"#7090c0",padding:24,fontSize:13}}>Nessuna spesa inserita ancora.</div>}
     </div>
   );
 }
