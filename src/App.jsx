@@ -2136,6 +2136,22 @@ export default function App() {
             "Magny-Cours":"Magny-Cours","Valencia":"Valencia","Aragon":"Alcañiz","Misano":"Misano Adriatico",
           };
 
+          // Circuit SVG paths (simplified outlines)
+          var CIRCUIT_SVGS = {
+            "Estoril": '<svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M40 80 C40 40 70 20 110 25 C150 30 165 50 168 75 C171 100 155 125 130 135 C105 145 75 140 58 125 C41 110 40 120 40 80Z" stroke="#4a9eff" stroke-width="6" fill="none" opacity="0.9"/><path d="M110 25 C130 22 155 35 165 55" stroke="#4a9eff" stroke-width="6" fill="none"/><circle cx="110" cy="25" r="5" fill="#ff4444"/><text x="102" y="17" fill="#ff4444" font-size="9" font-family="Arial">START</text></svg>',
+            "Barcellona": '<svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M30 90 L30 60 C30 40 50 25 80 22 L130 20 C155 20 170 35 172 55 L172 75 C172 90 160 100 145 105 L145 125 C145 140 130 148 110 148 L70 148 C50 148 35 138 30 125 L30 90Z" stroke="#4a9eff" stroke-width="6" fill="none" opacity="0.9"/><path d="M130 20 L145 20 C165 20 172 35 172 55" stroke="#4a9eff" stroke-width="6" fill="none"/><circle cx="80" cy="22" r="5" fill="#ff4444"/><text x="72" y="14" fill="#ff4444" font-size="9" font-family="Arial">START</text></svg>',
+            "Jerez": '<svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M35 80 L35 45 C35 28 55 18 80 18 L120 18 C145 18 162 30 165 50 C168 70 155 85 140 90 C155 95 168 108 165 128 C162 148 145 155 120 155 L80 155 C55 155 35 145 35 128 L35 80Z" stroke="#4a9eff" stroke-width="6" fill="none" opacity="0.9"/><circle cx="80" cy="18" r="5" fill="#ff4444"/><text x="72" y="10" fill="#ff4444" font-size="9" font-family="Arial">START</text></svg>',
+            "Magny-Cours": '<svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M25 40 L80 40 C95 40 100 50 100 60 L100 75 C100 88 112 95 130 95 L165 95 C178 95 178 110 165 115 L100 115 C80 115 65 125 60 140 L40 140 C25 140 20 128 25 115 L25 40Z" stroke="#4a9eff" stroke-width="6" fill="none" opacity="0.9"/><circle cx="25" cy="40" r="5" fill="#ff4444"/><text x="17" y="32" fill="#ff4444" font-size="9" font-family="Arial">START</text></svg>',
+            "Valencia": '<svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M30 130 L30 50 C30 30 50 18 75 18 L125 18 C150 18 170 30 170 50 L170 80 C170 95 158 105 145 105 L100 105 C85 105 78 115 78 128 L78 140 C78 152 65 158 52 155 C39 152 30 143 30 130Z" stroke="#4a9eff" stroke-width="6" fill="none" opacity="0.9"/><circle cx="75" cy="18" r="5" fill="#ff4444"/><text x="67" y="10" fill="#ff4444" font-size="9" font-family="Arial">START</text></svg>',
+            "Aragon": '<svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M25 80 L25 40 C25 22 45 12 70 12 L155 12 C175 12 182 25 180 42 L175 75 C173 90 160 98 145 98 L110 98 C95 98 88 108 88 120 L88 148 C88 158 75 162 62 158 C49 154 40 145 38 132 L25 80Z" stroke="#4a9eff" stroke-width="6" fill="none" opacity="0.9"/><circle cx="70" cy="12" r="5" fill="#ff4444"/><text x="62" y="5" fill="#ff4444" font-size="9" font-family="Arial">START</text></svg>',
+            "Misano": '<svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M35 120 L35 45 C35 25 55 15 80 15 L155 15 C172 15 178 28 175 45 L170 80 C168 95 155 102 140 102 L100 102 C82 102 75 112 75 125 C75 140 62 148 48 145 C38 142 35 132 35 120Z" stroke="#4a9eff" stroke-width="6" fill="none" opacity="0.9"/><path d="M140 102 L165 102 C178 102 182 115 175 125 L155 140 C142 150 125 152 110 148 L75 125" stroke="#4a9eff" stroke-width="6" fill="none"/><circle cx="80" cy="15" r="5" fill="#ff4444"/><text x="72" y="8" fill="#ff4444" font-size="9" font-family="Arial">START</text></svg>',
+          };
+
+          function getCircuitSVG(circuit) {
+            var key = Object.keys(CIRCUIT_SVGS).find(function(k){ return circuit && circuit.toLowerCase().includes(k.toLowerCase()); });
+            return key ? CIRCUIT_SVGS[key] : null;
+          }
+
           return (
           <div>
             {/* Logo header */}
@@ -2169,28 +2185,37 @@ export default function App() {
             )}
 
             {/* Prossimo evento HERO */}
-            {nextEv && (
+            {nextEv && (function(){
+              var circuitSVG = getCircuitSVG(nextEv.circuit);
+              return (
               <div onClick={function(){setView("event");setSelEvent(nextEv.id);}}
-                style={{background:"linear-gradient(135deg,#0d1b4b,#1e3a8a22)",border:"2px solid #1e3a8a",borderRadius:16,padding:"20px 18px",marginBottom:16,cursor:"pointer",position:"relative",overflow:"hidden"}}>
-                <div style={{position:"absolute",top:0,right:0,width:80,height:80,background:"#4a9eff08",borderRadius:"0 16px 0 80px"}}/>
-                <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>🏁 Prossimo Evento</div>
-                <div style={{fontSize:22,fontWeight:900,color:"#fff",marginBottom:4}}>{nextEv.label}</div>
-                <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>📍 {nextEv.circuit} · 📅 {nextEv.dates}</div>
-                <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                  <div style={{background: nextDays<=7?"#ff444422":nextDays<=30?"#ff980022":"#4a9eff22",
-                    border:"1px solid "+(nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff")+"44",
-                    borderRadius:10,padding:"8px 16px",textAlign:"center"}}>
-                    <div style={{fontSize:28,fontWeight:900,color:nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff",lineHeight:1}}>{nextDays===0?"OGGI":nextDays===1?"1":nextDays}</div>
-                    <div style={{fontSize:10,color:"#7090c0"}}>{nextDays===0?"":nextDays===1?"giorno":"giorni"}</div>
-                  </div>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>👥 {pCount(nextEv.id)} persone</span>
-                    <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>✈️ {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="volo";}).length} voli</span>
-                    <span style={{background:"#14532d33",color:"#4caf50",borderRadius:6,padding:"4px 10px",fontSize:11}}>🏨 {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="hotel";}).length} hotel</span>
+                style={{background:"linear-gradient(135deg,#0d1b4b,#1e3a8a22)",border:"2px solid #1e3a8a",borderRadius:16,padding:"20px 18px",marginBottom:16,cursor:"pointer",position:"relative",overflow:"hidden",minHeight:140}}>
+                {/* Circuit SVG background */}
+                {circuitSVG && (
+                  <div style={{position:"absolute",top:"50%",right:12,transform:"translateY(-50%)",width:120,height:100,opacity:0.25,pointerEvents:"none"}}
+                    dangerouslySetInnerHTML={{__html:circuitSVG}}/>
+                )}
+                <div style={{position:"relative",zIndex:1}}>
+                  <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>🏁 Prossimo Evento</div>
+                  <div style={{fontSize:22,fontWeight:900,color:"#fff",marginBottom:4}}>{nextEv.label}</div>
+                  <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>📍 {nextEv.circuit} · 📅 {nextEv.dates}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                    <div style={{background: nextDays<=7?"#ff444422":nextDays<=30?"#ff980022":"#4a9eff22",
+                      border:"1px solid "+(nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff")+"44",
+                      borderRadius:10,padding:"8px 16px",textAlign:"center"}}>
+                      <div style={{fontSize:28,fontWeight:900,color:nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff",lineHeight:1}}>{nextDays===0?"OGGI":nextDays===1?"1":nextDays}</div>
+                      <div style={{fontSize:10,color:"#7090c0"}}>{nextDays===0?"":nextDays===1?"giorno":"giorni"}</div>
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>👥 {pCount(nextEv.id)} persone</span>
+                      <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>✈️ {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="volo";}).length} voli</span>
+                      <span style={{background:"#14532d33",color:"#4caf50",borderRadius:6,padding:"4px 10px",fontSize:11}}>🏨 {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="hotel";}).length} hotel</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Le mie prenotazioni per il prossimo evento */}
             {nextEv && currentUser && (
