@@ -2141,11 +2141,49 @@ export default function App() {
             return Math.ceil((start - TODAY) / (1000*60*60*24));
           }
 
-          // Next upcoming event
-          var nextEv = EVENTS.find(function(ev){
-            var d = daysTo(ev.id);
-            return d !== null && d >= 0;
-          });
+          // Parse a booking's arrival date+time (Italian month abbreviations, year 2026)
+          var MONTHS_IT = {Gen:0,Feb:1,Mar:2,Apr:3,Mag:4,Giu:5,Lug:6,Ago:7,Set:8,Ott:9,Nov:10,Dic:11};
+          function parseArrDateTime(b) {
+            if (!b.date || !b.arr) return null;
+            var parts = b.date.trim().split(/\s+/);
+            var day, monthAbbr;
+            for (var i=0;i<parts.length;i++){
+              if (/^\d{1,2}$/.test(parts[i])) { day = parseInt(parts[i],10); monthAbbr = parts[i+1]; break; }
+            }
+            if (day===undefined || !monthAbbr) return null;
+            var month = MONTHS_IT[monthAbbr.substring(0,3)];
+            if (month===undefined) return null;
+            var tm = b.arr.match(/(\d{1,2}):(\d{2})\s*$/);
+            if (!tm) return null;
+            return new Date(2026, month, day, parseInt(tm[1],10), parseInt(tm[2],10));
+          }
+
+          // Determine which event is "current": last event whose start date has passed
+          var startedEvents = EVENTS.filter(function(ev){ var d=daysTo(ev.id); return d!==null && d<=0; });
+          var currentEv = startedEvents.length ? startedEvents[startedEvents.length-1] : null;
+          var futureEv = EVENTS.find(function(ev){ var d=daysTo(ev.id); return d!==null && d>0; });
+
+          var nextEv;
+          var eventInProgress = false;
+          if (currentEv) {
+            var returnFlights = bookings.filter(function(b){
+              return b.event===currentEv.id && b.type==="volo" && (b.dir||"").toLowerCase().indexOf("ritorno")!==-1;
+            });
+            if (returnFlights.length > 0) {
+              var allLanded = returnFlights.every(function(b){
+                var dt = parseArrDateTime(b);
+                return dt && TODAY > dt;
+              });
+              if (!allLanded) { nextEv = currentEv; eventInProgress = true; }
+              else { nextEv = futureEv || currentEv; }
+            } else {
+              // No return flight data: keep current event for its duration, then move on
+              nextEv = (daysTo(currentEv.id)===0) ? currentEv : (futureEv || currentEv);
+              if (nextEv===currentEv) eventInProgress = true;
+            }
+          } else {
+            nextEv = futureEv;
+          }
           var nextDays = nextEv ? daysTo(nextEv.id) : null;
 
           // My bookings for next event
@@ -2220,15 +2258,15 @@ export default function App() {
                     dangerouslySetInnerHTML={{__html:circuitSVG}}/>
                 )}
                 <div style={{position:"relative",zIndex:1}}>
-                  <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>🏁 Prossimo Evento</div>
+                  <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>🏁 {eventInProgress?"Evento in corso":"Prossimo Evento"}</div>
                   <div style={{fontSize:22,fontWeight:900,color:"#fff",marginBottom:4}}>{nextEv.label}</div>
                   <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>📍 {nextEv.circuit} · 📅 {nextEv.dates}</div>
                   <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                    <div style={{background: nextDays<=7?"#ff444422":nextDays<=30?"#ff980022":"#4a9eff22",
-                      border:"1px solid "+(nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff")+"44",
+                    <div style={{background: eventInProgress?"#4caf5022":nextDays<=7?"#ff444422":nextDays<=30?"#ff980022":"#4a9eff22",
+                      border:"1px solid "+(eventInProgress?"#4caf50":nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff")+"44",
                       borderRadius:10,padding:"8px 16px",textAlign:"center"}}>
-                      <div style={{fontSize:28,fontWeight:900,color:nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff",lineHeight:1}}>{nextDays===0?"OGGI":nextDays===1?"1":nextDays}</div>
-                      <div style={{fontSize:10,color:"#7090c0"}}>{nextDays===0?"":nextDays===1?"giorno":"giorni"}</div>
+                      <div style={{fontSize:eventInProgress?18:28,fontWeight:900,color:eventInProgress?"#4caf50":nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff",lineHeight:1}}>{eventInProgress?"IN CORSO":nextDays===0?"OGGI":nextDays===1?"1":nextDays}</div>
+                      <div style={{fontSize:10,color:"#7090c0"}}>{eventInProgress?"✈️ rientro in corso":nextDays===0?"":nextDays===1?"giorno":"giorni"}</div>
                     </div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>👥 {pCount(nextEv.id)} persone</span>
