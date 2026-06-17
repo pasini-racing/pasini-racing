@@ -1340,22 +1340,39 @@ function ExcelImport({ onImport, onClose }) {
       var allBookings = [];
       wb.SheetNames.forEach(function(sheetName) {
         var rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:""});
-        // Check if it's our standard import format (has "Evento" header)
-        if (rows.length > 0 && String(rows[0][0]).trim() === "Evento") {
-          rows.slice(1).forEach(function(row) {
-            if (!row[0] && !row[1]) return;
-            allBookings.push({
-              event: row[0]||selEvent, person: row[1]||"",
-              type: row[2]||"volo", dir: row[3]||"andata",
-              flight: row[4]||"", company: row[5]||"",
-              dep: row[6]||"", arr: row[7]||"",
-              date: row[8]||"", baggage: row[9]||"",
-              booking: row[10]||"", notes: row[11]||"",
-              status: row[12]||"confermata",
-              _matched: true,
-            });
-          });
+        // Find header row anywhere in the sheet (skip instruction banner rows)
+        var headerIdx = rows.findIndex(function(r){ return String(r[0]).trim()==="Evento"; });
+        if (headerIdx === -1) return;
+        var headerRow = rows[headerIdx].map(function(h){ return String(h||"").trim(); });
+        // Map column name -> index, so layout can vary (volo vs hotel vs auto vs parcheggio)
+        var colIdx = {};
+        headerRow.forEach(function(h, i){ colIdx[h] = i; });
+        function col(name, fallback) {
+          return colIdx.hasOwnProperty(name) ? colIdx[name] : fallback;
         }
+        rows.slice(headerIdx+1).forEach(function(row) {
+          if (!row[0] && !row[1]) return;
+          // Stop at "TOTALE" summary rows
+          if (String(row[0]||"").toUpperCase().indexOf("TOTALE")===0) return;
+          var type = row[col("Tipo",2)] || "volo";
+          var priceRaw = row[col("Prezzo (€)", -1)];
+          allBookings.push({
+            event: row[0]||selEvent, person: row[1]||"",
+            type: type, dir: row[col("Dir.",3)]||"andata",
+            flight: row[col("Volo",4)]||"", company: row[col("Compagnia",5)]||"",
+            dep: row[col("Partenza",6)]||"", arr: row[col("Arrivo",7)]||"",
+            date: row[col("Data",8)]||"", baggage: row[col("Bagaglio",9)]||"",
+            hotel: row[col("Hotel",-1)]||"", address: row[col("Indirizzo",-1)]||"",
+            room: row[col("Camera",-1)]||"", nights: row[col("Notti",-1)]||"",
+            checkin: row[col("Check-in",-1)]||"", checkout: row[col("Check-out",-1)]||"",
+            car: row[col("Auto",-1)]||row[col("Parcheggio",-1)]||"",
+            booking: row[col("N° Pren.",10)]||"",
+            price: priceRaw!==-1 && priceRaw!=="" && priceRaw!==undefined ? String(priceRaw) : "",
+            notes: row[col("Note",11)]||"",
+            status: row[col("Stato",12)]||"confermata",
+            _matched: true,
+          });
+        });
       });
       if (allBookings.length === 0) setError("Nessuna prenotazione trovata. Usa il formato standard dei file di importazione.");
       else setPreview(allBookings);
@@ -1957,7 +1974,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",costsOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -2246,6 +2263,38 @@ export default function App() {
               </div>
             )}
 
+            {/* Banner prenotazioni mancanti per il prossimo evento (solo admin) */}
+            {(isAdmin || (currentUser && (currentUser.canSeeCosts || currentUser.id==="ILARIO"))) && nextEv && !eventInProgress && (function(){
+              var CHECK_CATS = [
+                {key:"volo", full:"Volo"},
+                {key:"hotel", full:"Hotel"},
+              ];
+              var nextEvPeopleIds = bookings.filter(function(b){return b.event===nextEv.id;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+              var nextEvPeople = people.filter(function(p){return nextEvPeopleIds.includes(p.id);});
+              var missingPeople = nextEvPeople.filter(function(p){
+                return CHECK_CATS.some(function(c){
+                  return !bookings.some(function(b){return b.event===nextEv.id && b.person===p.id && b.type===c.key && b.status!=="cancellata";});
+                });
+              });
+              if (nextEvPeople.length===0 || missingPeople.length===0) return null;
+              return (
+                <div onClick={function(){setView("checklist");}}
+                  style={{background:"#1a0a00",border:"2px solid #ff444466",borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start",cursor:"pointer"}}>
+                  <div style={{fontSize:20,flexShrink:0}}>📋</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:800,color:"#ff6060",marginBottom:6}}>Prenotazioni incomplete — {nextEv.label}</div>
+                    <div style={{fontSize:11,color:"#c08080",marginBottom:6}}>{missingPeople.length} {missingPeople.length===1?"persona":"persone"} con volo/hotel mancante. Tocca per la checklist completa →</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {missingPeople.slice(0,8).map(function(p){
+                        return <span key={p.id} style={{background:"#ff444422",color:"#ff6060",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,border:"1px solid #ff444444"}}>{p.name.split(" ")[0]}</span>;
+                      })}
+                      {missingPeople.length>8 && <span style={{color:"#c08080",fontSize:11}}>+{missingPeople.length-8} altri</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Prossimo evento HERO */}
             {nextEv && (function(){
               var circuitSVG = getCircuitSVG(nextEv.circuit);
@@ -2523,9 +2572,12 @@ export default function App() {
                 var nk=pid+"_"+selEvent;
                 return(
                   <div key={pid} style={{background:"#0d0d1a",borderRadius:10,padding:14,marginBottom:10,border:"1px solid #ffffff11"}}>
-                    {showingAll && <div style={{fontWeight:800,fontSize:13,marginBottom:8,color:"#4a9eff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    {showingAll && <div style={{fontWeight:800,fontSize:13,marginBottom:8,color:"#4a9eff",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
                       <span>{person2?person2.name:pid} <span style={{fontWeight:400,color:"#7090c0",fontSize:11}}>{person2?person2.role:""}</span></span>
-                      <button onClick={function(){setPdfPreview({data:buildPDFData(pid,bookings,eventNotes),name:person2?person2.name:pid});}} style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",padding:"2px 8px",borderRadius:4,cursor:"pointer",fontSize:11}}>📄</button>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <CompletenessBadge personId={pid} eventId={selEvent} bookings={bookings}/>
+                        <button onClick={function(){setPdfPreview({data:buildPDFData(pid,bookings,eventNotes),name:person2?person2.name:pid});}} style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",padding:"2px 8px",borderRadius:4,cursor:"pointer",fontSize:11}}>📄</button>
+                      </div>
                     </div>}
                     {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
                     {showingAll && eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
@@ -2558,6 +2610,10 @@ export default function App() {
 
         {view==="costs" && (isAdmin || (currentUser && (currentUser.canSeeCosts || currentUser.id==="ILARIO"))) && (
           <CostsDashboard bookings={bookings} people={people}/>
+        )}
+
+        {view==="checklist" && (isAdmin || (currentUser && (currentUser.canSeeCosts || currentUser.id==="ILARIO"))) && (
+          <ChecklistDashboard bookings={bookings} people={people} setView={setView} setSelEvent={setSelEvent} setViewAll={function(){setViewAll(true);}}/>
         )}
 
         {view==="export" && isAdmin && (
@@ -2682,6 +2738,36 @@ function EventDocuments({ eventId, isAdmin }) {
 
 
 // ── PersonMealQR ───────────────────────────────────────────
+// ── CompletenessBadge ──────────────────────────────────────
+// Small ✅/⚠️ indicator showing whether a person has volo+hotel+QR pasti for this event.
+function CompletenessBadge({ personId, eventId, bookings }) {
+  var [hasMealQR, setHasMealQR] = useState(null); // null = loading
+  useEffect(function(){
+    var unsub = db.collection("mealQR").where("event","==",eventId).where("personId","==",personId).onSnapshot(function(snap){
+      setHasMealQR(snap.docs.length > 0);
+    }, function(e){console.error(e); setHasMealQR(false);});
+    return function(){unsub();};
+  },[personId,eventId]);
+
+  if (hasMealQR === null) return null;
+
+  var hasVolo = bookings.some(function(b){return b.event===eventId && b.person===personId && b.type==="volo" && b.status!=="cancellata";});
+  var hasHotel = bookings.some(function(b){return b.event===eventId && b.person===personId && b.type==="hotel" && b.status!=="cancellata";});
+  var missing = [];
+  if (!hasVolo) missing.push("Volo");
+  if (!hasHotel) missing.push("Hotel");
+  if (!hasMealQR) missing.push("QR Pasti");
+
+  if (missing.length === 0) {
+    return <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>✅</span>;
+  }
+  return (
+    <span title={"Manca: "+missing.join(", ")} style={{background:"#ff980022",color:"#ff9800",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>
+      ⚠️ {missing.join(", ")}
+    </span>
+  );
+}
+
 function PersonMealQR({ personId, eventId }) {
   var [qrs, setQrs] = useState([]);
   var [checkins, setCheckins] = useState({}); // "day_mealType" -> bool
@@ -3158,6 +3244,112 @@ function MealQRUploader({ eventId }) {
 
 
 // ── CostsDashboard ────────────────────────────────────────
+// ── ChecklistDashboard ────────────────────────────────────
+// Shows, per event, a matrix of person x category (volo/hotel/auto/parcheggio/QR pasti)
+// highlighting what's missing for each person attending that event.
+function ChecklistDashboard({ bookings, people, setView, setSelEvent, setViewAll }) {
+  var [selEvent, setSelEventLocal] = useState("");
+  var [mealQRByPerson, setMealQRByPerson] = useState({});
+
+  useEffect(function(){
+    if (!selEvent) { setMealQRByPerson({}); return; }
+    var unsub = db.collection("mealQR").where("event","==",selEvent).onSnapshot(function(snap){
+      var obj = {};
+      snap.docs.forEach(function(d){ var data=d.data(); obj[data.personId]=true; });
+      setMealQRByPerson(obj);
+    }, function(e){console.error(e);});
+    return function(){unsub();};
+  },[selEvent]);
+
+  var CATEGORIES = [
+    {key:"volo", label:"✈️", full:"Volo"},
+    {key:"hotel", label:"🏨", full:"Hotel"},
+    {key:"auto", label:"🚗", full:"Auto"},
+    {key:"parcheggio", label:"🅿️", full:"Parcheggio"},
+    {key:"meal", label:"🍽️", full:"QR Pasti"},
+  ];
+
+  // People attending this event = anyone with at least one booking for it
+  var eventPeopleIds = selEvent ? bookings.filter(function(b){return b.event===selEvent;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;}) : [];
+  var eventPeople = people.filter(function(p){ return eventPeopleIds.includes(p.id); });
+
+  function hasCategory(pid, cat) {
+    if (cat==="meal") return !!mealQRByPerson[pid];
+    return bookings.some(function(b){ return b.event===selEvent && b.person===pid && b.type===cat && b.status!=="cancellata"; });
+  }
+
+  function missingList(pid) {
+    return CATEGORIES.filter(function(c){ return !hasCategory(pid, c.key); }).map(function(c){return c.full;});
+  }
+
+  var ev = EVENTS.find(function(e){return e.id===selEvent;});
+  var totalMissing = eventPeople.reduce(function(sum,p){ return sum + missingList(p.id).length; }, 0);
+
+  return (
+    <div>
+      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:4}}>📋 Checklist Prenotazioni</div>
+      <div style={{fontSize:11,color:"#7090c0",marginBottom:16}}>Verifica rapidamente cosa manca per ogni persona, per evento.</div>
+
+      <select value={selEvent} onChange={function(e){setSelEventLocal(e.target.value);}}
+        style={{width:"100%",padding:"10px 12px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:8,color:"#e8e8f0",fontSize:13,outline:"none",marginBottom:16}}>
+        <option value="">-- Seleziona evento --</option>
+        {EVENTS.map(function(e){return React.createElement("option",{key:e.id,value:e.id},e.label+" ("+e.dates+")");})}
+      </select>
+
+      {!selEvent && (
+        <div style={{textAlign:"center",padding:30,color:"#7090c0",fontSize:13}}>Seleziona un evento per vedere la checklist.</div>
+      )}
+
+      {selEvent && eventPeople.length===0 && (
+        <div style={{textAlign:"center",padding:30,color:"#7090c0",fontSize:13}}>Nessuna persona ha ancora prenotazioni per questo evento.</div>
+      )}
+
+      {selEvent && eventPeople.length>0 && (
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,background:totalMissing>0?"#3a2a00":"#0d2a1a",borderRadius:10,padding:"10px 14px",border:"1px solid "+(totalMissing>0?"#ff980044":"#4caf5044")}}>
+            <span style={{fontSize:12,fontWeight:700,color:totalMissing>0?"#ff9800":"#4caf50"}}>
+              {totalMissing>0 ? "⚠️ "+totalMissing+" elementi mancanti" : "✅ Tutto completo!"}
+            </span>
+            <span style={{fontSize:11,color:"#7090c0"}}>{eventPeople.length} persone</span>
+          </div>
+
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead>
+                <tr>
+                  <th style={{textAlign:"left",padding:"8px 10px",color:"#7090c0",fontSize:11,position:"sticky",left:0,background:"#0a0a0f"}}>Persona</th>
+                  {CATEGORIES.map(function(c){return <th key={c.key} style={{padding:"8px 6px",color:"#7090c0",fontSize:14,textAlign:"center"}} title={c.full}>{c.label}</th>;})}
+                </tr>
+              </thead>
+              <tbody>
+                {eventPeople.map(function(p,pi){
+                  var missing = missingList(p.id);
+                  return (
+                    <tr key={p.id} onClick={function(){setView("event");setSelEvent(selEvent);if(setViewAll)setViewAll();}}
+                      style={{background:pi%2===0?"#12121f":"transparent",cursor:"pointer"}}>
+                      <td style={{padding:"8px 10px",fontWeight:700,color:missing.length>0?"#ff9800":"#e8e8f0"}}>
+                        {p.name.split(" ")[0]}
+                        {missing.length>0 && <div style={{fontSize:9,color:"#ff6060",fontWeight:400,marginTop:1}}>Manca: {missing.join(", ")}</div>}
+                      </td>
+                      {CATEGORIES.map(function(c){
+                        var has = hasCategory(p.id, c.key);
+                        return <td key={c.key} style={{padding:"8px 6px",textAlign:"center"}}>
+                          <span style={{fontSize:14,color:has?"#4caf50":"#ff4444"}}>{has?"✅":"❌"}</span>
+                        </td>;
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function CostsDashboard({ bookings, people }) {
   var [manualCosts, setManualCosts] = useState({});
   var [editingCost, setEditingCost] = useState(null);
