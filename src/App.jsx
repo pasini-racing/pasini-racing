@@ -445,8 +445,8 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
     } catch(e) {}
   }
   return (
-    <div onClick={b.type==="volo" ? function(e){if(!e.target.closest("button")&&!e.target.closest("a")){if(typeof window.__showFlightDetail==="function") window.__showFlightDetail(b);}} : undefined}
-      style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+(flightPast?"#444":tc.accent),borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative",opacity:flightPast?0.5:1,cursor:b.type==="volo"?"pointer":"default"}}>
+    <div onClick={function(e){if(!e.target.closest("button")&&!e.target.closest("a")){if(typeof window.__showBookingDetail==="function") window.__showBookingDetail(b);}}}
+      style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+(flightPast?"#444":tc.accent),borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative",opacity:flightPast?0.5:1,cursor:"pointer"}}>
       <span style={{fontSize:16}}>{tc.icon}{flightPast?" ✓":""}</span>
       {showPerson && person && <span style={{fontWeight:700,fontSize:12,color:tc.accent,minWidth:80}}>{person.name}</span>}
       {b.type === "volo" && (
@@ -1787,13 +1787,13 @@ export default function App() {
   var [docViewer, setDocViewer] = useState(null); // {fileData, fileName}
   var [hotelModal, setHotelModal] = useState(null); // null | eventId
   var [viewAll, setViewAll] = useState(false);
-  var [flightDetail, setFlightDetail] = useState(null); // toggle for admins to see all members
+  var [bookingDetail, setBookingDetail] = useState(null);
 
   // Register global doc opener for iOS-compatible inline viewer
   useEffect(function(){
     window.__showDoc = function(fileData, fileName) { setDocViewer({fileData:fileData, fileName:fileName}); };
-    window.__showFlightDetail = function(b) { setFlightDetail(b); };
-    return function(){ window.__showDoc = null; window.__showFlightDetail = null; };
+    window.__showBookingDetail = function(b) { setBookingDetail(b); };
+    return function(){ window.__showDoc = null; window.__showBookingDetail = null; };
   }, []);
 
   // Firebase sync
@@ -1970,7 +1970,7 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
-      {flightDetail && <FlightDetailModal b={flightDetail} allBookings={bookings} people={people} onClose={function(){setFlightDetail(null);}}
+      {bookingDetail && <BookingDetailModal b={bookingDetail} allBookings={bookings} people={people} onClose={function(){setBookingDetail(null);}}
         onEdit={isAdmin?handleEdit:null}
         onDelete={isAdmin?function(b){setConfirmDelete(b);}:null}
       />}
@@ -2684,12 +2684,26 @@ function EventDocuments({ eventId, isAdmin }) {
 // ── PersonMealQR ───────────────────────────────────────────
 function PersonMealQR({ personId, eventId }) {
   var [qrs, setQrs] = useState([]);
-  var [checkins, setCheckins] = useState({}); // mealType -> bool
+  var [checkins, setCheckins] = useState({}); // "day_mealType" -> bool
+  var [expanded, setExpanded] = useState(false);
   var MEAL_TYPES = [
-    {key:"breakfast", label:"☕ Colazione", color:"#ff9800"},
-    {key:"lunch",     label:"🍽️ Pranzo",    color:"#4caf50"},
-    {key:"dinner",    label:"🌙 Cena",       color:"#4a9eff"},
+    {key:"breakfast", label:"☕", full:"Colazione", color:"#ff9800"},
+    {key:"lunch",     label:"🍽️", full:"Pranzo",    color:"#4caf50"},
+    {key:"dinner",    label:"🌙", full:"Cena",       color:"#4a9eff"},
   ];
+
+  // Build list of days for this event from EVENTS dates string, e.g. "11-14 Giu"
+  var ev = EVENTS.find(function(e){return e.id===eventId;});
+  var eventDays = useMemo(function(){
+    if (!ev || !ev.dates) return [];
+    var m = ev.dates.match(/(\d+)-(\d+)\s+(\w+)/);
+    if (!m) return [];
+    var startDay=parseInt(m[1],10), endDay=parseInt(m[2],10), monthAbbr=m[3];
+    var days=[];
+    for (var d=startDay; d<=endDay; d++) days.push(d+" "+monthAbbr);
+    return days;
+  },[ev]);
+
   var checkinId = personId+"_"+eventId;
   useEffect(function(){
     var unsub = db.collection("mealQR")
@@ -2704,8 +2718,9 @@ function PersonMealQR({ personId, eventId }) {
     return function(){unsub(); unsub2();};
   },[personId,eventId]);
 
-  function toggleMeal(mealKey) {
-    var updated = Object.assign({}, checkins, {[mealKey]: !checkins[mealKey]});
+  function toggleMeal(dayKey, mealKey) {
+    var k = dayKey+"_"+mealKey;
+    var updated = Object.assign({}, checkins, {[k]: !checkins[k]});
     setCheckins(updated);
     db.collection("mealCheckins").doc(checkinId).set({
       event: eventId, personId: personId, meals: updated,
@@ -2716,56 +2731,70 @@ function PersonMealQR({ personId, eventId }) {
   function openQR(doc) {
     openDoc(doc.fileData, doc.fileName || "qr-pasto.pdf");
   }
-  // If single QR (all meals together), show one prominent button + 3 checkin flags
-  var hasSingle = qrs.length === 1 && !qrs[0].mealType || (qrs.length === 1);
-  if (hasSingle && qrs[0]) {
-    var doc = qrs[0];
-    return (
-      <div style={{marginTop:10}}>
-        <button onClick={function(){openQR(doc);}}
+  var hasSingle = qrs.length === 1;
+  var doneCount = Object.keys(checkins).filter(function(k){return checkins[k];}).length;
+  var totalCount = eventDays.length * MEAL_TYPES.length;
+
+  return (
+    <div style={{marginTop:10}}>
+      {hasSingle ? (
+        <button onClick={function(){openQR(qrs[0]);}}
           style={{width:"100%",padding:"10px",borderRadius:8,border:"2px solid #4caf5044",background:"#1a4a1a",color:"#4caf50",cursor:"pointer",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:6}}>
           🍽️ QR Code Pasti — Tocca per aprire
         </button>
-        <div style={{display:"flex",gap:6}}>
+      ) : (
+        <div style={{display:"flex",gap:6,marginBottom:6}}>
           {MEAL_TYPES.map(function(mt){
-            var done = !!checkins[mt.key];
+            var doc = qrs.find(function(q){return q.mealType===mt.key;});
+            if (!doc) return null;
             return (
-              <button key={mt.key} onClick={function(){toggleMeal(mt.key);}}
-                style={{flex:1,padding:"7px 4px",borderRadius:6,border:"1px solid "+(done?mt.color:mt.color+"33"),
-                  background:done?mt.color+"22":"#0d0d1a",color:done?mt.color:"#7090c0",cursor:"pointer",fontSize:10,fontWeight:700,
-                  display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
-                {done?"✅":"⬜"} {mt.label}
+              <button key={mt.key} onClick={function(){openQR(doc);}}
+                style={{flex:1,padding:"8px 6px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700}}>
+                {mt.label} {mt.full}
               </button>
             );
           })}
         </div>
-      </div>
-    );
-  }
-  // Multiple QRs (one per meal type)
-  return (
-    <div style={{marginTop:10}}>
-      <div style={{fontSize:10,color:"#7090c0",marginBottom:6,fontWeight:700}}>🍽️ QR PASTI</div>
-      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-        {MEAL_TYPES.map(function(mt){
-          var doc = qrs.find(function(q){return q.mealType===mt.key;});
-          if (!doc) return null;
-          var done = !!checkins[mt.key];
-          return (
-            <div key={mt.key} style={{flex:1,minWidth:90}}>
-              <button onClick={function(){openQR(doc);}}
-                style={{width:"100%",padding:"8px 6px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700,marginBottom:4}}>
-                {mt.label}
-              </button>
-              <button onClick={function(){toggleMeal(mt.key);}}
-                style={{width:"100%",padding:"5px 4px",borderRadius:5,border:"1px solid "+(done?mt.color:"#333"),
-                  background:done?mt.color+"22":"#0d0d1a",color:done?mt.color:"#7090c0",cursor:"pointer",fontSize:10,fontWeight:700}}>
-                {done?"✅ Fatto":"⬜ Da fare"}
-              </button>
+      )}
+
+      {eventDays.length > 0 && (
+        <div>
+          <button onClick={function(){setExpanded(function(v){return !v;});}}
+            style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a22",borderRadius:6,cursor:"pointer",fontSize:11,color:"#7090c0",fontWeight:700}}>
+            <span>✅ Check-in pasti ({doneCount}/{totalCount})</span>
+            <span>{expanded?"▲":"▼"}</span>
+          </button>
+          {expanded && (
+            <div style={{marginTop:6,border:"1px solid #1e3a8a22",borderRadius:8,overflow:"hidden"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",background:"#1e3a8a22"}}>
+                <div style={{padding:"6px 4px",fontSize:9,color:"#7090c0",fontWeight:700}}></div>
+                {MEAL_TYPES.map(function(mt){
+                  return <div key={mt.key} style={{padding:"6px 2px",fontSize:9,color:mt.color,fontWeight:700,textAlign:"center"}}>{mt.label}</div>;
+                })}
+              </div>
+              {eventDays.map(function(day,di){
+                return (
+                  <div key={day} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",background:di%2===0?"#0d0d1a":"transparent",borderTop:"1px solid #1e3a8a11"}}>
+                    <div style={{padding:"7px 6px",fontSize:10,color:"#e8e8f0",fontWeight:700}}>{day}</div>
+                    {MEAL_TYPES.map(function(mt){
+                      var done = !!checkins[day+"_"+mt.key];
+                      return (
+                        <div key={mt.key} style={{padding:"5px 2px",display:"flex",justifyContent:"center"}}>
+                          <button onClick={function(){toggleMeal(day, mt.key);}}
+                            style={{width:26,height:26,borderRadius:6,border:"1px solid "+(done?mt.color:"#333"),
+                              background:done?mt.color+"22":"transparent",color:done?mt.color:"#444",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {done?"✓":""}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -3370,6 +3399,15 @@ function ExportView({ bookings, people, eventNotes }) {
     if (!evId) return;
     setMealExporting(true);
     try {
+      var ev = EVENTS.find(function(e){return e.id===evId;});
+      var eventDays = [];
+      if (ev && ev.dates) {
+        var m = ev.dates.match(/(\d+)-(\d+)\s+(\w+)/);
+        if (m) {
+          var startDay=parseInt(m[1],10), endDay=parseInt(m[2],10), monthAbbr=m[3];
+          for (var d=startDay; d<=endDay; d++) eventDays.push(d+" "+monthAbbr);
+        }
+      }
       var qrSnap = await db.collection("mealQR").where("event","==",evId).get();
       var checkinSnap = await db.collection("mealCheckins").where("event","==",evId).get();
       var qrByPerson = {};
@@ -3381,13 +3419,13 @@ function ExportView({ bookings, people, eventNotes }) {
       Object.keys(qrByPerson).forEach(function(pid){
         var person = people.find(function(p){return p.id===pid;});
         var meals = checkinByPerson[pid]||{};
-        var hasSingleQR = qrByPerson[pid].length===1 && !qrByPerson[pid][0].mealType;
-        MEAL_TYPES.forEach(function(mt){
-          // If single shared QR, still track each meal type checkbox independently
-          var used = !!meals[mt.key];
-          if (!used) {
-            rows.push({person: person?person.name:pid, meal: mt.label});
-          }
+        eventDays.forEach(function(day){
+          MEAL_TYPES.forEach(function(mt){
+            var used = !!meals[day+"_"+mt.key];
+            if (!used) {
+              rows.push({person: person?person.name:pid, day: day, meal: mt.label});
+            }
+          });
         });
       });
       setMealData(rows);
@@ -3400,10 +3438,10 @@ function ExportView({ bookings, people, eventNotes }) {
     var XLSX = await import("xlsx");
     var ev = EVENTS.find(function(e){return e.id===mealEvent;});
     var wb = XLSX.utils.book_new();
-    var rows = [["Persona","Pasto non utilizzato"]];
-    mealData.forEach(function(r){ rows.push([r.person, r.meal]); });
+    var rows = [["Persona","Giorno","Pasto non utilizzato"]];
+    mealData.forEach(function(r){ rows.push([r.person, r.day, r.meal]); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{wch:24},{wch:18}];
+    ws["!cols"] = [{wch:24},{wch:12},{wch:18}];
     XLSX.utils.book_append_sheet(wb, ws, "Pasti non usati");
     XLSX.writeFile(wb, "Pasti_non_usati_"+(ev?ev.label.replace(/\s+/g,"_"):mealEvent)+".xlsx");
   }
@@ -3487,12 +3525,17 @@ function ExportView({ bookings, people, eventNotes }) {
               <div style={{maxHeight:220,overflowY:"auto",marginBottom:12,border:"1px solid #9c27b022",borderRadius:8}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                   <thead>
-                    <tr><th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Persona</th><th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Pasto non usato</th></tr>
+                    <tr>
+                      <th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Persona</th>
+                      <th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Giorno</th>
+                      <th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Pasto non usato</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {mealData.map(function(r,i){return(
                       <tr key={i} style={{background:i%2===0?"#0d0d1a":"transparent"}}>
                         <td style={{padding:"5px 10px",color:"#e8e8f0"}}>{r.person}</td>
+                        <td style={{padding:"5px 10px",color:"#7090c0"}}>{r.day}</td>
                         <td style={{padding:"5px 10px",color:"#ff9800"}}>{r.meal}</td>
                       </tr>
                     );})}
@@ -3853,11 +3896,11 @@ function PDF2Excel() {
 }
 
 // ── FlightDetailModal ──────────────────────────────────────
-function FlightDetailModal({ b, allBookings, people, onClose, onEdit, onDelete }) {
+// ── BookingDetailModal ────────────────────────────────────
+// Generic detail modal for volo/hotel/auto/parcheggio, showing all people sharing the same booking.
+function BookingDetailModal({ b, allBookings, people, onClose, onEdit, onDelete }) {
   var tc = TYPE_COLORS[b.type] || TYPE_COLORS.volo;
   var cc = b.company ? COMPANY_COLORS[b.company] : null;
-  var isAndata = !b.dir || b.dir !== "ritorno";
-  var dirColor = isAndata ? "#4a9eff" : "#4caf50";
   var row = function(label, value, color) {
     if (!value) return null;
     return (
@@ -3868,13 +3911,28 @@ function FlightDetailModal({ b, allBookings, people, onClose, onEdit, onDelete }
     );
   };
 
-  // Related bookings: same person + same event, other types
-  var related = (allBookings||[]).filter(function(x){
-    return x.event===b.event && x.person===b.person && x.type!=="volo";
+  // People sharing this exact booking: same event + type + booking number (if present), else same event+type+identifying field
+  var sharedPeople = (allBookings||[]).filter(function(x){
+    if (x.event!==b.event || x.type!==b.type) return false;
+    if (b.booking && b.booking!=="-" && x.booking) return x.booking===b.booking;
+    // fallback: same hotel/car/flight identifying field
+    if (b.type==="hotel") return x.hotel===b.hotel && x.room===b.room;
+    if (b.type==="volo") return x.flight===b.flight && x.dir===b.dir;
+    return x.car===b.car;
   });
-  var hotelBs = related.filter(function(x){return x.type==="hotel";});
-  var autoBs = related.filter(function(x){return x.type==="auto";});
-  var parkBs = related.filter(function(x){return x.type==="parcheggio";});
+  var peopleNames = sharedPeople.map(function(x){
+    var p = people.find(function(p2){return p2.id===x.person;});
+    return p ? p.name : x.person;
+  }).filter(function(v,i,a){return a.indexOf(v)===i;});
+
+  var isAndata = !b.dir || b.dir !== "ritorno";
+  var dirColor = isAndata ? "#4a9eff" : "#4caf50";
+
+  // Related bookings for the SAME person + event (other categories) — only meaningful for single-person view
+  var person = people.find(function(p){return p.id===b.person;});
+  var related = (allBookings||[]).filter(function(x){
+    return x.event===b.event && x.person===b.person && x.type!==b.type;
+  });
 
   function summaryCard(icon, color, title, lines) {
     return (
@@ -3885,89 +3943,156 @@ function FlightDetailModal({ b, allBookings, people, onClose, onEdit, onDelete }
     );
   }
 
+  var headerTitle, headerBadge;
+  if (b.type==="volo") {
+    headerTitle = b.flight||"—";
+    headerBadge = (
+      <span style={{background:dirColor+"22",color:dirColor,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>
+        {isAndata?"↗ ANDATA":"↙ RITORNO"}
+      </span>
+    );
+  } else if (b.type==="hotel") {
+    headerTitle = b.hotel||"Hotel";
+    headerBadge = <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>🏨 {b.room||"Camera"}</span>;
+  } else if (b.type==="auto") {
+    headerTitle = b.car||"Auto a noleggio";
+    headerBadge = <span style={{background:"#ff980022",color:"#ff9800",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>🚗 Noleggio</span>;
+  } else {
+    headerTitle = b.car||"Parcheggio";
+    headerBadge = <span style={{background:"#9c27b022",color:"#9c27b0",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>🅿️ Parcheggio</span>;
+  }
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:4500,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(e){if(e.target===e.currentTarget)onClose();}}>
       <div style={{background:"#12121f",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:560,border:"1px solid #1e3a8a",maxHeight:"85vh",overflowY:"auto"}}>
-        {/* Handle */}
         <div style={{width:40,height:4,background:"#333",borderRadius:2,margin:"0 auto 16px"}}/>
 
         {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
           <div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-              <span style={{background:dirColor+"22",color:dirColor,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>
-                {isAndata?"↗ ANDATA":"↙ RITORNO"}
-              </span>
-              {b.company && <span style={{background:cc||"#333",color:"#fff",borderRadius:5,padding:"3px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={function(){openAirlineApp(b.company);}}>🌐 {b.company}</span>}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+              {headerBadge}
+              {b.type==="volo" && b.company && <span style={{background:cc||"#333",color:"#fff",borderRadius:5,padding:"3px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={function(){openAirlineApp(b.company);}}>🌐 {b.company}</span>}
+              {b.type!=="volo" && b.company && <span style={{background:"#333",color:"#fff",borderRadius:5,padding:"3px 10px",fontSize:12,fontWeight:700}}>{b.company}</span>}
             </div>
-            <div style={{fontSize:28,fontWeight:900,color:"#fff",letterSpacing:1}}>{b.flight||"—"}</div>
+            <div style={{fontSize:24,fontWeight:900,color:"#fff",letterSpacing:0.5}}>{headerTitle}</div>
           </div>
-          <button onClick={onClose} style={{background:"#1a1a2a",border:"none",color:"#7090c0",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:18}}>✕</button>
+          <button onClick={onClose} style={{background:"#1a1a2a",border:"none",color:"#7090c0",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:18,flexShrink:0}}>✕</button>
         </div>
 
-        {/* Route big display */}
-        <div style={{background:"#0d0d1a",borderRadius:12,padding:16,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{textAlign:"center",flex:1}}>
-            <div style={{fontSize:28,fontWeight:900,color:"#4a9eff"}}>{b.dep ? b.dep.split(" ")[0] : "—"}</div>
-            <div style={{fontSize:16,color:"#7090c0"}}>{b.dep ? b.dep.split(" ").slice(1).join(" ") : ""}</div>
-            <div style={{fontSize:11,color:"#555",marginTop:2}}>Partenza</div>
-          </div>
-          <div style={{flex:1,textAlign:"center"}}>
-            <div style={{fontSize:20}}>✈️</div>
-            <div style={{height:2,background:"#1e3a8a",margin:"4px 0"}}/>
-            <div style={{fontSize:10,color:"#7090c0"}}>{b.date||""}</div>
-          </div>
-          <div style={{textAlign:"center",flex:1}}>
-            <div style={{fontSize:28,fontWeight:900,color:"#4caf50"}}>{b.arr ? b.arr.split(" ")[0] : "—"}</div>
-            <div style={{fontSize:16,color:"#7090c0"}}>{b.arr ? b.arr.split(" ").slice(1).join(" ") : ""}</div>
-            <div style={{fontSize:11,color:"#555",marginTop:2}}>Arrivo</div>
-          </div>
-        </div>
-
-        {/* Details */}
-        <div style={{marginBottom:16}}>
-          {row("Data", b.date)}
-          {row("Bagaglio", b.baggage, "#ff9800")}
-          {row("N° Prenotazione", b.booking ? "#"+b.booking : null, "#ff9800")}
-          {row("Stato", b.status==="confermata"?"✅ Confermata":b.status==="da_confermare"?"⏳ Da confermare":"❌ Cancellata")}
-          {row("Prezzo", b.price ? "€"+b.price : null, "#4caf50")}
-          {b.notes && row("Note", "📌 "+b.notes, "#c0a060")}
-        </div>
-
-        {/* Trip summary: hotel, car, parking for same person+event */}
-        {(hotelBs.length>0||autoBs.length>0||parkBs.length>0) && (
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#7090c0",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>🧳 Riepilogo viaggio</div>
-            {hotelBs.map(function(h,i){
-              return summaryCard("🏨","#4caf50","Hotel", [
-                h.hotel||"Hotel",
-                [h.room, h.nights?h.nights+" notti":null, h.checkin&&h.checkout?(h.checkin+" → "+h.checkout):null].filter(Boolean).join(" · "),
-                h.address ? "📍 "+h.address : null,
-              ].filter(Boolean));
-            })}
-            {autoBs.map(function(a,i){
-              return summaryCard("🚗","#ff9800","Noleggio auto", [
-                a.car||"Auto a noleggio",
-                [a.company, a.booking?"#"+a.booking:null].filter(Boolean).join(" · "),
-                a.notes ? "📌 "+a.notes : null,
-              ].filter(Boolean));
-            })}
-            {parkBs.map(function(p,i){
-              return summaryCard("🅿️","#9c27b0","Parcheggio", [
-                p.car||"Parcheggio",
-                [p.company, p.booking?"#"+p.booking:null].filter(Boolean).join(" · "),
-                p.notes ? "📌 "+p.notes : null,
-              ].filter(Boolean));
-            })}
+        {/* Flight route big display */}
+        {b.type==="volo" && (
+          <div style={{background:"#0d0d1a",borderRadius:12,padding:16,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{textAlign:"center",flex:1}}>
+              <div style={{fontSize:28,fontWeight:900,color:"#4a9eff"}}>{b.dep ? b.dep.split(" ")[0] : "—"}</div>
+              <div style={{fontSize:16,color:"#7090c0"}}>{b.dep ? b.dep.split(" ").slice(1).join(" ") : ""}</div>
+              <div style={{fontSize:11,color:"#555",marginTop:2}}>Partenza</div>
+            </div>
+            <div style={{flex:1,textAlign:"center"}}>
+              <div style={{fontSize:20}}>✈️</div>
+              <div style={{height:2,background:"#1e3a8a",margin:"4px 0"}}/>
+              <div style={{fontSize:10,color:"#7090c0"}}>{b.date||""}</div>
+            </div>
+            <div style={{textAlign:"center",flex:1}}>
+              <div style={{fontSize:28,fontWeight:900,color:"#4caf50"}}>{b.arr ? b.arr.split(" ")[0] : "—"}</div>
+              <div style={{fontSize:16,color:"#7090c0"}}>{b.arr ? b.arr.split(" ").slice(1).join(" ") : ""}</div>
+              <div style={{fontSize:11,color:"#555",marginTop:2}}>Arrivo</div>
+            </div>
           </div>
         )}
 
+        {/* Hotel quick info */}
+        {b.type==="hotel" && (
+          <div style={{background:"#0d0d1a",borderRadius:12,padding:16,marginBottom:16}}>
+            {b.address && (
+              <div onClick={function(){window.open("https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((b.hotel||"")+" "+b.address),"_blank");}}
+                style={{color:"#4caf50",fontSize:13,fontWeight:700,cursor:"pointer",textDecoration:"underline dotted",marginBottom:8}}>
+                📍 {b.address}
+              </div>
+            )}
+            <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+              {b.checkin && <div><div style={{fontSize:10,color:"#7090c0"}}>Check-in</div><div style={{fontSize:14,fontWeight:700,color:"#4a9eff"}}>{b.checkin}</div></div>}
+              {b.checkout && <div><div style={{fontSize:10,color:"#7090c0"}}>Check-out</div><div style={{fontSize:14,fontWeight:700,color:"#ff9800"}}>{b.checkout}</div></div>}
+              {b.nights && <div><div style={{fontSize:10,color:"#7090c0"}}>Notti</div><div style={{fontSize:14,fontWeight:700,color:"#e8e8f0"}}>{b.nights}</div></div>}
+            </div>
+          </div>
+        )}
+
+        {/* People sharing this booking */}
+        {peopleNames.length > 0 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:800,color:"#7090c0",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+              👥 {peopleNames.length>1?"Persone in questa prenotazione":"Persona"} ({peopleNames.length})
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {peopleNames.map(function(name,i){
+                return <span key={i} style={{background:tc.bg+"66",color:tc.accent,borderRadius:6,padding:"5px 12px",fontSize:12,fontWeight:700,border:"1px solid "+tc.accent+"33"}}>{name}</span>;
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Details */}
+        <div style={{marginBottom:16}}>
+          {b.type==="volo" && row("Data", b.date)}
+          {b.type==="volo" && row("Bagaglio", b.baggage, "#ff9800")}
+          {b.type!=="volo" && b.notes && row("Dettagli", b.notes)}
+          {row("N° Prenotazione", b.booking && b.booking!=="-" ? "#"+b.booking : null, "#ff9800")}
+          {row("Stato", b.status==="confermata"?"✅ Confermata":b.status==="da_confermare"?"⏳ Da confermare":"❌ Cancellata")}
+          {row("Prezzo", b.price ? "€"+b.price : null, "#4caf50")}
+          {b.type==="volo" && b.notes && row("Note", "📌 "+b.notes, "#c0a060")}
+        </div>
+
+        {/* Trip summary: other booking types for same person+event */}
+        {related.length>0 && (function(){
+          var hotelBs = related.filter(function(x){return x.type==="hotel";});
+          var autoBs = related.filter(function(x){return x.type==="auto";});
+          var parkBs = related.filter(function(x){return x.type==="parcheggio";});
+          var voloBs = related.filter(function(x){return x.type==="volo";});
+          if (hotelBs.length===0 && autoBs.length===0 && parkBs.length===0 && voloBs.length===0) return null;
+          return (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#7090c0",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>🧳 Altre prenotazioni di {person?person.name.split(" ")[0]:""}</div>
+              {voloBs.map(function(v,i){
+                return summaryCard("✈️","#4a9eff", v.dir==="ritorno"?"Volo ritorno":"Volo andata", [
+                  [v.flight, v.company].filter(Boolean).join(" · "),
+                  [v.dep, v.arr].filter(Boolean).join(" → "),
+                ].filter(Boolean));
+              })}
+              {hotelBs.map(function(h,i){
+                return summaryCard("🏨","#4caf50","Hotel", [
+                  h.hotel||"Hotel",
+                  [h.room, h.nights?h.nights+" notti":null].filter(Boolean).join(" · "),
+                ].filter(Boolean));
+              })}
+              {autoBs.map(function(a,i){
+                return summaryCard("🚗","#ff9800","Noleggio auto", [
+                  a.car||"Auto a noleggio",
+                  [a.company, a.booking?"#"+a.booking:null].filter(Boolean).join(" · "),
+                ].filter(Boolean));
+              })}
+              {parkBs.map(function(p,i){
+                return summaryCard("🅿️","#9c27b0","Parcheggio", [
+                  p.car||"Parcheggio",
+                  [p.company, p.booking?"#"+p.booking:null].filter(Boolean).join(" · "),
+                ].filter(Boolean));
+              })}
+            </div>
+          );
+        })()}
+
         {/* Actions */}
         <div style={{display:"flex",gap:10}}>
-          {b.company && (COMPANY_URLS[b.company]||COMPANY_DEEPLINKS[b.company]) && (
+          {b.type==="volo" && b.company && (COMPANY_URLS[b.company]||COMPANY_DEEPLINKS[b.company]) && (
             <button onClick={function(){openAirlineApp(b.company);}}
               style={{flex:2,padding:12,background:"#1e3a8a",color:"#4a9eff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>
               🌐 Apri {b.company}
+            </button>
+          )}
+          {b.type==="hotel" && b.address && (
+            <button onClick={function(){window.open("https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((b.hotel||"")+" "+b.address),"_blank");}}
+              style={{flex:2,padding:12,background:"#14532d",color:"#4caf50",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>
+              📍 Apri in Google Maps
             </button>
           )}
           {onEdit && <button onClick={function(){onEdit(b);onClose();}}
