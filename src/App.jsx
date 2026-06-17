@@ -1970,7 +1970,7 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
-      {flightDetail && <FlightDetailModal b={flightDetail} onClose={function(){setFlightDetail(null);}}
+      {flightDetail && <FlightDetailModal b={flightDetail} allBookings={bookings} people={people} onClose={function(){setFlightDetail(null);}}
         onEdit={isAdmin?handleEdit:null}
         onDelete={isAdmin?function(b){setConfirmDelete(b);}:null}
       />}
@@ -2530,6 +2530,7 @@ export default function App() {
                     {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
                     {showingAll && eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
                     <PersonMealQR personId={pid} eventId={selEvent}/>
+                    <PersonalReceipts personId={pid} eventId={selEvent} canEdit={isAdmin || (currentUser && currentUser.id===pid)}/>
                   </div>
                 );
               }) : visibleBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
@@ -2683,11 +2684,13 @@ function EventDocuments({ eventId, isAdmin }) {
 // ── PersonMealQR ───────────────────────────────────────────
 function PersonMealQR({ personId, eventId }) {
   var [qrs, setQrs] = useState([]);
+  var [checkins, setCheckins] = useState({}); // mealType -> bool
   var MEAL_TYPES = [
     {key:"breakfast", label:"☕ Colazione", color:"#ff9800"},
     {key:"lunch",     label:"🍽️ Pranzo",    color:"#4caf50"},
     {key:"dinner",    label:"🌙 Cena",       color:"#4a9eff"},
   ];
+  var checkinId = personId+"_"+eventId;
   useEffect(function(){
     var unsub = db.collection("mealQR")
       .where("event","==",eventId)
@@ -2695,23 +2698,47 @@ function PersonMealQR({ personId, eventId }) {
       .onSnapshot(function(snap){
         setQrs(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
       }, function(e){console.error(e);});
-    return function(){unsub();};
+    var unsub2 = db.collection("mealCheckins").doc(checkinId).onSnapshot(function(doc){
+      setCheckins(doc.exists ? (doc.data().meals||{}) : {});
+    }, function(e){console.error(e);});
+    return function(){unsub(); unsub2();};
   },[personId,eventId]);
+
+  function toggleMeal(mealKey) {
+    var updated = Object.assign({}, checkins, {[mealKey]: !checkins[mealKey]});
+    setCheckins(updated);
+    db.collection("mealCheckins").doc(checkinId).set({
+      event: eventId, personId: personId, meals: updated,
+    }, {merge:true});
+  }
+
   if (qrs.length === 0) return null;
   function openQR(doc) {
     openDoc(doc.fileData, doc.fileName || "qr-pasto.pdf");
   }
-  // If single QR (all meals together), show one prominent button
+  // If single QR (all meals together), show one prominent button + 3 checkin flags
   var hasSingle = qrs.length === 1 && !qrs[0].mealType || (qrs.length === 1);
   if (hasSingle && qrs[0]) {
     var doc = qrs[0];
-    var mt = MEAL_TYPES.find(function(m){return m.key===doc.mealType;}) || {label:"🍽️ QR Pasti", color:"#4caf50"};
     return (
       <div style={{marginTop:10}}>
         <button onClick={function(){openQR(doc);}}
-          style={{width:"100%",padding:"10px",borderRadius:8,border:"2px solid #4caf5044",background:"#1a4a1a",color:"#4caf50",cursor:"pointer",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          style={{width:"100%",padding:"10px",borderRadius:8,border:"2px solid #4caf5044",background:"#1a4a1a",color:"#4caf50",cursor:"pointer",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:6}}>
           🍽️ QR Code Pasti — Tocca per aprire
         </button>
+        <div style={{display:"flex",gap:6}}>
+          {MEAL_TYPES.map(function(mt){
+            var done = !!checkins[mt.key];
+            return (
+              <button key={mt.key} onClick={function(){toggleMeal(mt.key);}}
+                style={{flex:1,padding:"7px 4px",borderRadius:6,border:"1px solid "+(done?mt.color:mt.color+"33"),
+                  background:done?mt.color+"22":"#0d0d1a",color:done?mt.color:"#7090c0",cursor:"pointer",fontSize:10,fontWeight:700,
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                {done?"✅":"⬜"} {mt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -2723,14 +2750,112 @@ function PersonMealQR({ personId, eventId }) {
         {MEAL_TYPES.map(function(mt){
           var doc = qrs.find(function(q){return q.mealType===mt.key;});
           if (!doc) return null;
+          var done = !!checkins[mt.key];
           return (
-            <button key={mt.key} onClick={function(){openQR(doc);}}
-              style={{flex:1,padding:"8px 6px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700}}>
-              {mt.label}
-            </button>
+            <div key={mt.key} style={{flex:1,minWidth:90}}>
+              <button onClick={function(){openQR(doc);}}
+                style={{width:"100%",padding:"8px 6px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700,marginBottom:4}}>
+                {mt.label}
+              </button>
+              <button onClick={function(){toggleMeal(mt.key);}}
+                style={{width:"100%",padding:"5px 4px",borderRadius:5,border:"1px solid "+(done?mt.color:"#333"),
+                  background:done?mt.color+"22":"#0d0d1a",color:done?mt.color:"#7090c0",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                {done?"✅ Fatto":"⬜ Da fare"}
+              </button>
+            </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ── PersonalReceipts ───────────────────────────────────────
+// Personal expense receipts per person per event. Visible to the person themselves + Luca/Ilario.
+function PersonalReceipts({ personId, eventId, canEdit }) {
+  var [items, setItems] = useState([]);
+  var [uploading, setUploading] = useState(false);
+  var [form, setForm] = useState({name:"",amount:""});
+
+  useEffect(function(){
+    var unsub = db.collection("personalReceipts")
+      .where("event","==",eventId)
+      .where("personId","==",personId)
+      .onSnapshot(function(snap){
+        setItems(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+      }, function(e){console.error(e);});
+    return function(){unsub();};
+  },[personId,eventId]);
+
+  async function upload(file) {
+    if (!file) return;
+    var b64 = await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result);};r.onerror=rej;r.readAsDataURL(file);});
+    await db.collection("personalReceipts").add({
+      event: eventId, personId: personId,
+      name: form.name || file.name,
+      amount: parseFloat(form.amount)||0,
+      fileData: b64,
+      date: new Date().toISOString().substring(0,10),
+    });
+    setUploading(false);
+    setForm({name:"",amount:""});
+  }
+
+  async function removeItem(id) {
+    await db.collection("personalReceipts").doc(id).delete();
+  }
+
+  if (!canEdit && items.length===0) return null;
+
+  var total = items.reduce(function(s,r){return s+(r.amount||0);},0);
+
+  return (
+    <div style={{marginTop:10,background:"#0d0d1a",borderRadius:8,padding:"10px 12px",border:"1px solid #9c27b022"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:items.length>0||uploading?8:0}}>
+        <div style={{fontSize:10,color:"#9c27b0",fontWeight:700,textTransform:"uppercase"}}>
+          🧾 Spese personali {total>0 && <span style={{color:"#4caf50"}}>— €{total.toFixed(2)}</span>}
+        </div>
+        {canEdit && (
+          <button onClick={function(){setUploading(function(v){return !v;});}}
+            style={{background:"#2a0a3a",color:"#9c27b0",border:"1px solid #9c27b033",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+            {uploading?"✕ Annulla":"➕ Carica"}
+          </button>
+        )}
+      </div>
+      {uploading && (
+        <div style={{background:"#12121f",borderRadius:8,padding:10,marginBottom:8,border:"1px solid #9c27b033"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+            <input value={form.name} onChange={function(e){setForm(function(f){return Object.assign({},f,{name:e.target.value});});}} placeholder="Descrizione"
+              style={{padding:"6px 8px",background:"#0d0d1a",border:"1px solid #9c27b033",borderRadius:6,color:"#e8e8f0",fontSize:11,outline:"none"}}/>
+            <input type="number" value={form.amount} onChange={function(e){setForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} placeholder="Importo €"
+              style={{padding:"6px 8px",background:"#0d0d1a",border:"1px solid #9c27b033",borderRadius:6,color:"#e8e8f0",fontSize:11,outline:"none"}}/>
+          </div>
+          <label style={{display:"block",background:"#0d0d1a",border:"2px dashed #9c27b044",borderRadius:6,padding:"10px",textAlign:"center",cursor:"pointer"}}>
+            <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={function(e){upload(e.target.files[0]);}}/>
+            <span style={{fontSize:11,color:"#9c27b0"}}>📷 Scatta foto o carica PDF</span>
+          </label>
+        </div>
+      )}
+      {items.length>0 && (
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+          {items.map(function(r){
+            var isImg = r.fileData && r.fileData.startsWith("data:image");
+            return(
+              <div key={r._id} onClick={function(){openDoc(r.fileData, r.name||"scontrino");}}
+                style={{background:"#12121f",borderRadius:8,padding:8,border:"1px solid #9c27b022",cursor:"pointer",position:"relative"}}>
+                {isImg
+                  ? <img src={r.fileData} style={{width:"100%",height:55,objectFit:"cover",borderRadius:4,marginBottom:4}} alt="scontrino"/>
+                  : <div style={{height:55,background:"#1a0a2a",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:4,fontSize:22}}>📄</div>
+                }
+                <div style={{fontSize:10,color:"#e8e8f0",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"Scontrino"}</div>
+                {r.amount>0 && <div style={{fontSize:10,color:"#4caf50",fontWeight:700}}>€{r.amount.toFixed(2)}</div>}
+                {canEdit && <button onClick={function(e){e.stopPropagation();removeItem(r._id);}}
+                  style={{position:"absolute",top:4,right:4,background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:9}}>✕</button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -3232,6 +3357,56 @@ function CostsDashboard({ bookings, people }) {
 function ExportView({ bookings, people, eventNotes }) {
   var [exporting, setExporting] = useState(false);
   var [exported, setExported] = useState(false);
+  var [mealEvent, setMealEvent] = useState("");
+  var [mealExporting, setMealExporting] = useState(false);
+  var [mealData, setMealData] = useState(null);
+  var MEAL_TYPES = [
+    {key:"breakfast", label:"Colazione"},
+    {key:"lunch",     label:"Pranzo"},
+    {key:"dinner",    label:"Cena"},
+  ];
+
+  async function loadMealReport(evId) {
+    if (!evId) return;
+    setMealExporting(true);
+    try {
+      var qrSnap = await db.collection("mealQR").where("event","==",evId).get();
+      var checkinSnap = await db.collection("mealCheckins").where("event","==",evId).get();
+      var qrByPerson = {};
+      qrSnap.docs.forEach(function(d){ var data=d.data(); if(!qrByPerson[data.personId]) qrByPerson[data.personId]=[]; qrByPerson[data.personId].push(data); });
+      var checkinByPerson = {};
+      checkinSnap.docs.forEach(function(d){ var data=d.data(); checkinByPerson[data.personId]=data.meals||{}; });
+
+      var rows = [];
+      Object.keys(qrByPerson).forEach(function(pid){
+        var person = people.find(function(p){return p.id===pid;});
+        var meals = checkinByPerson[pid]||{};
+        var hasSingleQR = qrByPerson[pid].length===1 && !qrByPerson[pid][0].mealType;
+        MEAL_TYPES.forEach(function(mt){
+          // If single shared QR, still track each meal type checkbox independently
+          var used = !!meals[mt.key];
+          if (!used) {
+            rows.push({person: person?person.name:pid, meal: mt.label});
+          }
+        });
+      });
+      setMealData(rows);
+    } catch(e) { console.error(e); alert("Errore: "+e.message); }
+    setMealExporting(false);
+  }
+
+  async function exportMealReport() {
+    if (!mealData || !mealEvent) return;
+    var XLSX = await import("xlsx");
+    var ev = EVENTS.find(function(e){return e.id===mealEvent;});
+    var wb = XLSX.utils.book_new();
+    var rows = [["Persona","Pasto non utilizzato"]];
+    mealData.forEach(function(r){ rows.push([r.person, r.meal]); });
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{wch:24},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws, "Pasti non usati");
+    XLSX.writeFile(wb, "Pasti_non_usati_"+(ev?ev.label.replace(/\s+/g,"_"):mealEvent)+".xlsx");
+  }
 
   async function exportToExcel() {
     setExporting(true);
@@ -3290,6 +3465,47 @@ function ExportView({ bookings, people, eventNotes }) {
           {exporting?"⏳ Esportazione...":exported?"✅ Scaricato!":"📥 Scarica Excel"}
         </button>
         <div style={{marginTop:10,fontSize:11,color:"#7090c0",textAlign:"center"}}>{bookings.length} prenotazioni · {people.length} membri</div>
+      </div>
+
+      {/* Meal usage report */}
+      <div style={{background:"#12121f",borderRadius:12,padding:24,border:"1px solid #9c27b033",maxWidth:560,marginTop:16}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:8,color:"#9c27b0"}}>🍽️ Report Pasti Non Utilizzati</div>
+        <div style={{fontSize:12,color:"#7090c0",marginBottom:14,lineHeight:1.6}}>
+          Estrai l'elenco di chi non ha spuntato colazione, pranzo o cena per un evento — utile a fine weekend per verificare con l'hospitality.
+        </div>
+        <select value={mealEvent} onChange={function(e){setMealEvent(e.target.value); setMealData(null); loadMealReport(e.target.value);}}
+          style={{width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #9c27b033",borderRadius:7,color:"#e8e8f0",fontSize:13,outline:"none",marginBottom:12}}>
+          <option value="">-- Seleziona evento --</option>
+          {EVENTS.map(function(ev){return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" ("+ev.dates+")");})}
+        </select>
+        {mealExporting && <div style={{fontSize:12,color:"#9c27b0",textAlign:"center",padding:10}}>⏳ Caricamento dati pasti...</div>}
+        {mealData && !mealExporting && (
+          mealData.length===0 ? (
+            <div style={{textAlign:"center",padding:14,color:"#4caf50",fontSize:13,fontWeight:700}}>✅ Tutti i pasti sono stati utilizzati!</div>
+          ) : (
+            <div>
+              <div style={{maxHeight:220,overflowY:"auto",marginBottom:12,border:"1px solid #9c27b022",borderRadius:8}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead>
+                    <tr><th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Persona</th><th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Pasto non usato</th></tr>
+                  </thead>
+                  <tbody>
+                    {mealData.map(function(r,i){return(
+                      <tr key={i} style={{background:i%2===0?"#0d0d1a":"transparent"}}>
+                        <td style={{padding:"5px 10px",color:"#e8e8f0"}}>{r.person}</td>
+                        <td style={{padding:"5px 10px",color:"#ff9800"}}>{r.meal}</td>
+                      </tr>
+                    );})}
+                  </tbody>
+                </table>
+              </div>
+              <button onClick={exportMealReport}
+                style={{width:"100%",padding:12,background:"#2a0a3a",color:"#9c27b0",border:"1px solid #9c27b044",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
+                📥 Scarica report Excel
+              </button>
+            </div>
+          )
+        )}
       </div>
     </div>
   );
@@ -3637,7 +3853,7 @@ function PDF2Excel() {
 }
 
 // ── FlightDetailModal ──────────────────────────────────────
-function FlightDetailModal({ b, onClose, onEdit, onDelete }) {
+function FlightDetailModal({ b, allBookings, people, onClose, onEdit, onDelete }) {
   var tc = TYPE_COLORS[b.type] || TYPE_COLORS.volo;
   var cc = b.company ? COMPANY_COLORS[b.company] : null;
   var isAndata = !b.dir || b.dir !== "ritorno";
@@ -3651,6 +3867,24 @@ function FlightDetailModal({ b, onClose, onEdit, onDelete }) {
       </div>
     );
   };
+
+  // Related bookings: same person + same event, other types
+  var related = (allBookings||[]).filter(function(x){
+    return x.event===b.event && x.person===b.person && x.type!=="volo";
+  });
+  var hotelBs = related.filter(function(x){return x.type==="hotel";});
+  var autoBs = related.filter(function(x){return x.type==="auto";});
+  var parkBs = related.filter(function(x){return x.type==="parcheggio";});
+
+  function summaryCard(icon, color, title, lines) {
+    return (
+      <div style={{background:"#0d0d1a",borderRadius:10,padding:"10px 12px",marginBottom:8,borderLeft:"3px solid "+color}}>
+        <div style={{fontSize:11,fontWeight:800,color:color,marginBottom:4}}>{icon} {title}</div>
+        {lines.map(function(l,i){return <div key={i} style={{fontSize:12,color:"#e8e8f0",marginBottom:i<lines.length-1?2:0}}>{l}</div>;})}
+      </div>
+    );
+  }
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:4500,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(e){if(e.target===e.currentTarget)onClose();}}>
       <div style={{background:"#12121f",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:560,border:"1px solid #1e3a8a",maxHeight:"85vh",overflowY:"auto"}}>
@@ -3699,6 +3933,34 @@ function FlightDetailModal({ b, onClose, onEdit, onDelete }) {
           {row("Prezzo", b.price ? "€"+b.price : null, "#4caf50")}
           {b.notes && row("Note", "📌 "+b.notes, "#c0a060")}
         </div>
+
+        {/* Trip summary: hotel, car, parking for same person+event */}
+        {(hotelBs.length>0||autoBs.length>0||parkBs.length>0) && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:800,color:"#7090c0",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>🧳 Riepilogo viaggio</div>
+            {hotelBs.map(function(h,i){
+              return summaryCard("🏨","#4caf50","Hotel", [
+                h.hotel||"Hotel",
+                [h.room, h.nights?h.nights+" notti":null, h.checkin&&h.checkout?(h.checkin+" → "+h.checkout):null].filter(Boolean).join(" · "),
+                h.address ? "📍 "+h.address : null,
+              ].filter(Boolean));
+            })}
+            {autoBs.map(function(a,i){
+              return summaryCard("🚗","#ff9800","Noleggio auto", [
+                a.car||"Auto a noleggio",
+                [a.company, a.booking?"#"+a.booking:null].filter(Boolean).join(" · "),
+                a.notes ? "📌 "+a.notes : null,
+              ].filter(Boolean));
+            })}
+            {parkBs.map(function(p,i){
+              return summaryCard("🅿️","#9c27b0","Parcheggio", [
+                p.car||"Parcheggio",
+                [p.company, p.booking?"#"+p.booking:null].filter(Boolean).join(" · "),
+                p.notes ? "📌 "+p.notes : null,
+              ].filter(Boolean));
+            })}
+          </div>
+        )}
 
         {/* Actions */}
         <div style={{display:"flex",gap:10}}>
