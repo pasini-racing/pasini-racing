@@ -1355,22 +1355,35 @@ function ExcelImport({ onImport, onClose, people }) {
           if (!row[0] && !row[1]) return;
           // Stop at "TOTALE" summary rows
           if (String(row[0]||"").toUpperCase().indexOf("TOTALE")===0) return;
-          var type = row[col("Tipo",2)] || "volo";
-          var priceRaw = row[col("Prezzo (€)", -1)];
+          var type = String(row[col("Tipo",2)]||"").trim() || "volo";
+          var priceRaw = col("Prezzo (€)",-1) >= 0 ? row[col("Prezzo (€)",-1)] : "";
+          function safeCol(name, fallback) {
+            var idx = col(name, fallback);
+            if (idx < 0 || idx >= row.length) return "";
+            return String(row[idx]||"").trim();
+          }
           allBookings.push({
-            event: row[0]||selEvent, person: row[1]||"",
-            type: type, dir: row[col("Dir.",3)]||"andata",
-            flight: row[col("Volo",4)]||"", company: row[col("Compagnia",5)]||"",
-            dep: row[col("Partenza",6)]||"", arr: row[col("Arrivo",7)]||"",
-            date: row[col("Data",8)]||"", baggage: row[col("Bagaglio",9)]||"",
-            hotel: row[col("Hotel",-1)]||"", address: row[col("Indirizzo",-1)]||"",
-            room: row[col("Camera",-1)]||"", nights: row[col("Notti",-1)]||"",
-            checkin: row[col("Check-in",-1)]||"", checkout: row[col("Check-out",-1)]||"",
-            car: row[col("Auto",-1)]||row[col("Parcheggio",-1)]||"",
-            booking: row[col("N° Pren.",10)]||"",
-            price: priceRaw!==-1 && priceRaw!=="" && priceRaw!==undefined ? String(priceRaw) : "",
-            notes: row[col("Note",11)]||"",
-            status: row[col("Stato",12)]||"confermata",
+            event:   String(row[0]||"").trim() || selEvent,
+            person:  String(row[1]||"").trim(),
+            type:    type,
+            dir:     safeCol("Dir.",3) || "andata",
+            flight:  safeCol("Volo",4),
+            company: safeCol("Compagnia",5),
+            dep:     safeCol("Partenza",6),
+            arr:     safeCol("Arrivo",7),
+            date:    safeCol("Data",8),
+            baggage: safeCol("Bagaglio",9),
+            hotel:   safeCol("Hotel",-1),
+            address: safeCol("Indirizzo",-1),
+            room:    safeCol("Camera",-1),
+            nights:  safeCol("Notti",-1),
+            checkin: safeCol("Check-in",-1),
+            checkout:safeCol("Check-out",-1),
+            car:     safeCol("Auto",-1) || safeCol("Parcheggio",-1),
+            booking: safeCol("N° Pren.",10),
+            price:   priceRaw !== "" && priceRaw !== undefined ? String(priceRaw) : "",
+            notes:   safeCol("Note",11),
+            status:  safeCol("Stato",12) || "confermata",
             _matched: true,
           });
         });
@@ -2073,25 +2086,40 @@ export default function App() {
       {showExcelImport && <ExcelImport
         people={people}
         onImport={function(importedBs) {
+          var saved = 0; var failed = 0;
           importedBs.forEach(function(b) {
-            fbAdd("bookings", b).then(function(ref) {
-              if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});
-              // Auto-save cost if price field present
-              if (b.price && parseFloat(b.price) > 0) {
-                var cat = b.type==="volo"?"Voli":b.type==="hotel"?"Hotel":b.type==="auto"?"Auto/Noleggio":"Parcheggio";
-                fbAdd("eventCosts", {
-                  event: b.event,
-                  category: cat,
-                  amount: parseFloat(b.price),
-                  notes: (b.flight||b.hotel||b.car||"") + (b.person?" — "+b.person:""),
-                  date: new Date().toISOString().substring(0,10),
-                  manual: false,
-                  bookingRef: ref ? ref.id : "",
-                });
+            // Remove any undefined/empty fields that would cause Firestore to reject
+            var clean = {};
+            Object.keys(b).forEach(function(k){ if(b[k]!==undefined && b[k]!=="") clean[k]=b[k]; });
+            if (!clean.event) clean.event = "";
+            if (!clean.person) clean.person = "";
+            if (!clean.type) clean.type = "volo";
+            if (!clean.status) clean.status = "confermata";
+            fbAdd("bookings", clean).then(function(ref) {
+              if(ref) {
+                saved++;
+                setBookings(function(p){return p.concat([Object.assign({_id:ref.id},clean)]);});
+                if (clean.price && parseFloat(clean.price) > 0) {
+                  var cat = clean.type==="volo"?"Voli":clean.type==="hotel"?"Hotel":clean.type==="auto"?"Auto/Noleggio":"Parcheggio";
+                  fbAdd("eventCosts", {
+                    event: clean.event,
+                    category: cat,
+                    amount: parseFloat(clean.price),
+                    notes: (clean.flight||clean.hotel||clean.car||"") + (clean.person?" — "+clean.person:""),
+                    date: new Date().toISOString().substring(0,10),
+                    manual: false,
+                  });
+                }
+              } else {
+                failed++;
+                console.error("fbAdd returned null for booking:", clean);
               }
-            }).catch(function(e){console.error(e);});
+            }).catch(function(e){
+              failed++;
+              console.error("fbAdd error:", e, clean);
+            });
           });
-          showToast("Importate " + importedBs.length + " prenotazioni ✓");
+          showToast("Importazione avviata: " + importedBs.length + " prenotazioni ✓");
         }}
         onClose={function(){setShowExcelImport(false);}}
       />}
