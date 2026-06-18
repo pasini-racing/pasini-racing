@@ -1362,8 +1362,11 @@ function ExcelImport({ onImport, onClose, people }) {
             if (idx < 0 || idx >= row.length) return "";
             return String(row[idx]||"").trim();
           }
+          var rawEvent = String(row[0]||"").trim();
+          // Use selEvent if the Excel value doesn't match any known EVENTS id
+          var resolvedEvent = EVENTS.find(function(e){return e.id===rawEvent;}) ? rawEvent : selEvent;
           allBookings.push({
-            event:   String(row[0]||"").trim() || selEvent,
+            event:   resolvedEvent || rawEvent,
             person:  String(row[1]||"").trim(),
             type:    type,
             dir:     safeCol("Dir.",3) || "andata",
