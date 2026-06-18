@@ -1217,7 +1217,8 @@ function ExtraPersonSelector({ preview, setPreview, selEvent }) {
 }
 
 // ── Excel Import ──────────────────────────────────────────
-function ExcelImport({ onImport, onClose }) {
+function ExcelImport({ onImport, onClose, people }) {
+  var memberList = (people && people.length > 0) ? people : (typeof PEOPLE !== "undefined" ? PEOPLE : []);
   var [file, setFile] = useState(null);
   var [loading, setLoading] = useState(false);
   var [preview, setPreview] = useState(null);
@@ -1540,9 +1541,9 @@ function ExcelImport({ onImport, onClose }) {
                       <span style={{fontSize:14}}>{b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗"}</span>
                       {/* Person selector */}
                       <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
-                        style={{padding:"2px 6px",background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:5,color:b._matched===false?"#ff6060":"#e8e8f0",fontSize:11,fontWeight:700,maxWidth:110,outline:"none"}}>
-                        <option value="">-- Persona --</option>
-                        {PEOPLE.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
+                        style={{padding:"2px 6px",background:"#12121f",border:"1px solid "+((!b.person)?"#ff444488":"#1e3a8a44"),borderRadius:5,color:(!b.person)?"#ff6060":"#e8e8f0",fontSize:11,fontWeight:700,maxWidth:130,outline:"none"}}>
+                        <option value="">⚠️ Scegli persona</option>
+                        {memberList.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
                       </select>
                       {b.flight&&<span style={{color:tc,fontSize:11}}>{b.flight}</span>}
                       {b.dep&&<span style={{color:"#7090c0",fontSize:10}}>{b.dep}{b.arr&&"→"+b.arr}</span>}
@@ -1572,14 +1573,20 @@ function ExcelImport({ onImport, onClose }) {
               style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4a9eff",border:"1px dashed #1e3a8a",borderRadius:6,cursor:"pointer",fontSize:12,marginBottom:8,fontWeight:700}}>
               ➕ Aggiungi riga manualmente
             </button>
-            {preview.some(function(b){return b._matched===false;}) && (
+            {preview.some(function(b){return !b.person;}) && (
+              <div style={{background:"#3a1a00",border:"1px solid #ff440033",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#ff6060"}}>
+                ⚠️ Assegna una persona a ogni riga prima di importare.
+              </div>
+            )}
+            {preview.some(function(b){return b._matched===false && b.person;}) && (
               <div style={{background:"#2a1a00",border:"1px solid #ff980033",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#ff9800"}}>
                 ⚠️ Alcune persone non sono state riconosciute automaticamente. Puoi importare comunque e correggere manualmente.
               </div>
             )}
             <div style={{display:"flex",gap:10}}>
               <button onClick={function(){setPreview(null);}} style={{flex:1,padding:11,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>← Rianalizza</button>
-              <button onClick={confirmImport} style={{flex:2,padding:11,background:"#14532d",color:"#4caf50",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+              <button onClick={confirmImport} disabled={preview.some(function(b){return !b.person;})}
+                style={{flex:2,padding:11,background:preview.some(function(b){return !b.person;})?"#1a2a1a":"#14532d",color:preview.some(function(b){return !b.person;})?"#4a6a4a":"#4caf50",border:"none",borderRadius:8,cursor:preview.some(function(b){return !b.person;})?"not-allowed":"pointer",fontWeight:700,fontSize:14}}>
                 💾 Importa {preview.length} prenotazioni
               </button>
             </div>
@@ -2012,6 +2019,7 @@ export default function App() {
       />}
       {pdfPreview && <PDFPreview data={pdfPreview.data} name={pdfPreview.name} onClose={function(){setPdfPreview(null);}}/>}
       {showExcelImport && <ExcelImport
+        people={people}
         onImport={function(importedBs) {
           importedBs.forEach(function(b) {
             fbAdd("bookings", b).then(function(ref) {
