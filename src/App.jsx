@@ -1530,44 +1530,96 @@ function ExcelImport({ onImport, onClose, people }) {
             <div style={{fontSize:14,fontWeight:800,color:"#4caf50",marginBottom:12}}>
               ✅ Trovate {preview.length} prenotazioni
             </div>
-            <div style={{maxHeight:300,overflowY:"auto",marginBottom:16}}>
-              {preview.map(function(b,i){
-                var person = PEOPLE.find(function(p){return p.id===b.person;});
-                var tc = b.type==="volo"?"#4a9eff":b.type==="hotel"?"#4caf50":"#ff9800";
-                return (
-                  <div key={i} style={{background:"#0d0d1a",borderRadius:8,marginBottom:6,border:"1px solid #ffffff11",borderLeft:"3px solid "+(b._matched===false?"#ff6060":tc)}}>
-                    {/* Row summary */}
-                    <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{fontSize:14}}>{b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗"}</span>
-                      {/* Person selector */}
-                      <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
-                        style={{padding:"2px 6px",background:"#12121f",border:"1px solid "+((!b.person)?"#ff444488":"#1e3a8a44"),borderRadius:5,color:(!b.person)?"#ff6060":"#e8e8f0",fontSize:11,fontWeight:700,maxWidth:130,outline:"none"}}>
-                        <option value="">⚠️ Scegli persona</option>
-                        {memberList.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
-                      </select>
-                      {b.flight&&<span style={{color:tc,fontSize:11}}>{b.flight}</span>}
-                      {b.dep&&<span style={{color:"#7090c0",fontSize:10}}>{b.dep}{b.arr&&"→"+b.arr}</span>}
-                      {b.date&&<span style={{color:"#7090c0",fontSize:10}}>{b.date}</span>}
-                      {b.booking&&<span style={{color:"#ff9800",fontSize:10,fontFamily:"monospace"}}>#{b.booking}</span>}
-                      <div style={{marginLeft:"auto",display:"flex",gap:4}}>
-                        {/* Attach file */}
-                        <label title="Allega PDF/immagine" style={{cursor:"pointer",padding:"3px 7px",background:"#1e3a8a22",color:b.attachment?"#4caf50":"#4a9eff",borderRadius:5,fontSize:11}}>
-                          <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){attachFile(i,e.target.files[0]);e.target.value="";}}/>
-                          {b.attachment?"📎✓":"📎"}
-                        </label>
-                        {/* Delete row */}
-                        <button onClick={function(){removePreviewItem(i);}} title="Rimuovi" style={{padding:"3px 7px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,cursor:"pointer",fontSize:11}}>✕</button>
+            <div style={{maxHeight:400,overflowY:"auto",marginBottom:16}}>
+              {(function(){
+                // For hotel bookings, group by room name and show camera header
+                var isHotel = preview.length > 0 && preview[0].type === "hotel";
+                if (isHotel) {
+                  // Build groups: {roomName, bookingNum, rows:[{b, originalIdx}]}
+                  var groups = [];
+                  preview.forEach(function(b, i) {
+                    var key = (b.room||"Camera") + "|" + (b.booking||"");
+                    var g = groups.find(function(g){ return g.key===key; });
+                    if (!g) { g={key:key, room:b.room||"Camera", booking:b.booking, hotel:b.hotel, rows:[]}; groups.push(g); }
+                    g.rows.push({b:b, idx:i});
+                  });
+                  return groups.map(function(g, gi) {
+                    var tc = "#4caf50";
+                    var roomColor = ["#4caf50","#4a9eff","#ff9800","#9c27b0","#ff4444"][gi % 5];
+                    return (
+                      <div key={g.key} style={{marginBottom:12,border:"1px solid "+roomColor+"44",borderRadius:10,overflow:"hidden"}}>
+                        {/* Camera header */}
+                        <div style={{background:roomColor+"22",padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div>
+                            <span style={{fontSize:13,fontWeight:800,color:roomColor}}>🏨 {g.room}</span>
+                            <span style={{fontSize:10,color:"#7090c0",marginLeft:8}}>{g.hotel}</span>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            {g.booking && <span style={{fontSize:10,color:"#ff9800",fontFamily:"monospace"}}>#{g.booking}</span>}
+                            <span style={{fontSize:10,color:roomColor,fontWeight:700,background:roomColor+"22",borderRadius:4,padding:"2px 6px"}}>
+                              {g.rows.length} {g.rows.length===1?"persona":"persone"}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Person rows */}
+                        {g.rows.map(function(item, ri) {
+                          var b = item.b; var i = item.idx;
+                          return (
+                            <div key={ri} style={{background:"#0d0d1a",borderBottom:ri<g.rows.length-1?"1px solid #1e3a8a22":"none",padding:"8px 12px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                              <span style={{fontSize:11,color:"#7090c0",minWidth:24}}>#{ri+1}</span>
+                              <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
+                                style={{flex:1,minWidth:140,padding:"5px 8px",background:"#12121f",border:"1px solid "+((!b.person)?"#ff444488":"#1e3a8a44"),borderRadius:6,color:(!b.person)?"#ff6060":"#e8e8f0",fontSize:12,fontWeight:700,outline:"none"}}>
+                                <option value="">⚠️ Scegli persona</option>
+                                {memberList.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
+                              </select>
+                              <div style={{display:"flex",gap:4,marginLeft:"auto"}}>
+                                <label title="Allega PDF" style={{cursor:"pointer",padding:"3px 7px",background:"#1e3a8a22",color:b.attachment?"#4caf50":"#4a9eff",borderRadius:5,fontSize:11}}>
+                                  <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){attachFile(i,e.target.files[0]);e.target.value="";}}/>
+                                  {b.attachment?"📎✓":"📎"}
+                                </label>
+                                <button onClick={function(){removePreviewItem(i);}} title="Rimuovi" style={{padding:"3px 7px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,cursor:"pointer",fontSize:11}}>✕</button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
+                    );
+                  });
+                }
+                // For volo/auto/parcheggio: flat list as before
+                return preview.map(function(b,i){
+                  var tc = b.type==="volo"?"#4a9eff":b.type==="hotel"?"#4caf50":"#ff9800";
+                  return (
+                    <div key={i} style={{background:"#0d0d1a",borderRadius:8,marginBottom:6,border:"1px solid #ffffff11",borderLeft:"3px solid "+((!b.person)?"#ff4444":tc)}}>
+                      <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,alignItems:"center",flexWrap:"wrap"}}>
+                        <span style={{fontSize:14}}>{b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗"}</span>
+                        <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
+                          style={{padding:"2px 6px",background:"#12121f",border:"1px solid "+((!b.person)?"#ff444488":"#1e3a8a44"),borderRadius:5,color:(!b.person)?"#ff6060":"#e8e8f0",fontSize:11,fontWeight:700,maxWidth:130,outline:"none"}}>
+                          <option value="">⚠️ Scegli persona</option>
+                          {memberList.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
+                        </select>
+                        {b.flight&&<span style={{color:tc,fontSize:11}}>{b.flight}</span>}
+                        {b.dep&&<span style={{color:"#7090c0",fontSize:10}}>{b.dep}{b.arr&&" → "+b.arr}</span>}
+                        {b.date&&<span style={{color:"#7090c0",fontSize:10}}>{b.date}</span>}
+                        {b.booking&&<span style={{color:"#ff9800",fontSize:10,fontFamily:"monospace"}}>#{b.booking}</span>}
+                        <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+                          <label title="Allega PDF/immagine" style={{cursor:"pointer",padding:"3px 7px",background:"#1e3a8a22",color:b.attachment?"#4caf50":"#4a9eff",borderRadius:5,fontSize:11}}>
+                            <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){attachFile(i,e.target.files[0]);e.target.value="";}}/>
+                            {b.attachment?"📎✓":"📎"}
+                          </label>
+                          <button onClick={function(){removePreviewItem(i);}} title="Rimuovi" style={{padding:"3px 7px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,cursor:"pointer",fontSize:11}}>✕</button>
+                        </div>
+                      </div>
+                      {b.attachment&&(
+                        <div style={{padding:"4px 10px 8px",fontSize:10,color:"#4caf50",display:"flex",alignItems:"center",gap:6}}>
+                          📎 {b.attachment.name} ({b.attachment.size}MB)
+                          <button onClick={function(){updatePreviewItem(i,"attachment",null);}} style={{background:"none",border:"none",color:"#ff6060",cursor:"pointer",fontSize:10}}>✕</button>
+                        </div>
+                      )}
                     </div>
-                    {b.attachment&&(
-                      <div style={{padding:"4px 10px 8px",fontSize:10,color:"#4caf50",display:"flex",alignItems:"center",gap:6}}>
-                        📎 {b.attachment.name} ({b.attachment.size}MB)
-                        <button onClick={function(){updatePreviewItem(i,"attachment",null);}} style={{background:"none",border:"none",color:"#ff6060",cursor:"pointer",fontSize:10}}>✕</button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
             <button onClick={function(){setPreview(function(p){return p.concat([{event:selEvent,person:"",type:"volo",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",notes:"",status:"confermata",_matched:false}]);});}}
               style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4a9eff",border:"1px dashed #1e3a8a",borderRadius:6,cursor:"pointer",fontSize:12,marginBottom:8,fontWeight:700}}>
