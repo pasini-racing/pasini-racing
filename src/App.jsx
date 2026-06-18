@@ -476,7 +476,7 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
               </span>
             : <span style={{fontWeight:700,fontSize:12}}>{b.hotel}</span>
           }
-          {b.room && <span style={{fontSize:11,color:"#7090c0"}}>Camera {b.room}</span>}
+          {b.room && <span style={{fontSize:11,color:"#7090c0"}}>{b.room}</span>}
           {b.nights && <span style={{fontSize:11,color:"#7090c0"}}>{b.nights} notti</span>}
           {b.booking && <span style={{fontSize:10,color:"#ff9800",fontFamily:"monospace"}}>#{b.booking}</span>}
         </span>
@@ -2134,6 +2134,12 @@ export default function App() {
           if (confirmDelete.booking && x.booking && confirmDelete.booking !== "-" && x.booking === confirmDelete.booking && x.event === confirmDelete.event && x.type === confirmDelete.type) return true;
           return x === confirmDelete;
         });
+        function deleteOne() {
+          if (confirmDelete._id) fbDel("bookings", confirmDelete._id);
+          setBookings(function(prev){return prev.filter(function(x){ return x!==confirmDelete; });});
+          setConfirmDelete(null);
+          showToast("Prenotazione eliminata ✓");
+        }
         return (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"#1a0a0a",borderRadius:14,padding:28,maxWidth:380,width:"100%",border:"2px solid #ff4444",textAlign:"center"}}>
@@ -2141,17 +2147,22 @@ export default function App() {
             <div style={{fontWeight:800,fontSize:16,marginBottom:8,color:"#ff6060"}}>Elimina prenotazione?</div>
             <div style={{fontSize:13,color:"#b0b0c0",marginBottom:8}}>
               {confirmDelete.type==="volo"&&(confirmDelete.flight+" "+confirmDelete.dep+" → "+confirmDelete.arr)}
-              {confirmDelete.type==="hotel"&&confirmDelete.hotel}
+              {confirmDelete.type==="hotel"&&(confirmDelete.hotel+(confirmDelete.room?" — "+confirmDelete.room:""))}
               {(confirmDelete.type==="auto"||confirmDelete.type==="parcheggio")&&confirmDelete.car}
             </div>
             {linked.length > 1 && (
               <div style={{background:"#3a0a0a",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#ff9800"}}>
-                ⚠️ Verranno eliminate <b>{linked.length} prenotazioni</b> collegate (stesso N° prenotazione)
+                ⚠️ Ci sono <b>{linked.length} prenotazioni</b> con lo stesso N° — vuoi eliminare solo questa o tutte?
               </div>
             )}
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={function(){setConfirmDelete(null);}} style={{flex:1,padding:11,background:"#0d0d1a",color:"#aaa",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>Annulla</button>
-              <button onClick={function(){deleteBooking(confirmDelete);}} style={{flex:1,padding:11,background:"#7f1d1d",color:"#ff6060",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>🗑️ Elimina {linked.length>1?"("+linked.length+")":""}</button>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button onClick={function(){setConfirmDelete(null);}} style={{flex:1,padding:11,background:"#0d0d1a",color:"#aaa",border:"1px solid #333",borderRadius:8,cursor:"pointer",minWidth:80}}>Annulla</button>
+              {linked.length > 1 && (
+                <button onClick={deleteOne} style={{flex:1,padding:11,background:"#4a2000",color:"#ff9800",border:"1px solid #ff980044",borderRadius:8,cursor:"pointer",fontWeight:700,minWidth:80}}>Solo questa</button>
+              )}
+              <button onClick={function(){deleteBooking(confirmDelete);}} style={{flex:1,padding:11,background:"#7f1d1d",color:"#ff6060",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,minWidth:80}}>
+                🗑️ {linked.length>1?"Tutte ("+linked.length+")":"Elimina"}
+              </button>
             </div>
           </div>
         </div>
