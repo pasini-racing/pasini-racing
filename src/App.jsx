@@ -1879,6 +1879,7 @@ export default function App() {
   var [docViewer, setDocViewer] = useState(null); // {fileData, fileName}
   var [hotelModal, setHotelModal] = useState(null); // null | eventId
   var [viewAll, setViewAll] = useState(false);
+  var [showTeamSummary, setShowTeamSummary] = useState(true); // open by default
   var [bookingDetail, setBookingDetail] = useState(null);
 
   // Register global doc opener for iOS-compatible inline viewer
@@ -2441,6 +2442,85 @@ export default function App() {
                 <PersonMealQR personId={currentUser.id} eventId={nextEv.id}/>
               </div>
             )}
+
+            {/* Riepilogo completo team per il prossimo evento — solo admin */}
+            {nextEv && (isAdmin || (currentUser && currentUser.id==="ILARIO")) && (function(){
+              var evPeopleIds = bookings.filter(function(b){return b.event===nextEv.id;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+              var evPeople = people.filter(function(p){return evPeopleIds.includes(p.id);});
+              if (evPeople.length===0) return null;
+              return (
+                <div style={{background:"#12121f",borderRadius:12,border:"1px solid #1e3a8a44",marginBottom:16,overflow:"hidden"}}>
+                  {/* Header cliccabile */}
+                  <div onClick={function(){setShowTeamSummary(function(v){return !v;});}}
+                    style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",background:"#0d1a2a"}}>
+                    <div style={{fontSize:12,fontWeight:800,color:"#4a9eff"}}>👥 Riepilogo team — {nextEv.label}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:10,color:"#7090c0"}}>{evPeople.length} persone</span>
+                      <span style={{color:"#4a9eff",fontSize:12}}>{showTeamSummary?"▲":"▼"}</span>
+                    </div>
+                  </div>
+                  {showTeamSummary && (
+                    <div style={{padding:"0 12px 12px"}}>
+                      {evPeople.map(function(p){
+                        var pBs = bookings.filter(function(b){return b.event===nextEv.id && b.person===p.id;});
+                        var hasVolo = pBs.some(function(b){return b.type==="volo"&&b.status!=="cancellata";});
+                        var hasHotel = pBs.some(function(b){return b.type==="hotel"&&b.status!=="cancellata";});
+                        var hasAuto = pBs.some(function(b){return b.type==="auto"&&b.status!=="cancellata";});
+                        var hasPark = pBs.some(function(b){return b.type==="parcheggio"&&b.status!=="cancellata";});
+                        var volos = pBs.filter(function(b){return b.type==="volo"&&b.status!=="cancellata";});
+                        var hotels = pBs.filter(function(b){return b.type==="hotel"&&b.status!=="cancellata";});
+                        return (
+                          <div key={p.id} style={{borderTop:"1px solid #1e3a8a22",paddingTop:10,marginTop:10}}
+                            onClick={function(){setView("event");setSelEvent(nextEv.id);setViewAll(true);}}>
+                            {/* Person header */}
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                <div style={{width:26,height:26,borderRadius:"50%",background:"#1e3a8a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#4a9eff",flexShrink:0}}>{p.name.charAt(0)}</div>
+                                <div>
+                                  <div style={{fontWeight:700,fontSize:12,color:"#e8e8f0"}}>{p.name}</div>
+                                  {p.role&&<div style={{fontSize:9,color:"#7090c0"}}>{p.role}</div>}
+                                </div>
+                              </div>
+                              <div style={{display:"flex",gap:4}}>
+                                {[{ok:hasVolo,icon:"✈️"},{ok:hasHotel,icon:"🏨"},{ok:hasAuto,icon:"🚗"},{ok:hasPark,icon:"🅿️"}].map(function(item,i){
+                                  return <span key={i} style={{fontSize:12,opacity:item.ok?1:0.2}}>{item.icon}</span>;
+                                })}
+                              </div>
+                            </div>
+                            {/* Voli */}
+                            {volos.length>0 && volos.map(function(b,i){
+                              var isAndata = !b.dir || b.dir!=="ritorno";
+                              return (
+                                <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:isAndata?"#0d1a2a":"#0d2a0d",borderRadius:6,marginBottom:3,fontSize:11}}>
+                                  <span style={{color:isAndata?"#4a9eff":"#4caf50",fontSize:9,fontWeight:700,minWidth:40}}>{isAndata?"↗":"↙"} {b.dir==="ritorno"?"RIT":"AND"}</span>
+                                  {b.company&&<span style={{background:"#ffffff11",color:"#e8e8f0",borderRadius:3,padding:"1px 4px",fontSize:9}}>{b.company}</span>}
+                                  <span style={{fontWeight:700,color:"#e8e8f0"}}>{b.flight}</span>
+                                  {b.dep&&<span style={{color:"#4a9eff"}}>{b.dep}</span>}
+                                  {b.arr&&<span style={{color:"#7090c0"}}>→ {b.arr}</span>}
+                                  {b.date&&<span style={{color:"#555",fontSize:9,marginLeft:"auto"}}>{b.date}</span>}
+                                </div>
+                              );
+                            })}
+                            {/* Hotel */}
+                            {hotels.length>0 && hotels.map(function(b,i){
+                              return (
+                                <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:"#0d2a1a",borderRadius:6,marginBottom:3,fontSize:11}}>
+                                  <span style={{fontSize:9}}>🏨</span>
+                                  <span style={{fontWeight:700,color:"#4caf50",fontSize:11}}>{b.hotel}</span>
+                                  {b.room&&<span style={{color:"#7090c0",fontSize:9}}>{b.room}</span>}
+                                  {b.nights&&<span style={{color:"#555",fontSize:9,marginLeft:"auto"}}>{b.nights}n</span>}
+                                </div>
+                              );
+                            })}
+                            {pBs.length===0&&<div style={{fontSize:10,color:"#7090c0",fontStyle:"italic",padding:"2px 0"}}>Nessuna prenotazione</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Stats row */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
