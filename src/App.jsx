@@ -4417,6 +4417,30 @@ function MasterImportModal({ onClose, onDone }) {
               <input type="file" accept=".xlsx" style={{display:"none"}} onChange={function(e){if(e.target.files[0]) handleFile(e.target.files[0]);}}/>
               📂 Tocca per scegliere il file
             </label>
+            <div style={{marginTop:12,borderTop:"1px solid #ffffff11",paddingTop:12}}>
+              <div style={{fontSize:11,color:"#7090c0",marginBottom:8}}>Oppure cancella solo i dati esistenti:</div>
+              <button onClick={async function(){
+                if (!window.confirm("Cancellare TUTTE le prenotazioni da Firestore?")) return;
+                setStep("importing"); setProgress(0);
+                try {
+                  var snap = await db.collection("bookings").get();
+                  var batches = []; var b = db.batch(); var bc = 0;
+                  snap.docs.forEach(function(doc){
+                    b.delete(doc.ref); bc++;
+                    if (bc===490){ batches.push(b); b=db.batch(); bc=0; }
+                  });
+                  if (bc>0) batches.push(b);
+                  for (var i=0;i<batches.length;i++){
+                    await batches[i].commit();
+                    setProgress(Math.floor((i+1)/Math.max(batches.length,1)*100));
+                  }
+                  setProgress(100);
+                  setTimeout(function(){ onDone([]); }, 500);
+                } catch(e){ setError("Errore: "+e.message); setStep("upload"); }
+              }} style={{width:"100%",padding:12,background:"#3a0a0a",color:"#ff6060",border:"1px solid #ff444433",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
+                🗑️ Cancella tutto Firestore
+              </button>
+            </div>
             {error && <div style={{marginTop:12,color:"#ff6060",fontSize:12}}>{error}</div>}
           </div>
         )}
