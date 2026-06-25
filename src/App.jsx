@@ -4306,14 +4306,40 @@ function MasterImportModal({ onClose, onDone }) {
           var personId = PERSON_MAP[name];
           if (!personId) return;
 
-          // Volo andata
+          // Volo andata — check for connecting flight (contains "+" or "→")
           var andFlight = v(row,C.and_flight);
+          var andNote = v(row,C.and_note);
           if (andFlight && andFlight!=="—") {
-            rows.push({event:eventId,person:personId,type:"volo",dir:"andata",
-              flight:andFlight,company:v(row,C.and_comp),date:v(row,C.and_date),
-              dep:v(row,C.and_dep),arr:v(row,C.and_arr),booking:v(row,C.and_pren),
-              baggage:v(row,C.and_bag),notes:v(row,C.and_note),status:"confermata"});
-            sheetRows++;
+            // Check if connecting flight info is in note (SCALO MADRID pattern)
+            var scaloMatch = andNote.match(/SCALO[^:]*:\s*(\S+)\s+(\d{1,2}:\d{2})→(\S+)\s+(\d{1,2}:\d{2})\s*\(([^)]+)\s+([A-Z0-9]+)\)\s*\+\s*(\S+)\s+(\d{1,2}:\d{2})→(\S+)\s+(\d{1,2}:\d{2})\s*\(([^)]+)\s+([A-Z0-9]+)\)/);
+            if (scaloMatch) {
+              // First leg
+              rows.push({event:eventId,person:personId,type:"volo",dir:"andata",
+                flight:scaloMatch[5].trim(), company:"Wizz",
+                date:v(row,C.and_date),
+                dep:scaloMatch[1]+" "+scaloMatch[2],
+                arr:scaloMatch[3]+" "+scaloMatch[4],
+                booking:scaloMatch[6],
+                baggage:v(row,C.and_bag),
+                notes:"Scalo Madrid - 1° tratta",status:"confermata"});
+              // Second leg
+              rows.push({event:eventId,person:personId,type:"volo",dir:"andata",
+                flight:scaloMatch[11].trim(), company:"Iberia",
+                date:v(row,C.and_date),
+                dep:scaloMatch[7]+" "+scaloMatch[8],
+                arr:scaloMatch[9]+" "+scaloMatch[10],
+                booking:scaloMatch[12],
+                baggage:v(row,C.and_bag),
+                notes:"Scalo Madrid - 2° tratta",status:"confermata"});
+              sheetRows += 2;
+            } else {
+              // Single flight
+              rows.push({event:eventId,person:personId,type:"volo",dir:"andata",
+                flight:andFlight,company:v(row,C.and_comp),date:v(row,C.and_date),
+                dep:v(row,C.and_dep),arr:v(row,C.and_arr),booking:v(row,C.and_pren),
+                baggage:v(row,C.and_bag),notes:andNote,status:"confermata"});
+              sheetRows++;
+            }
           }
           // Volo ritorno
           var ritFlight = v(row,C.rit_flight);
