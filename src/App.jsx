@@ -4394,39 +4394,43 @@ function MasterImportModal({ onClose, onDone }) {
   async function doImport() {
     setStep("importing");
     try {
-      // 1. Delete ALL existing bookings
+      // 1. Delete ALL existing bookings — one by one to avoid batch limits
       var snap = await db.collection("bookings").get();
-      var total = snap.docs.length;
-      var deleted = 0;
-      // Delete in batches of 400
-      var batch = db.batch();
-      snap.docs.forEach(function(doc, i) {
-        batch.delete(doc.ref);
-        deleted++;
-        if (deleted % 400 === 0) { batch.commit(); batch = db.batch(); }
+      setProgress(5);
+      var deleteBatches = [];
+      var b = db.batch(); var bc = 0;
+      snap.docs.forEach(function(doc) {
+        b.delete(doc.ref); bc++;
+        if (bc === 490) { deleteBatches.push(b); b = db.batch(); bc = 0; }
       });
-      await batch.commit();
-      setProgress(10);
+      if (bc > 0) deleteBatches.push(b);
+      for (var di=0; di<deleteBatches.length; di++) {
+        await deleteBatches[di].commit();
+        setProgress(5 + Math.floor((di+1)/Math.max(deleteBatches.length,1)*20));
+      }
+      setProgress(25);
 
-      // 2. Write all new bookings in batches
-      var written = 0;
-      var newBatch = db.batch();
+      // 2. Write all new bookings in batches of 490
+      var writeBatches = [];
+      var wb2 = db.batch(); var wc = 0;
       var imported = [];
-      allRows.forEach(function(row, i) {
-        // Clean undefined fields
+      allRows.forEach(function(row) {
         var clean = {};
         Object.keys(row).forEach(function(k){ if(row[k]!==undefined && row[k]!=="") clean[k]=row[k]; });
         if (!clean.event||!clean.person||!clean.type) return;
         var ref = db.collection("bookings").doc();
-        newBatch.set(ref, clean);
+        wb2.set(ref, clean);
         imported.push(Object.assign({_id:ref.id}, clean));
-        written++;
-        if (written % 400 === 0) { newBatch.commit(); newBatch = db.batch(); }
-        setProgress(10 + Math.floor(written/allRows.length*85));
+        wc++;
+        if (wc === 490) { writeBatches.push(wb2); wb2 = db.batch(); wc = 0; }
       });
-      await newBatch.commit();
+      if (wc > 0) writeBatches.push(wb2);
+      for (var wi=0; wi<writeBatches.length; wi++) {
+        await writeBatches[wi].commit();
+        setProgress(25 + Math.floor((wi+1)/Math.max(writeBatches.length,1)*70));
+      }
       setProgress(100);
-      setTimeout(function(){ onDone(imported); }, 600);
+      setTimeout(function(){ onDone(imported); }, 800);
     } catch(e) {
       setError("Errore import: " + e.message);
       setStep("preview");
