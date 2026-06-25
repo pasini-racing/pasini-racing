@@ -2290,13 +2290,19 @@ export default function App() {
           var nextEv;
           var eventInProgress = false;
           if (currentEv) {
-            var returnFlights = bookings.filter(function(b){
+            // Hard fallback: if current event started more than 7 days ago, it's definitely over
+            var daysSinceStart = currentEv ? -(daysTo(currentEv.id)) : 0;
+            if (daysSinceStart > 7) {
+              nextEv = futureEv || currentEv;
+            } else {
+              var returnFlights = bookings.filter(function(b){
               return b.event===currentEv.id && b.type==="volo" && (b.dir||"").toLowerCase().indexOf("ritorno")!==-1;
             });
             if (returnFlights.length > 0) {
               var allLanded = returnFlights.every(function(b){
                 var dt = parseArrDateTime(b);
-                return dt && TODAY > dt;
+                if (!dt) return true; // can't parse = assume landed
+                return TODAY > dt;
               });
               if (!allLanded) { nextEv = currentEv; eventInProgress = true; }
               else { nextEv = futureEv || currentEv; }
@@ -2305,6 +2311,7 @@ export default function App() {
               nextEv = (daysTo(currentEv.id)===0) ? currentEv : (futureEv || currentEv);
               if (nextEv===currentEv) eventInProgress = true;
             }
+            } // end daysSinceStart check
           } else {
             nextEv = futureEv;
           }
