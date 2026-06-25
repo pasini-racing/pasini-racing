@@ -2685,6 +2685,7 @@ export default function App() {
                 <textarea value={eventNotes[evNK]||""} onChange={function(e){setNote(evNK,e.target.value);}} placeholder="Note logistiche..." style={{width:"100%",background:"#0d0d1a",border:"1px solid #f0c04022",borderRadius:6,color:"#e8c87a",fontSize:12,resize:"vertical",minHeight:48,padding:"7px 9px",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
               </div>}
               {showingAll && <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>}
+              {isAdmin && showingAll && <div style={{marginBottom:12}}><TeamMealQR eventId={selEvent} isAdmin={isAdmin}/></div>}
               {isAdmin && showingAll && <div style={{marginBottom:12}}><MealQRUploader eventId={selEvent}/></div>}
               {filterType==="all" ? people2.map(function(pid){
                 var person2=people.find(function(p){return p.id===pid;});
@@ -2702,6 +2703,7 @@ export default function App() {
                     {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
                     {showingAll && eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
                     <PersonMealQR personId={pid} eventId={selEvent}/>
+                {!showingAll && <TeamMealQR eventId={selEvent} isAdmin={false}/>}
                     <PersonalReceipts personId={pid} eventId={selEvent} canEdit={isAdmin || (currentUser && currentUser.id===pid)}/>
                   </div>
                 );
@@ -3197,6 +3199,80 @@ function MealQRSection({ personId, person, events, currentUserId }) {
 }
 
 
+
+// ── TeamMealQR — QR unico per tutto il team ────────────────
+function TeamMealQR({ eventId, isAdmin }) {
+  var [qr, setQr] = useState(null);
+  var [uploading, setUploading] = useState(false);
+  var [open, setOpen] = useState(false);
+
+  useEffect(function(){
+    var unsub = db.collection("teamQR").where("event","==",eventId)
+      .onSnapshot(function(snap){
+        setQr(snap.empty ? null : Object.assign({_id:snap.docs[0].id}, snap.docs[0].data()));
+      }, function(e){console.error(e);});
+    return function(){unsub();};
+  },[eventId]);
+
+  async function handleUpload(file) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      var b64 = await new Promise(function(res,rej){
+        var r = new FileReader();
+        r.onload = function(e){ var result=e.target.result; var idx=result.indexOf(","); res(idx>=0?result.substring(idx+1):result); };
+        r.onerror=rej; r.readAsDataURL(file);
+      });
+      var mime = file.type || "application/pdf";
+      var data = {event:eventId, fileName:file.name, fileData:"data:"+mime+";base64,"+b64, uploadedAt:new Date().toISOString().substring(0,10)};
+      var snap = await db.collection("teamQR").where("event","==",eventId).get();
+      if (!snap.empty) await snap.docs[0].ref.set(data);
+      else await db.collection("teamQR").add(data);
+    } catch(e){ alert("Errore: "+e.message); }
+    setUploading(false);
+  }
+
+  async function handleDelete() {
+    if (!qr || !qr._id) return;
+    await db.collection("teamQR").doc(qr._id).delete();
+    setQr(null);
+  }
+
+  return (
+    <div style={{background:"#0d1a0d",borderRadius:10,padding:12,border:"1px solid #4caf5033"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:qr?8:0}}>
+        <div style={{fontWeight:700,fontSize:12,color:"#4caf50"}}>🍽️ QR Pasti — Team</div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {qr && <button onClick={function(){setOpen(true);}} style={{background:"#0d2a1a",color:"#4caf50",border:"1px solid #4caf5033",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:11,fontWeight:700}}>👁️ Mostra QR</button>}
+          {isAdmin && (
+            <label style={{cursor:"pointer",background:"#1a3a1a",color:"#4caf50",border:"1px solid #4caf5033",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700}}>
+              <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){if(e.target.files[0]) handleUpload(e.target.files[0]); e.target.value="";}}/>
+              {uploading?"⏳...": qr?"🔄 Sostituisci":"📤 Carica QR"}
+            </label>
+          )}
+          {isAdmin && qr && <button onClick={handleDelete} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:11}}>🗑️</button>}
+        </div>
+      </div>
+      {!qr && <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessun QR team caricato</div>}
+      {qr && <div style={{fontSize:10,color:"#7090c0"}}>📎 {qr.fileName} · {qr.uploadedAt}</div>}
+
+      {/* Fullscreen viewer */}
+      {open && qr && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.97)",zIndex:9000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}} onClick={function(){setOpen(false);}}>
+          <div style={{background:"#fff",borderRadius:12,padding:16,maxWidth:380,width:"90%",textAlign:"center"}} onClick={function(e){e.stopPropagation();}}>
+            <div style={{fontWeight:800,fontSize:14,color:"#1a1a2a",marginBottom:8}}>🍽️ QR Pasti — {eventId}</div>
+            {qr.fileData.includes("pdf") ? (
+              <iframe src={qr.fileData} style={{width:"100%",height:420,border:"none",borderRadius:8}}/>
+            ) : (
+              <img src={qr.fileData} style={{maxWidth:"100%",borderRadius:8}} alt="QR Pasti"/>
+            )}
+            <button onClick={function(){setOpen(false);}} style={{marginTop:12,width:"100%",padding:10,background:"#1e3a8a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>Chiudi</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── MealQRUploader (admin) ─────────────────────────────────
 function MealQRUploader({ eventId }) {
