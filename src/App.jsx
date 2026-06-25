@@ -4282,58 +4282,20 @@ function MasterImportModal({ onClose, onDone }) {
         if (hdrRow < 0) return;
 
         var headers = data[hdrRow].map(function(c){return String(c||"").trim();});
-        var col = function(name) { return headers.indexOf(name); };
 
-        // Column indices based on master format
+        // Fixed column indices based on master Excel structure (1-based → 0-based)
+        // Col 1=Nome, 2=Ruolo
+        // Andata: 3=Volo,4=Compagnia,5=Data,6=Partenza,7=Arrivo,8=N°Pren,9=Bagaglio,10=Note
+        // Ritorno: 11=Volo,12=Compagnia,13=Data,14=Partenza,15=Arrivo,16=N°Pren,17=Bagaglio,18=Note
+        // Hotel: 19=Hotel,20=Camera,21=Indirizzo,22=CheckIn,23=CheckOut,24=Notti,25=N°Pren,26=Note
+        // Auto: 27=Veicolo,28=Compagnia,29=N°Pren,30=Note
         var C = {
-          name:    col("Nome"),
-          // Andata
-          and_flight: col("N° Volo"),      // first occurrence
-          and_comp:   col("Compagnia"),
-          and_date:   col("Data"),
-          and_dep:    col("Partenza"),
-          and_arr:    col("→ Arrivo"),
-          and_pren:   col("N° Pren."),
-          and_bag:    col("Bagaglio"),
-          and_note:   col("Note"),
-          // Find ritorno cols (second occurrence of same headers)
-          rit_flight: -1, rit_comp:-1, rit_date:-1, rit_dep:-1, rit_arr:-1, rit_pren:-1, rit_bag:-1, rit_note:-1,
-          // Hotel
-          hotel:    -1, camera:-1, addr:-1, cin:-1, cout:-1, notti:-1, hpren:-1,
-          // Auto
-          auto:-1, acomp:-1, apren:-1, anote:-1,
+          name:0, role:1,
+          and_flight:2, and_comp:3, and_date:4, and_dep:5, and_arr:6, and_pren:7, and_bag:8, and_note:9,
+          rit_flight:10, rit_comp:11, rit_date:12, rit_dep:13, rit_arr:14, rit_pren:15, rit_bag:16, rit_note:17,
+          hotel:18, camera:19, addr:20, cin:21, cout:22, notti:23, hpren:24, hnote:25,
+          auto:26, acomp:27, apren:28, anote:29,
         };
-
-        // Find second occurrences for ritorno (same column names appear twice)
-        var seen = {};
-        headers.forEach(function(h,i){
-          if (!h) return;
-          if (!seen[h]) { seen[h]=i; return; }
-          // second occurrence
-          if (h==="N° Volo" && C.and_flight>=0) C.rit_flight=i;
-          if (h==="Compagnia" && C.and_comp>=0 && C.rit_comp<0) C.rit_comp=i;
-          if (h==="Data" && C.and_date>=0 && C.rit_date<0) C.rit_date=i;
-          if (h==="Partenza" && C.and_dep>=0 && C.rit_dep<0) C.rit_dep=i;
-          if (h==="→ Arrivo" && C.and_arr>=0 && C.rit_arr<0) C.rit_arr=i;
-          if (h==="N° Pren." && C.and_pren>=0 && C.rit_pren<0) C.rit_pren=i;
-          if (h==="Bagaglio" && C.and_bag>=0 && C.rit_bag<0) C.rit_bag=i;
-          if (h==="Note" && C.and_note>=0 && C.rit_note<0) C.rit_note=i;
-          // third occurrence = hotel N° Pren.
-          if (h==="N° Pren." && C.rit_pren>=0 && C.hpren<0) C.hpren=i;
-          if (h==="Note" && C.rit_note>=0 && C.and_note>=0 && C.rit_note!==i) { /* hotel note */ }
-        });
-        // Hotel cols
-        C.hotel  = headers.indexOf("Hotel");
-        C.camera = headers.indexOf("Camera");
-        C.addr   = headers.indexOf("Indirizzo");
-        C.cin    = headers.indexOf("Check-in");
-        C.cout   = headers.indexOf("Check-out");
-        C.notti  = headers.indexOf("Notti");
-        // Auto cols
-        C.auto  = headers.indexOf("Veicolo");
-        C.acomp = headers.indexOf("Compagnia/Tipo");
-        C.apren = headers.findIndex(function(h,i){return h==="N° Pren." && i>C.auto;});
-        C.anote = headers.findIndex(function(h,i){return h==="Note" && i>C.auto;});
 
         function v(row,ci){ return ci>=0 ? String(row[ci]||"").trim() : ""; }
 
