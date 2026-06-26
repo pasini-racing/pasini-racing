@@ -2451,6 +2451,7 @@ export default function App() {
                   : <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessuna prenotazione per questo evento</div>
                 }
                 <PersonMealQR personId={currentUser.id} eventId={nextEv.id}/>
+                <TeamMealQR eventId={nextEv.id} isAdmin={false}/>
               </div>
             )}
 
@@ -4457,41 +4458,23 @@ function MasterImportModal({ onClose, onDone }) {
 
   async function doImport() {
     setStep("importing");
+    setProgress(0);
     try {
-      // 1. Delete ALL existing bookings — one by one to avoid batch limits
-      var snap = await db.collection("bookings").get();
-      setProgress(5);
-      var deleteBatches = [];
-      var b = db.batch(); var bc = 0;
-      snap.docs.forEach(function(doc) {
-        b.delete(doc.ref); bc++;
-        if (bc === 490) { deleteBatches.push(b); b = db.batch(); bc = 0; }
-      });
-      if (bc > 0) deleteBatches.push(b);
-      for (var di=0; di<deleteBatches.length; di++) {
-        await deleteBatches[di].commit();
-        setProgress(5 + Math.floor((di+1)/Math.max(deleteBatches.length,1)*20));
-      }
-      setProgress(25);
-
-      // 2. Write all new bookings in batches of 490
-      var writeBatches = [];
-      var wb2 = db.batch(); var wc = 0;
-      var imported = [];
+      // Clean rows first
+      var toWrite = [];
       allRows.forEach(function(row) {
         var clean = {};
         Object.keys(row).forEach(function(k){ if(row[k]!==undefined && row[k]!=="") clean[k]=row[k]; });
         if (!clean.event||!clean.person||!clean.type) return;
-        var ref = db.collection("bookings").doc();
-        wb2.set(ref, clean);
-        imported.push(Object.assign({_id:ref.id}, clean));
-        wc++;
-        if (wc === 490) { writeBatches.push(wb2); wb2 = db.batch(); wc = 0; }
+        toWrite.push(clean);
       });
-      if (wc > 0) writeBatches.push(wb2);
-      for (var wi=0; wi<writeBatches.length; wi++) {
-        await writeBatches[wi].commit();
-        setProgress(25 + Math.floor((wi+1)/Math.max(writeBatches.length,1)*70));
+
+      // Write one by one — slow but reliable
+      var imported = [];
+      for (var i=0; i<toWrite.length; i++) {
+        var ref = await db.collection("bookings").add(toWrite[i]);
+        imported.push(Object.assign({_id:ref.id}, toWrite[i]));
+        if (i % 5 === 0) setProgress(Math.floor(i/Math.max(toWrite.length,1)*100));
       }
       setProgress(100);
       setTimeout(function(){ onDone(imported); }, 800);
@@ -4526,15 +4509,11 @@ function MasterImportModal({ onClose, onDone }) {
                 setStep("importing"); setProgress(0);
                 try {
                   var snap = await db.collection("bookings").get();
-                  var batches = []; var b = db.batch(); var bc = 0;
-                  snap.docs.forEach(function(doc){
-                    b.delete(doc.ref); bc++;
-                    if (bc===490){ batches.push(b); b=db.batch(); bc=0; }
-                  });
-                  if (bc>0) batches.push(b);
-                  for (var i=0;i<batches.length;i++){
-                    await batches[i].commit();
-                    setProgress(Math.floor((i+1)/Math.max(batches.length,1)*100));
+                  var docs = snap.docs;
+                  var total = docs.length;
+                  for (var i=0; i<docs.length; i++) {
+                    await docs[i].ref.delete();
+                    if (i % 10 === 0) setProgress(Math.floor(i/Math.max(total,1)*100));
                   }
                   setProgress(100);
                   setTimeout(function(){ onDone([]); }, 500);
@@ -4578,7 +4557,7 @@ function MasterImportModal({ onClose, onDone }) {
             <div style={{background:"#0d0d1a",borderRadius:8,height:12,overflow:"hidden"}}>
               <div style={{height:"100%",background:"#9c27b0",borderRadius:8,width:progress+"%",transition:"width 0.3s"}}/>
             </div>
-            <div style={{marginTop:8,fontSize:12,color:"#7090c0"}}>{progress}%</div>
+            <div style={{marginTop:8,fontSize:12,color:"#7090c0"}}>{progress}% — {Math.floor(progress/100*allRows.length)}/{allRows.length} prenotazioni</div>
           </div>
         )}
       </div>
