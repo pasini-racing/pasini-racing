@@ -2446,12 +2446,26 @@ export default function App() {
             {nextEv && currentUser && (
               <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:16,border:"1px solid #4caf5033"}}>
                 <div style={{fontSize:12,fontWeight:800,color:"#4caf50",marginBottom:10}}>🎒 Le mie prenotazioni — {nextEv.label}</div>
-                {myNextBs.length > 0
-                  ? myNextBs.map(function(b,i){ return <BookingCard key={i} b={b} compact/>; })
-                  : <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessuna prenotazione per questo evento</div>
-                }
+
+                {/* 1. Documenti */}
+                <EventDocuments eventId={nextEv.id} isAdmin={isAdmin}/>
+
+                {/* 2. QR Pasti */}
                 <PersonMealQR personId={currentUser.id} eventId={nextEv.id}/>
                 <TeamMealQR eventId={nextEv.id} isAdmin={false}/>
+
+                {/* 3-7. Prenotazioni ordinate: parcheggio, volo andata, auto, hotel, ritorno */}
+                {(function(){
+                  var order = ["parcheggio","volo_andata","auto","hotel","volo_ritorno"];
+                  var sorted = order.map(function(key){
+                    if (key==="volo_andata") return myNextBs.filter(function(b){return b.type==="volo"&&b.dir!=="ritorno";});
+                    if (key==="volo_ritorno") return myNextBs.filter(function(b){return b.type==="volo"&&b.dir==="ritorno";});
+                    return myNextBs.filter(function(b){return b.type===key;});
+                  });
+                  var all = [].concat.apply([], sorted);
+                  if (all.length === 0) return <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessuna prenotazione per questo evento</div>;
+                  return all.map(function(b,i){ return <BookingCard key={i} b={b} compact/>; });
+                })()}
               </div>
             )}
 
