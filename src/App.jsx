@@ -2052,7 +2052,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",costsOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",costsOnly:true},{k:"bookingsdb",l:"🔑",adminOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -2753,6 +2753,10 @@ export default function App() {
           <ChecklistDashboard bookings={bookings} people={people} setView={setView} setSelEvent={setSelEvent} setViewAll={function(){setViewAll(true);}}/>
         )}
 
+        {view==="bookingsdb" && isAdmin && (
+          <BookingsDashboard bookings={bookings} setBookings={setBookings} people={people}/>
+        )}
+
         {view==="export" && isAdmin && (
           <div>
             <ExportView bookings={bookings} people={people} eventNotes={eventNotes}/>
@@ -2861,7 +2865,12 @@ function EventDocuments({ eventId, isAdmin }) {
                 <div style={{fontSize:12,fontWeight:700,color:"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
                 <div style={{fontSize:10,color:"#7090c0"}}>{doc.size} MB · {doc.uploadedAt?doc.uploadedAt.substring(0,10):""}</div>
               </div>
-              <button onClick={function(){download(doc);}} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>👁️ Apri</button>
+              <button onClick={function(){
+                // On iOS, open in new tab for native PDF viewer (shows all pages)
+                var w = window.open();
+                w.document.write('<html><body style="margin:0"><iframe src="'+doc.data+'" style="width:100%;height:100vh;border:none"></iframe></body></html>');
+                w.document.close();
+              }} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>👁️ Apri</button>
               {isAdmin&&<button onClick={function(){if(window.confirm("Eliminare "+doc.name+"?")) deleteDoc(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>🗑️</button>}
             </div>
           );})}
@@ -3271,20 +3280,26 @@ function TeamMealQR({ eventId, isAdmin }) {
       {!qr && <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessun QR team caricato</div>}
       {qr && <div style={{fontSize:10,color:"#7090c0"}}>📎 {qr.fileName} · {qr.uploadedAt}</div>}
 
-      {/* Fullscreen viewer */}
-      {open && qr && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.97)",zIndex:9000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}} onClick={function(){setOpen(false);}}>
-          <div style={{background:"#fff",borderRadius:12,padding:16,maxWidth:380,width:"90%",textAlign:"center"}} onClick={function(e){e.stopPropagation();}}>
-            <div style={{fontWeight:800,fontSize:14,color:"#1a1a2a",marginBottom:8}}>🍽️ QR Pasti — {eventId}</div>
-            {qr.fileData.includes("pdf") ? (
-              <iframe src={qr.fileData} style={{width:"100%",height:420,border:"none",borderRadius:8}}/>
-            ) : (
-              <img src={qr.fileData} style={{maxWidth:"100%",borderRadius:8}} alt="QR Pasti"/>
-            )}
-            <button onClick={function(){setOpen(false);}} style={{marginTop:12,width:"100%",padding:10,background:"#1e3a8a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>Chiudi</button>
-          </div>
-        </div>
-      )}
+          {open && qr && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.97)",zIndex:9000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}} onClick={function(){setOpen(false);}}>
+              <div style={{background:"#fff",borderRadius:12,padding:16,maxWidth:380,width:"90%",textAlign:"center"}} onClick={function(e){e.stopPropagation();}}>
+                <div style={{fontWeight:800,fontSize:14,color:"#1a1a2a",marginBottom:8}}>🍽️ QR Pasti — {eventId}</div>
+                {qr.fileData.includes("pdf") ? (
+                  <div>
+                    <div style={{fontSize:12,color:"#555",marginBottom:8}}>PDF — apri per vedere tutte le pagine</div>
+                    <button onClick={function(){
+                      var w = window.open();
+                      w.document.write('<html><body style="margin:0"><iframe src="'+qr.fileData+'" style="width:100%;height:100vh;border:none"></iframe></body></html>');
+                      w.document.close();
+                    }} style={{width:"100%",padding:12,background:"#1e3a8a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,marginBottom:8}}>📄 Apri PDF completo</button>
+                  </div>
+                ) : (
+                  <img src={qr.fileData} style={{maxWidth:"100%",borderRadius:8}} alt="QR Pasti"/>
+                )}
+                <button onClick={function(){setOpen(false);}} style={{width:"100%",padding:10,background:"#333",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>Chiudi</button>
+              </div>
+            </div>
+          )}
     </div>
   );
 }
@@ -4307,6 +4322,269 @@ function PDF2Excel() {
 }
 
 // ── FlightDetailModal ──────────────────────────────────────
+// ── BookingsDashboard — gestione per N° Prenotazione ────────
+function BookingsDashboard({ bookings, setBookings, people }) {
+  var [search, setSearch] = useState("");
+  var [selCode, setSelCode] = useState(null); // selected booking code group
+  var [editScope, setEditScope] = useState(null); // null | "all" | personId — when editing a shared field
+
+  // Group bookings by booking code (N° Pren.)
+  var groups = {};
+  bookings.forEach(function(b) {
+    var code = b.booking || "—";
+    var key = code + "|" + b.type; // separate by type too (volo vs hotel vs auto can share coincidentally)
+    if (!groups[key]) groups[key] = { code:code, type:b.type, items:[] };
+    groups[key].items.push(b);
+  });
+  var groupList = Object.values(groups).sort(function(a,b){
+    // Most recent / most people first
+    return b.items.length - a.items.length;
+  });
+
+  if (search.trim()) {
+    var s = search.trim().toUpperCase();
+    groupList = groupList.filter(function(g){
+      if (g.code.toUpperCase().includes(s)) return true;
+      return g.items.some(function(it){
+        var p = people.find(function(pp){return pp.id===it.person;});
+        return p && p.name.toUpperCase().includes(s);
+      });
+    });
+  }
+
+  var typeIcon = {volo:"✈️", hotel:"🏨", auto:"🚗", parcheggio:"🅿️"};
+  var typeColor = {volo:"#4a9eff", hotel:"#9c27b0", auto:"#ff9800", parcheggio:"#4caf50"};
+
+  function personName(pid) {
+    var p = people.find(function(pp){return pp.id===pid;});
+    return p ? p.name : pid;
+  }
+
+  return (
+    <div style={{padding:"16px"}}>
+      <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🔑 Gestione Prenotazioni</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>Organizzate per Numero di Prenotazione — {groupList.length} codici</div>
+
+      <input value={search} onChange={function(e){setSearch(e.target.value);}}
+        placeholder="🔍 Cerca per codice o nome..."
+        style={{width:"100%",padding:12,background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:10,color:"#e8e8f0",fontSize:14,marginBottom:16,boxSizing:"border-box"}}/>
+
+      <div>
+        {groupList.map(function(g, gi) {
+          var tc = typeColor[g.type] || "#7090c0";
+          var ev = EVENTS.find(function(e){return e.id===g.items[0].event;});
+          return (
+            <div key={gi} onClick={function(){setSelCode(g);}}
+              style={{background:"#12121f",borderRadius:10,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid "+tc,cursor:"pointer"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:16}}>{typeIcon[g.type]||"📄"}</span>
+                  <span style={{fontWeight:800,color:"#ff9800",fontFamily:"monospace",fontSize:14}}>#{g.code}</span>
+                </div>
+                <span style={{fontSize:11,color:"#7090c0"}}>{ev?ev.label:g.items[0].event}</span>
+              </div>
+              <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
+                {g.items.length} {g.items.length===1?"persona":"persone"}: {g.items.slice(0,4).map(function(it){return personName(it.person);}).join(", ")}{g.items.length>4?" +"+(g.items.length-4):""}
+              </div>
+              {g.type==="volo" && g.items[0].flight && (
+                <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].flight} · {g.items[0].dep} → {g.items[0].arr} · {g.items[0].date}</div>
+              )}
+              {g.type==="hotel" && g.items[0].hotel && (
+                <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].hotel} {g.items[0].room?"— "+g.items[0].room:""}</div>
+              )}
+            </div>
+          );
+        })}
+        {groupList.length===0 && <div style={{textAlign:"center",color:"#555",padding:40,fontSize:13}}>Nessuna prenotazione trovata</div>}
+      </div>
+
+      {selCode && (
+        <BookingCodeEditor group={selCode} bookings={bookings} setBookings={setBookings} people={people}
+          onClose={function(){setSelCode(null);}}/>
+      )}
+    </div>
+  );
+}
+
+// ── BookingCodeEditor — modal di modifica per un gruppo di prenotazioni ──
+function BookingCodeEditor({ group, bookings, setBookings, people, onClose }) {
+  // Re-resolve current items from live bookings (in case of updates)
+  var liveItems = bookings.filter(function(b){
+    return (b.booking||"—")===group.code && b.type===group.type;
+  });
+  var [form, setForm] = useState(liveItems[0] || {});
+  var [scopeChoice, setScopeChoice] = useState("all"); // "all" | specific personId
+  var [saving, setSaving] = useState(false);
+
+  var typeFields = {
+    volo: [
+      {k:"event", l:"Evento", type:"event"},
+      {k:"dir", l:"Direzione", type:"select", opts:["andata","ritorno"]},
+      {k:"flight", l:"N° Volo"},
+      {k:"company", l:"Compagnia"},
+      {k:"date", l:"Data"},
+      {k:"dep", l:"Partenza"},
+      {k:"arr", l:"Arrivo"},
+      {k:"baggage", l:"Bagaglio"},
+      {k:"notes", l:"Note"},
+    ],
+    hotel: [
+      {k:"event", l:"Evento", type:"event"},
+      {k:"hotel", l:"Hotel"},
+      {k:"room", l:"Camera"},
+      {k:"address", l:"Indirizzo"},
+      {k:"checkin", l:"Check-in"},
+      {k:"checkout", l:"Check-out"},
+      {k:"nights", l:"Notti"},
+      {k:"notes", l:"Note"},
+    ],
+    auto: [
+      {k:"event", l:"Evento", type:"event"},
+      {k:"car", l:"Veicolo"},
+      {k:"company", l:"Compagnia"},
+      {k:"notes", l:"Note"},
+    ],
+    parcheggio: [
+      {k:"event", l:"Evento", type:"event"},
+      {k:"car", l:"Parcheggio"},
+      {k:"notes", l:"Note"},
+    ],
+  };
+  var fields = typeFields[group.type] || typeFields.volo;
+
+  function update(key, val) {
+    setForm(function(p){ return Object.assign({}, p, {_dirty:Object.assign({},p._dirty,{[key]:true})}, {[key]:val}); });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      var targets = scopeChoice==="all" ? liveItems : liveItems.filter(function(it){return it.person===scopeChoice;});
+      var changedKeys = Object.keys(form._dirty || {});
+      if (changedKeys.length === 0) { onClose(); return; }
+
+      var updates = {};
+      changedKeys.forEach(function(k){ updates[k] = form[k]; });
+
+      for (var i=0; i<targets.length; i++) {
+        var item = targets[i];
+        if (item._id) {
+          await db.collection("bookings").doc(item._id).update(updates);
+        }
+      }
+      // Update local state
+      setBookings(function(prev){
+        return prev.map(function(b){
+          var isTarget = targets.some(function(t){ return t._id === b._id; });
+          return isTarget ? Object.assign({}, b, updates) : b;
+        });
+      });
+      onClose();
+    } catch(e) {
+      alert("Errore salvataggio: " + e.message);
+    }
+    setSaving(false);
+  }
+
+  function removePerson(personId) {
+    if (!window.confirm("Rimuovere "+personId+" da questa prenotazione?")) return;
+    var item = liveItems.find(function(it){return it.person===personId;});
+    if (!item || !item._id) return;
+    db.collection("bookings").doc(item._id).delete();
+    setBookings(function(prev){ return prev.filter(function(b){ return b._id !== item._id; }); });
+  }
+
+  var hasMultiple = liveItems.length > 1;
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:7000,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
+      <div style={{maxWidth:480,margin:"0 auto",width:"100%"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:12,color:"#7090c0"}}>Modifica prenotazione</div>
+            <div style={{fontWeight:800,fontSize:18,color:"#ff9800",fontFamily:"monospace"}}>#{group.code}</div>
+          </div>
+          <button onClick={onClose} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontWeight:700}}>✕</button>
+        </div>
+
+        {/* Persone collegate */}
+        <div style={{background:"#12121f",borderRadius:10,padding:12,marginBottom:16}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>👥 PERSONE COLLEGATE ({liveItems.length})</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {liveItems.map(function(it){
+              var p = people.find(function(pp){return pp.id===it.person;});
+              return (
+                <div key={it.person} style={{display:"flex",alignItems:"center",gap:4,background:"#0d0d1a",borderRadius:6,padding:"4px 8px",fontSize:12,color:"#e8e8f0"}}>
+                  {p?p.name:it.person}
+                  <button onClick={function(){removePerson(it.person);}} style={{background:"none",border:"none",color:"#ff6060",cursor:"pointer",fontSize:12,padding:0,marginLeft:4}}>✕</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Scope selector if multiple people */}
+        {hasMultiple && (
+          <div style={{background:"#1a1200",border:"1px solid #ff980033",borderRadius:10,padding:12,marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#ff9800",marginBottom:8}}>⚠️ APPLICA MODIFICHE A:</div>
+            <select value={scopeChoice} onChange={function(e){setScopeChoice(e.target.value);}}
+              style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #ff980044",borderRadius:8,color:"#e8e8f0",fontSize:13}}>
+              <option value="all">Tutte le {liveItems.length} persone</option>
+              {liveItems.map(function(it){
+                var p = people.find(function(pp){return pp.id===it.person;});
+                return <option key={it.person} value={it.person}>Solo {p?p.name:it.person}</option>;
+              })}
+            </select>
+          </div>
+        )}
+
+        {/* Form fields */}
+        <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:16}}>
+          {fields.map(function(f){
+            if (f.type==="event") {
+              return (
+                <div key={f.k} style={{marginBottom:12}}>
+                  <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{f.l}</label>
+                  <select value={form[f.k]||""} onChange={function(e){update(f.k,e.target.value);}}
+                    style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #1e3a8a44",borderRadius:8,color:"#e8e8f0",fontSize:13}}>
+                    {EVENTS.map(function(ev){return <option key={ev.id} value={ev.id}>{ev.label}</option>;})}
+                  </select>
+                </div>
+              );
+            }
+            if (f.type==="select") {
+              return (
+                <div key={f.k} style={{marginBottom:12}}>
+                  <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{f.l}</label>
+                  <select value={form[f.k]||""} onChange={function(e){update(f.k,e.target.value);}}
+                    style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #1e3a8a44",borderRadius:8,color:"#e8e8f0",fontSize:13}}>
+                    {f.opts.map(function(o){return <option key={o} value={o}>{o}</option>;})}
+                  </select>
+                </div>
+              );
+            }
+            return (
+              <div key={f.k} style={{marginBottom:12}}>
+                <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{f.l}</label>
+                <input value={form[f.k]||""} onChange={function(e){update(f.k,e.target.value);}}
+                  style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #1e3a8a44",borderRadius:8,color:"#e8e8f0",fontSize:13,boxSizing:"border-box"}}/>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{display:"flex",gap:10,paddingBottom:30}}>
+          <button onClick={onClose} style={{flex:1,padding:14,background:"#1a1a2a",color:"#aaa",border:"1px solid #333",borderRadius:10,cursor:"pointer",fontWeight:700}}>Annulla</button>
+          <button onClick={save} disabled={saving} style={{flex:2,padding:14,background:"#14532d",color:"#4caf50",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:14}}>
+            {saving?"⏳ Salvataggio...":"✅ Salva modifiche"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ── MasterImportModal ─────────────────────────────────────
 // Reads Pasini_Racing_Master_2026.xlsx (multi-sheet) and replaces all Firestore bookings
 function MasterImportModal({ onClose, onDone }) {
