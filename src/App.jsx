@@ -4322,35 +4322,28 @@ function PDF2Excel() {
 }
 
 // ── FlightDetailModal ──────────────────────────────────────
-// ── BookingsDashboard — gestione per N° Prenotazione ────────
+// ── BookingsDashboard — gestione per N° Prenotazione, suddivisa per evento ──
 function BookingsDashboard({ bookings, setBookings, people }) {
   var [search, setSearch] = useState("");
-  var [selCode, setSelCode] = useState(null); // selected booking code group
-  var [editScope, setEditScope] = useState(null); // null | "all" | personId — when editing a shared field
+  var [selCode, setSelCode] = useState(null);
+  var [selEventFilter, setSelEventFilter] = useState(null); // null = show event list, else show that event's codes
 
-  // Group bookings by booking code (N° Pren.)
+  // Group bookings by booking code + type
   var groups = {};
   bookings.forEach(function(b) {
     var code = b.booking || "—";
-    var key = code + "|" + b.type; // separate by type too (volo vs hotel vs auto can share coincidentally)
-    if (!groups[key]) groups[key] = { code:code, type:b.type, items:[] };
+    var key = b.event + "|" + code + "|" + b.type;
+    if (!groups[key]) groups[key] = { code:code, type:b.type, event:b.event, items:[] };
     groups[key].items.push(b);
   });
-  var groupList = Object.values(groups).sort(function(a,b){
-    // Most recent / most people first
-    return b.items.length - a.items.length;
-  });
+  var allGroups = Object.values(groups);
 
-  if (search.trim()) {
-    var s = search.trim().toUpperCase();
-    groupList = groupList.filter(function(g){
-      if (g.code.toUpperCase().includes(s)) return true;
-      return g.items.some(function(it){
-        var p = people.find(function(pp){return pp.id===it.person;});
-        return p && p.name.toUpperCase().includes(s);
-      });
-    });
-  }
+  // Count codes per event, only show events that have bookings, in EVENTS order
+  var eventCounts = EVENTS.map(function(ev){
+    var codes = allGroups.filter(function(g){return g.event===ev.id;});
+    var peopleCount = bookings.filter(function(b){return b.event===ev.id;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;}).length;
+    return {ev:ev, codeCount:codes.length, peopleCount:peopleCount};
+  }).filter(function(e){return e.codeCount>0;});
 
   var typeIcon = {volo:"✈️", hotel:"🏨", auto:"🚗", parcheggio:"🅿️"};
   var typeColor = {volo:"#4a9eff", hotel:"#9c27b0", auto:"#ff9800", parcheggio:"#4caf50"};
@@ -4360,48 +4353,132 @@ function BookingsDashboard({ bookings, setBookings, people }) {
     return p ? p.name : pid;
   }
 
+  // ── EVENT LIST VIEW ──
+  if (!selEventFilter) {
+    var filteredEvents = eventCounts;
+    if (search.trim()) {
+      var s = search.trim().toUpperCase();
+      // If searching, show matching codes across all events directly
+      var matchGroups = allGroups.filter(function(g){
+        if (g.code.toUpperCase().includes(s)) return true;
+        return g.items.some(function(it){ var p=people.find(function(pp){return pp.id===it.person;}); return p && p.name.toUpperCase().includes(s); });
+      }).sort(function(a,b){return b.items.length-a.items.length;});
+
+      return (
+        <div style={{padding:16}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🔑 Gestione Prenotazioni</div>
+          <input value={search} onChange={function(e){setSearch(e.target.value);}}
+            placeholder="🔍 Cerca per codice o nome..."
+            style={{width:"100%",padding:12,background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:10,color:"#e8e8f0",fontSize:14,marginBottom:16,boxSizing:"border-box"}}/>
+          <div style={{fontSize:11,color:"#7090c0",marginBottom:8}}>{matchGroups.length} risultati per "{search}"</div>
+          {matchGroups.map(function(g,gi){
+            var tc = typeColor[g.type]||"#7090c0";
+            var ev = EVENTS.find(function(e){return e.id===g.event;});
+            return (
+              <div key={gi} onClick={function(){setSelCode(g);}}
+                style={{background:"#12121f",borderRadius:10,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid "+tc,cursor:"pointer"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:16}}>{typeIcon[g.type]||"📄"}</span>
+                    <span style={{fontWeight:800,color:"#ff9800",fontFamily:"monospace",fontSize:14}}>#{g.code}</span>
+                  </div>
+                  <span style={{fontSize:11,color:"#7090c0"}}>{ev?ev.label:g.event}</span>
+                </div>
+                <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
+                  {g.items.length} {g.items.length===1?"persona":"persone"}: {g.items.slice(0,4).map(function(it){return personName(it.person);}).join(", ")}{g.items.length>4?" +"+(g.items.length-4):""}
+                </div>
+              </div>
+            );
+          })}
+          {selCode && <BookingCodeEditor group={selCode} bookings={bookings} setBookings={setBookings} people={people} onClose={function(){setSelCode(null);}}/>}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{padding:16}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🔑 Gestione Prenotazioni</div>
+        <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>Seleziona un evento per vedere i codici prenotazione</div>
+        <input value={search} onChange={function(e){setSearch(e.target.value);}}
+          placeholder="🔍 Cerca per codice o nome..."
+          style={{width:"100%",padding:12,background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:10,color:"#e8e8f0",fontSize:14,marginBottom:16,boxSizing:"border-box"}}/>
+        {filteredEvents.map(function(e){
+          return (
+            <div key={e.ev.id} onClick={function(){setSelEventFilter(e.ev.id);}}
+              style={{background:"#12121f",borderRadius:10,padding:"14px 16px",marginBottom:8,cursor:"pointer",border:"1px solid #1e3a8a33",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:14,color:"#e8e8f0"}}>🏁 {e.ev.label}</div>
+                <div style={{fontSize:11,color:"#7090c0"}}>{e.ev.dates} · {e.ev.circuit}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#ff9800"}}>{e.codeCount} codici</div>
+                <div style={{fontSize:10,color:"#555"}}>{e.peopleCount} persone</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── CODES LIST FOR SELECTED EVENT ──
+  var ev = EVENTS.find(function(e){return e.id===selEventFilter;});
+  var eventGroups = allGroups.filter(function(g){return g.event===selEventFilter;}).sort(function(a,b){return b.items.length-a.items.length;});
+  if (search.trim()) {
+    var s2 = search.trim().toUpperCase();
+    eventGroups = eventGroups.filter(function(g){
+      if (g.code.toUpperCase().includes(s2)) return true;
+      return g.items.some(function(it){ var p=people.find(function(pp){return pp.id===it.person;}); return p && p.name.toUpperCase().includes(s2); });
+    });
+  }
+
   return (
-    <div style={{padding:"16px"}}>
-      <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🔑 Gestione Prenotazioni</div>
-      <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>Organizzate per Numero di Prenotazione — {groupList.length} codici</div>
+    <div style={{padding:16}}>
+      <button onClick={function(){setSelEventFilter(null); setSearch("");}} style={{background:"none",border:"none",color:"#4a9eff",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12,padding:0}}>← Tutti gli eventi</button>
+      <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🏁 {ev?ev.label:selEventFilter}</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>{eventGroups.length} codici prenotazione</div>
 
       <input value={search} onChange={function(e){setSearch(e.target.value);}}
         placeholder="🔍 Cerca per codice o nome..."
         style={{width:"100%",padding:12,background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:10,color:"#e8e8f0",fontSize:14,marginBottom:16,boxSizing:"border-box"}}/>
 
-      <div>
-        {groupList.map(function(g, gi) {
-          var tc = typeColor[g.type] || "#7090c0";
-          var ev = EVENTS.find(function(e){return e.id===g.items[0].event;});
-          return (
-            <div key={gi} onClick={function(){setSelCode(g);}}
-              style={{background:"#12121f",borderRadius:10,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid "+tc,cursor:"pointer"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:16}}>{typeIcon[g.type]||"📄"}</span>
-                  <span style={{fontWeight:800,color:"#ff9800",fontFamily:"monospace",fontSize:14}}>#{g.code}</span>
+      {/* Group by type within event */}
+      {["volo","hotel","auto","parcheggio"].map(function(t){
+        var typeGroups = eventGroups.filter(function(g){return g.type===t;});
+        if (typeGroups.length===0) return null;
+        return (
+          <div key={t} style={{marginBottom:18}}>
+            <div style={{fontSize:11,fontWeight:800,color:typeColor[t],marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>{typeIcon[t]} {t==="volo"?"Voli":t==="hotel"?"Hotel":t==="auto"?"Auto/Noleggio":"Parcheggio"} ({typeGroups.length})</div>
+            {typeGroups.map(function(g,gi){
+              var tc = typeColor[g.type]||"#7090c0";
+              return (
+                <div key={gi} onClick={function(){setSelCode(g);}}
+                  style={{background:"#12121f",borderRadius:10,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid "+tc,cursor:"pointer"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontWeight:800,color:"#ff9800",fontFamily:"monospace",fontSize:14}}>#{g.code}</span>
+                    <span style={{fontSize:11,color:"#7090c0"}}>{g.items.length} {g.items.length===1?"persona":"persone"}</span>
+                  </div>
+                  <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
+                    {g.items.slice(0,5).map(function(it){return personName(it.person);}).join(", ")}{g.items.length>5?" +"+(g.items.length-5):""}
+                  </div>
+                  {g.type==="volo" && g.items[0].flight && (
+                    <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].flight} · {g.items[0].dep} → {g.items[0].arr} · {g.items[0].date}</div>
+                  )}
+                  {g.type==="hotel" && g.items[0].hotel && (
+                    <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].hotel} {g.items[0].room?"— "+g.items[0].room:""}</div>
+                  )}
+                  {(g.type==="auto"||g.type==="parcheggio") && g.items[0].car && (
+                    <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].car}</div>
+                  )}
                 </div>
-                <span style={{fontSize:11,color:"#7090c0"}}>{ev?ev.label:g.items[0].event}</span>
-              </div>
-              <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
-                {g.items.length} {g.items.length===1?"persona":"persone"}: {g.items.slice(0,4).map(function(it){return personName(it.person);}).join(", ")}{g.items.length>4?" +"+(g.items.length-4):""}
-              </div>
-              {g.type==="volo" && g.items[0].flight && (
-                <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].flight} · {g.items[0].dep} → {g.items[0].arr} · {g.items[0].date}</div>
-              )}
-              {g.type==="hotel" && g.items[0].hotel && (
-                <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].hotel} {g.items[0].room?"— "+g.items[0].room:""}</div>
-              )}
-            </div>
-          );
-        })}
-        {groupList.length===0 && <div style={{textAlign:"center",color:"#555",padding:40,fontSize:13}}>Nessuna prenotazione trovata</div>}
-      </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      {eventGroups.length===0 && <div style={{textAlign:"center",color:"#555",padding:40,fontSize:13}}>Nessuna prenotazione trovata</div>}
 
-      {selCode && (
-        <BookingCodeEditor group={selCode} bookings={bookings} setBookings={setBookings} people={people}
-          onClose={function(){setSelCode(null);}}/>
-      )}
+      {selCode && <BookingCodeEditor group={selCode} bookings={bookings} setBookings={setBookings} people={people} onClose={function(){setSelCode(null);}}/>}
     </div>
   );
 }
@@ -4573,12 +4650,31 @@ function BookingCodeEditor({ group, bookings, setBookings, people, onClose }) {
           })}
         </div>
 
-        <div style={{display:"flex",gap:10,paddingBottom:30}}>
+        <div style={{display:"flex",gap:10,paddingBottom:14}}>
           <button onClick={onClose} style={{flex:1,padding:14,background:"#1a1a2a",color:"#aaa",border:"1px solid #333",borderRadius:10,cursor:"pointer",fontWeight:700}}>Annulla</button>
           <button onClick={save} disabled={saving} style={{flex:2,padding:14,background:"#14532d",color:"#4caf50",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:14}}>
             {saving?"⏳ Salvataggio...":"✅ Salva modifiche"}
           </button>
         </div>
+
+        <button onClick={async function(){
+          var msg = hasMultiple
+            ? "Eliminare l'INTERA prenotazione #"+group.code+"? Verranno rimosse tutte le "+liveItems.length+" persone collegate."
+            : "Eliminare questa prenotazione #"+group.code+"?";
+          if (!window.confirm(msg)) return;
+          setSaving(true);
+          try {
+            for (var i=0; i<liveItems.length; i++) {
+              if (liveItems[i]._id) await db.collection("bookings").doc(liveItems[i]._id).delete();
+            }
+            setBookings(function(prev){
+              return prev.filter(function(b){ return !liveItems.some(function(it){return it._id===b._id;}); });
+            });
+            onClose();
+          } catch(e) { alert("Errore: "+e.message); setSaving(false); }
+        }} style={{width:"100%",padding:12,background:"#3a0a0a",color:"#ff6060",border:"1px solid #ff444433",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,marginBottom:30}}>
+          🗑️ Elimina {hasMultiple?"intera prenotazione ("+liveItems.length+" persone)":"prenotazione"}
+        </button>
       </div>
     </div>
   );
