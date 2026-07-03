@@ -35,17 +35,37 @@ function openDoc(fileData, fileName) {
 // ── DocViewer: inline modal per iOS ──────────────────────
 function DocViewer({ fileData, fileName, onClose }) {
   var isImage = fileData && (fileData.startsWith("data:image") || /\.(png|jpg|jpeg|gif|webp)/i.test(fileName||""));
+  var isPDF = !isImage;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:9000,display:"flex",flexDirection:"column"}} onClick={function(e){if(e.target===e.currentTarget) onClose();}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.98)",zIndex:9000,display:"flex",flexDirection:"column"}}>
       <div style={{background:"#12121f",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,borderBottom:"1px solid #1e3a8a"}}>
         <span style={{color:"#e8e8f0",fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{fileName||"Documento"}</span>
-        <button onClick={onClose} style={{background:"#ff444433",color:"#ff6060",border:"none",borderRadius:6,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,flexShrink:0,marginLeft:8}}>✕ Chiudi</button>
+        <div style={{display:"flex",gap:8,flexShrink:0,marginLeft:8}}>
+          {isPDF && (
+            <button onClick={function(){
+              var link = document.createElement("a");
+              link.href = fileData;
+              link.download = fileName || "documento.pdf";
+              link.click();
+            }} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:700}}>
+              ⬇️ Scarica
+            </button>
+          )}
+          <button onClick={onClose} style={{background:"#ff444433",color:"#ff6060",border:"none",borderRadius:6,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700}}>✕ Chiudi</button>
+        </div>
       </div>
-      <div style={{flex:1,overflow:"auto",display:"flex",alignItems:"center",justifyContent:"center",padding:8}}>
+      <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
         {isImage ? (
-          <img src={fileData} alt={fileName} style={{maxWidth:"100%",maxHeight:"100%",borderRadius:8,objectFit:"contain"}}/>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100%",padding:8}}>
+            <img src={fileData} alt={fileName} style={{maxWidth:"100%",borderRadius:8,objectFit:"contain"}}/>
+          </div>
         ) : (
-          <iframe src={fileData} title={fileName} style={{width:"100%",height:"100%",border:"none",borderRadius:8,minHeight:"70vh"}}/>
+          <iframe
+            src={fileData}
+            title={fileName}
+            style={{width:"100%",height:"100%",border:"none",minHeight:"calc(100vh - 60px)"}}
+            allow="fullscreen"
+          />
         )}
       </div>
     </div>
@@ -2865,12 +2885,7 @@ function EventDocuments({ eventId, isAdmin }) {
                 <div style={{fontSize:12,fontWeight:700,color:"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
                 <div style={{fontSize:10,color:"#7090c0"}}>{doc.size} MB · {doc.uploadedAt?doc.uploadedAt.substring(0,10):""}</div>
               </div>
-              <button onClick={function(){
-                // On iOS, open in new tab for native PDF viewer (shows all pages)
-                var w = window.open();
-                w.document.write('<html><body style="margin:0"><iframe src="'+doc.data+'" style="width:100%;height:100vh;border:none"></iframe></body></html>');
-                w.document.close();
-              }} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>👁️ Apri</button>
+              <button onClick={function(){ openDoc(doc.data, doc.name); }} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>👁️ Apri</button>
               {isAdmin&&<button onClick={function(){if(window.confirm("Eliminare "+doc.name+"?")) deleteDoc(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>🗑️</button>}
             </div>
           );})}
@@ -3287,11 +3302,7 @@ function TeamMealQR({ eventId, isAdmin }) {
                 {qr.fileData.includes("pdf") ? (
                   <div>
                     <div style={{fontSize:12,color:"#555",marginBottom:8}}>PDF — apri per vedere tutte le pagine</div>
-                    <button onClick={function(){
-                      var w = window.open();
-                      w.document.write('<html><body style="margin:0"><iframe src="'+qr.fileData+'" style="width:100%;height:100vh;border:none"></iframe></body></html>');
-                      w.document.close();
-                    }} style={{width:"100%",padding:12,background:"#1e3a8a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,marginBottom:8}}>📄 Apri PDF completo</button>
+                    <button onClick={function(){ setOpen(false); openDoc(qr.fileData, qr.fileName||"qr-pasti.pdf"); }} style={{width:"100%",padding:12,background:"#1e3a8a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,marginBottom:8}}>📄 Apri PDF</button>
                   </div>
                 ) : (
                   <img src={qr.fileData} style={{maxWidth:"100%",borderRadius:8}} alt="QR Pasti"/>
