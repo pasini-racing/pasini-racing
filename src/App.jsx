@@ -2091,9 +2091,6 @@ export default function App() {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App/>);
-
 // ── EventDocuments ────────────────────────────────────────
 function EventDocuments({ eventId, isAdmin }) {
   var [docs, setDocs] = useState([]);
