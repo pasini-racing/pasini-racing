@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 
 // ── Firebase init ─────────────────────────────────────────
 const firebaseConfig = {
@@ -15,62 +15,6 @@ const db = firebase.firestore();
 async function fbSet(col, id, data) { try { await db.collection(col).doc(id).set(data, {merge:true}); } catch(e) { console.error(e); } }
 async function fbDel(col, id) { try { await db.collection(col).doc(id).delete(); } catch(e) { console.error(e); } }
 async function fbAdd(col, data) { try { return await db.collection(col).add(data); } catch(e) { console.error(e); return null; } }
-
-// ── iOS-compatible document opener ───────────────────────
-// Components call window.__showDoc(fileData, fileName) to open inline viewer
-function openDoc(fileData, fileName) {
-  if (typeof window.__showDoc === "function") {
-    window.__showDoc(fileData, fileName);
-  } else {
-    try {
-      var a = document.createElement("a");
-      a.href = fileData; a.target = "_blank"; a.rel = "noopener";
-      if (fileName) a.download = fileName;
-      document.body.appendChild(a); a.click();
-      setTimeout(function(){ document.body.removeChild(a); }, 200);
-    } catch(e) { window.open(fileData, "_blank"); }
-  }
-}
-
-// ── DocViewer: inline modal per iOS ──────────────────────
-function DocViewer({ fileData, fileName, onClose }) {
-  var isImage = fileData && (fileData.startsWith("data:image") || /\.(png|jpg|jpeg|gif|webp)/i.test(fileName||""));
-  var isPDF = !isImage;
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.98)",zIndex:9000,display:"flex",flexDirection:"column"}}>
-      <div style={{background:"#12121f",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,borderBottom:"1px solid #1e3a8a"}}>
-        <span style={{color:"#e8e8f0",fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{fileName||"Documento"}</span>
-        <div style={{display:"flex",gap:8,flexShrink:0,marginLeft:8}}>
-          {isPDF && (
-            <button onClick={function(){
-              var link = document.createElement("a");
-              link.href = fileData;
-              link.download = fileName || "documento.pdf";
-              link.click();
-            }} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:700}}>
-              ⬇️ Scarica
-            </button>
-          )}
-          <button onClick={onClose} style={{background:"#ff444433",color:"#ff6060",border:"none",borderRadius:6,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700}}>✕ Chiudi</button>
-        </div>
-      </div>
-      <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch"}}>
-        {isImage ? (
-          <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100%",padding:8}}>
-            <img src={fileData} alt={fileName} style={{maxWidth:"100%",borderRadius:8,objectFit:"contain"}}/>
-          </div>
-        ) : (
-          <iframe
-            src={fileData}
-            title={fileName}
-            style={{width:"100%",height:"100%",border:"none",minHeight:"calc(100vh - 60px)"}}
-            allow="fullscreen"
-          />
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Data ──────────────────────────────────────────────────
 const LOGO_B64 = "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v++jR9jn/wCerf8AfRrTooD2sjM+xz/89W/76NH2Of8A56t/30a06KA9rIzPsc//AD1b/vo0fY5/+erf99GtOigPayMz7HP/AM9W/wC+jR9jn/56t/30a06KA9rIzPsc/wDz1b/vo0fY5/8Anq3/AH0a06KA9rIzPsc//PVv++jR9jn/AOerf99GtOigPayMz7HP/wA9W/76NH2Of/nq3/fRrTooD2sjM+xz/wDPVv8Avo0fY5/+erf99GtOigPayMz7HP8A89W/76NH2Of/AJ6t/wB9GtOigPayMz7HP/z1b/vo0fY5/wDnq3/fRrTooD2sjM+xz/8APVv++jR9jn/56t/30a06KA9rIzPsc/8Az1b/AL6NH2Of/nq3/fRrTooD2sjM+xz/APPVv++jR9jn/wCerf8AfRrTooD2sjM+xz/89W/76NH2Of8A56t/30a06KA9rIzPsc//AD1b/vo0fY5/+erf99GtOigPayMz7HP/AM9W/wC+jR9jn/56t/30a06KA9rIzPsc/wDz1b/vo0fY5/8Anq3/AH0a06KA9rIzPsc//PVv++jR9jn/AOerf99GtOigPayMw2k//PVv++jW7oGnTXE+wzN1/vGqb/dNbnhRj9sP1Fc+MdqMpIcZtuzP6Rf2J7Y2vwinRmLfuU6nNfEP/BQnnQbg/wDTNv6191/saf8AJJp/+uSV8K/8FCP+QBcf9cm/rX8bcIScuK5t/wA59ZWVsOrH426d/qq0Kz9O/wBVWhX9os+QnuFFFFIkKKKKACiiigD/0vyHooor/VQ/NzI1T7tfv1+w1/yKdt9Er8BdU+7X79fsNf8AIp230Svxnxx/5FK9T3Mo+I7b/goT/wAilF/17rX8+Ov/APIRP41/Qd/wUJ/5FKL/AK91r+fHX/8AkIn8a4vAT/kVx+Y87+NlMdBS0g6Clr90Z4QUUUUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAa/wB01t+FP+Pw/wC8KxH+6a2/Cn/H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ooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAa/wB01t+FP+Pw/wC8KxH+6a2/Cn/H4f8AeFc+O/gTLp/Ef0p/saf8kmn/AOuSV8K/8FCP+QBcf9cm/rX3V+xp/wAkmn/65JXwr/wUI/5AFx/1yb+tfxtwb/yVU/8AGfX1/wDd0fjZp/8AqvyrRrO0/wD1X5Vo1/Zy+JnyE9woooqyAooooAKKKKAP/9D8h6KKK/1UPzcyNU+7X79fsNf8inbfRK/AXVPu1+/X7DX/ACKdt9Er8Z8cf+RSvU9zKPiO2/4KE/8AIpRf9e61/Pjr/wDyET+Nf0Hf8FCf+RSi/wCvda/nx1//AJCJ/GuLwE/5FcfmPO/jZTHQUtIOgpa/dGeEFFFFIAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAGv8AdNbfhT/j8P8AvCsR/umtvwp/x+H/AHhXPjv4Ey6fxH9Kf7Gn/JJp/wDrklfCv/BQj/kAXH/XJv6191fsaf8AJJp/+uSV8K/8FCP+QBcf9cm/rX8bcG/8lVP/ABn19f8A3dH42af/AKr8q0az9O/1VaFf2hy2bPj57hRRRTJCiiigAooooA//0fyHooor/VQ/NzI1T7tfv1+w1/yKdt9Er8BdU+7X79fsNf8AIp230Svxnxx/5FK9T3Mo+I7b/goT/wAilF/17rX8+Ov/APIRP41/Qd/wUJ/5FKL/AK91r+fHX/8AkIn8a4vAT/kVx+Y87+NlMdBS0g6Clr90Z4QUUUUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoo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8/Uv/fVHmat/z9S/99Uf8QNy3+b8A/tSXc/c3/hsyT/n+/8AHqP+GzJP+f7/AMer8MvM1b/n6l/76o8zVv8An6l/76o/4gblv834B/aku5+5v/DZkn/P9/49R/w2ZJ/z/f8Aj1fhl5mrf8/Uv/fVHmat/wA/Uv8A31R/xA3Lf5vwD+1Jdz9zf+GzJP8An+/8eo/4bMk/5/v/AB6vwy8zVv8An6l/76o8zVv+fqX/AL6o/wCIG5b/ADfgH9qS7n7m/wDDZkn/AD/f+PUf8NmSf8/3/j1fhl5mrf8AP1L/AN9UeZq3/P1L/wB9Uf8AEDct/m/AP7Ul3P3N/wCGzJP+f7/x6kP7Zkn/AD/f+PV+Gfmat/z9S/8AfVJ5mrf8/Uv/AH0aP+IG5b/N+ALNZdz9uNQ/bGmuIXiN7w3+1Xw9+0j8WV8d6W8KTeaWQjrXxPv1X/n5l/76P+NSRC7Y/wCkSM4/2jmvfyXwvwOAxEMTResTGtmDkrDbJSseGq7SAAdKWv0eUru55bYUUUVIgooooAKKKKAP/9X8h6KKK/1UPzcKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooA//9k=";
@@ -383,45 +327,7 @@ const TYPE_COLORS = {
 const COMPANY_COLORS = {
   "Ryanair":"#073590","EasyJet":"#ff6600","Wizz":"#c6007e",
   "Vueling":"#c8a800","TAP":"#006600","Air Europa":"#003087",
-  "Iberia":"#d4001a","Transavia":"#00a0c8",
 };
-
-const COMPANY_URLS = {
-  "Ryanair":    "https://www.ryanair.com/it/it/manage-my-booking",
-  "EasyJet":    "https://www.easyjet.com/it",
-  "Wizz":       "https://wizzair.com/it-it/bookings/manage-booking",
-  "Vueling":    "https://www.vueling.com/it/servizi-per-i-viaggiatori/gestisci-il-tuo-volo",
-  "TAP":        "https://www.tapairportugal.com/it",
-  "Air Europa": "https://www.aireuropa.com/it/voli/gestisci-la-tua-prenotazione",
-  "Iberia":     "https://www.iberia.com/it/gestisci/",
-  "Transavia":  "https://www.transavia.com/it-IT/manage-your-booking/",
-};
-
-// Deep link: apre l'app se installata, altrimenti il sito web
-const COMPANY_DEEPLINKS = {
-  "Ryanair":    "ryanair://",
-  "EasyJet":    "easyjet://",
-  "Wizz":       "wizzair://",
-  "Vueling":    "vueling://",
-  "Iberia":     "iberia://",
-};
-
-function openAirlineApp(company) {
-  var deeplink = COMPANY_DEEPLINKS[company];
-  var weburl = COMPANY_URLS[company];
-  if (deeplink) {
-    // Prova ad aprire l'app, se fallisce dopo 500ms apre il sito
-    var start = Date.now();
-    window.location.href = deeplink;
-    setTimeout(function() {
-      if (Date.now() - start < 1000 && weburl) {
-        window.open(weburl, "_blank");
-      }
-    }, 500);
-  } else if (weburl) {
-    window.open(weburl, "_blank");
-  }
-}
 
 // ── Helpers ───────────────────────────────────────────────
 function buildPDFData(personId, allBookings, eventNotes) {
@@ -443,44 +349,53 @@ function buildPDFData(personId, allBookings, eventNotes) {
   });
 }
 
+function normBookingCode(v) { return (v || "").toString().trim().toUpperCase(); }
+
+// Vero se questa persona ha già una prenotazione ATTIVA (non cancellata) con lo stesso codice
+function isDuplicateBookingCode(existingBookings, person, code, excludeId) {
+  var nc = normBookingCode(code);
+  if (!nc) return false; // niente codice = niente controllo duplicati
+  return existingBookings.some(function(b) {
+    return b.person === person &&
+      normBookingCode(b.booking) === nc &&
+      b.status !== "cancellata" &&
+      (!excludeId || b._id !== excludeId);
+  });
+}
+
+// Divide un elenco di nuove prenotazioni candidate in { toAdd, skipped },
+// scartando quelle il cui codice è già attivo per la stessa persona
+// (sia contro le prenotazioni esistenti, sia contro doppioni nello stesso lotto).
+function dedupeBookings(existingBookings, candidates) {
+  var toAdd = [], skipped = [], seenInBatch = [];
+  candidates.forEach(function(b) {
+    var nc = normBookingCode(b.booking);
+    var dupExisting = isDuplicateBookingCode(existingBookings, b.person, b.booking);
+    var dupInBatch = nc && seenInBatch.some(function(s) { return s.person === b.person && s.code === nc; });
+    if (dupExisting || dupInBatch) {
+      skipped.push(b);
+    } else {
+      toAdd.push(b);
+      if (nc) seenInBatch.push({ person: b.person, code: nc });
+    }
+  });
+  return { toAdd: toAdd, skipped: skipped };
+}
+
 // ── BookingCard ───────────────────────────────────────────
 function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
   var tc = TYPE_COLORS[b.type] || TYPE_COLORS.volo;
   var cc = b.company ? COMPANY_COLORS[b.company] : null;
   var person = showPerson ? PEOPLE.find(function(p) { return p.id === b.person; }) : null;
-
-  // Check if flight has already landed
-  var flightPast = false;
-  if (b.type === "volo" && b.arr) {
-    try {
-      // Parse arr time like "BCN 13:35" → extract HH:MM
-      var arrMatch = b.arr.match(/(\d{1,2}):(\d{2})$/);
-      if (arrMatch) {
-        var now = new Date();
-        var arrTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(arrMatch[1]), parseInt(arrMatch[2]));
-        // If date field contains day info, try to use it
-        // Simple check: if current time > arr time today, mark as past
-        flightPast = now > arrTime;
-      }
-    } catch(e) {}
-  }
   return (
-    <div onClick={function(e){if(!e.target.closest("button")&&!e.target.closest("a")){if(typeof window.__showBookingDetail==="function") window.__showBookingDetail(b);}}}
-      style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+(flightPast?"#444":tc.accent),borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative",opacity:flightPast?0.5:1,cursor:"pointer"}}>
-      <span style={{fontSize:16}}>{tc.icon}{flightPast?" ✓":""}</span>
+    <div style={{background:tc.bg+"44",border:"1px solid "+tc.accent+"33",borderLeft:"3px solid "+tc.accent,borderRadius:8,padding:compact?"8px 12px":"12px 16px",marginBottom:8,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",position:"relative"}}>
+      <span style={{fontSize:16}}>{tc.icon}</span>
       {showPerson && person && <span style={{fontWeight:700,fontSize:12,color:tc.accent,minWidth:80}}>{person.name}</span>}
       {b.type === "volo" && (
         <span style={{display:"contents"}}>
-          {b.company && (
-            (COMPANY_URLS[b.company] || COMPANY_DEEPLINKS[b.company])
-              ? <span onClick={function(e){e.stopPropagation(); openAirlineApp(b.company);}}
-                  style={{background:cc||"#333",color:"#fff",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
-                  🌐 {b.company}
-                </span>
-              : <span style={{background:cc||"#333",color:"#fff",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.company}</span>
-          )}
+          {b.company && <span style={{background:cc||"#333",color:"#fff",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.company}</span>}
           {b.flight && <span style={{fontWeight:700,fontSize:12}}>{b.flight}</span>}
-          {(b.dep||b.arr) && <span style={{fontSize:12,color:"#b0c0e0"}}>{b.dep}{!flightPast && b.arr ? " → "+b.arr : ""}</span>}
+          {(b.dep||b.arr) && <span style={{fontSize:12,color:"#b0c0e0"}}>{b.dep} → {b.arr}</span>}
           {b.date && <span style={{fontSize:11,color:"#7090c0"}}>{b.date}</span>}
           {b.dir && <span style={{background:b.dir==="andata"?"#1e3a8a":"#1a4a1a",color:b.dir==="andata"?"#4a9eff":"#4caf50",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.dir==="andata"?"↗ ANDATA":"↙ RITORNO"}</span>}
           {b.baggage && <span style={{fontSize:10,color:"#7090c0"}}>🧳 {b.baggage}</span>}
@@ -489,14 +404,8 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete }) {
       )}
       {b.type === "hotel" && (
         <span style={{display:"contents"}}>
-          {b.address
-            ? <span onClick={function(e){e.stopPropagation(); window.open("https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((b.hotel||"")+" "+b.address),"_blank");}}
-                style={{fontWeight:700,fontSize:12,cursor:"pointer",color:"#4caf50",textDecoration:"underline dotted"}}>
-                📍 {b.hotel}
-              </span>
-            : <span style={{fontWeight:700,fontSize:12}}>{b.hotel}</span>
-          }
-          {b.room && <span style={{fontSize:11,color:"#7090c0"}}>{b.room}</span>}
+          <span style={{fontWeight:700,fontSize:12}}>{b.hotel}</span>
+          {b.room && <span style={{fontSize:11,color:"#7090c0"}}>Camera {b.room}</span>}
           {b.nights && <span style={{fontSize:11,color:"#7090c0"}}>{b.nights} notti</span>}
           {b.booking && <span style={{fontSize:10,color:"#ff9800",fontFamily:"monospace"}}>#{b.booking}</span>}
         </span>
@@ -532,10 +441,10 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
   var [showDuplicate, setShowDuplicate] = useState(false);
   var [dupPeople, setDupPeople] = useState([]);
   var fields = booking.type === "volo"
-    ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]]
+    ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["notes","Note"]]
     : booking.type === "hotel"
-    ? [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]]
-    : [["car","Veicolo"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]];
+    ? [["hotel","Hotel"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["notes","Note"]]
+    : [["car","Veicolo"],["booking","N° Prenotazione"],["notes","Note"]];
   var statusOptions = [{v:"confermata",l:"✅ Confermata"},{v:"da_confermare",l:"⏳ Da confermare"},{v:"cancellata",l:"❌ Cancellata"}];
   var ev = EVENTS.find(function(e) { return e.id === booking.event; });
   var inp = {width:"100%",padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:6,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
@@ -614,15 +523,73 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
 
 // ── PDFPreview ────────────────────────────────────────────
 function PDFPreview({ data, name, onClose }) {
+  var contentRef = useRef(null);
+  var [busy, setBusy] = useState(false);
+  var [busyLabel, setBusyLabel] = useState("");
+  var [errMsg, setErrMsg] = useState("");
+
+  async function buildPdfBlob() {
+    var html2canvas = (await import("html2canvas")).default;
+    var { jsPDF } = await import("jspdf");
+    var node = contentRef.current;
+    var canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+    var imgData = canvas.toDataURL("image/jpeg", 0.92);
+    var pdf = new jsPDF({ unit: "pt", format: "a4" });
+    var pageW = pdf.internal.pageSize.getWidth();
+    var pageH = pdf.internal.pageSize.getHeight();
+    var imgW = pageW;
+    var imgH = (canvas.height * imgW) / canvas.width;
+    var heightLeft = imgH;
+    var position = 0;
+    pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+    heightLeft -= pageH;
+    while (heightLeft > 0) {
+      position = heightLeft - imgH;
+      pdf.addPage();
+      pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+      heightLeft -= pageH;
+    }
+    return pdf.output("blob");
+  }
+
+  async function handleShare() {
+    setErrMsg("");
+    setBusy(true); setBusyLabel("Genero il PDF…");
+    try {
+      var blob = await buildPdfBlob();
+      var fileName = "Itinerario_" + (name || "viaggio").replace(/[^a-z0-9]+/gi, "_") + ".pdf";
+      var file = new File([blob], fileName, { type: "application/pdf" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        setBusyLabel("Apro condivisione…");
+        await navigator.share({ files: [file], title: "Itinerario — " + name });
+      } else {
+        // Fallback: scarica il file (funziona anche in modalità standalone)
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = fileName;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      }
+    } catch (e) {
+      if (e && e.name !== "AbortError") {
+        setErrMsg("Errore nella generazione del PDF: " + (e.message || e));
+      }
+    } finally {
+      setBusy(false); setBusyLabel("");
+    }
+  }
+
   return (
     <div style={{position:"fixed",inset:0,background:"#fff",zIndex:3000,display:"flex",flexDirection:"column",fontFamily:"Arial,sans-serif",color:"#111"}}>
       <div style={{background:"#1e3a8a",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,gap:8}}>
         <span style={{color:"#fff",fontWeight:700,fontSize:14,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>✈ Itinerario — {name}</span>
+        <button onClick={handleShare} disabled={busy} style={{background:"#4caf50",color:"#fff",border:"none",padding:"6px 14px",borderRadius:6,cursor:busy?"default":"pointer",fontSize:13,fontWeight:700,opacity:busy?0.7:1}}>{busy ? "⏳ "+busyLabel : "⬆️ Condividi PDF"}</button>
         <button onClick={onClose} style={{background:"rgba(255,255,255,0.2)",color:"#fff",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>✕ Chiudi</button>
       </div>
-      <div style={{flex:1,overflowY:"auto",padding:"20px 16px",maxWidth:700,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
+      <div ref={contentRef} style={{flex:1,overflowY:"auto",padding:"20px 16px",maxWidth:700,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
+        {errMsg && <div style={{background:"#3a1a1a",color:"#ff8080",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12}}>{errMsg}</div>}
         <div style={{background:"#e8eeff",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#1e3a8a"}}>
-          <b>Salvare come PDF su iPhone:</b> Condividi ⬆️ → Stampa → pizzica per ingrandire → Condividi → Salva su File
+          <b>Consiglio:</b> tocca "⬆️ Condividi PDF" in alto per salvare o inviare direttamente il documento.
         </div>
         <h2 style={{color:"#1e3a8a",margin:"0 0 4px 0",fontSize:20}}>{name}</h2>
         <p style={{color:"#555",margin:"0 0 20px 0",fontSize:12}}>Team Echovit Pasini Racing — FIM Junior GP 2026</p>
@@ -689,31 +656,20 @@ function PDFPreview({ data, name, onClose }) {
 // ── AI Import ─────────────────────────────────────────────
 function AIImportSection({ onImported, onSkip }) {
   var [file, setFile] = useState(null);
-  var [docType, setDocType] = useState("");
+  var [preview, setPreview] = useState(null);
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
-
-  var DOC_TYPES = [
-    {id:"volo",      label:"✈️ Volo",        color:"#4a9eff"},
-    {id:"hotel",     label:"🏨 Hotel",       color:"#4caf50"},
-    {id:"noleggio",  label:"🚗 Noleggio",    color:"#ff9800"},
-    {id:"parcheggio",label:"🅿️ Parcheggio",  color:"#9c27b0"},
-  ];
 
   function handleFile(f) {
     if (!f) return;
     setFile(f); setError("");
-    if (!docType) {
-      var n = f.name.toLowerCase();
-      if (n.includes("booking") || n.includes("hotel")) setDocType("hotel");
-      else if (n.includes("goldcar") || n.includes("noleggio") || n.includes("car")) setDocType("noleggio");
-      else if (n.includes("park") || n.includes("parcheggio")) setDocType("parcheggio");
-      else setDocType("volo");
-    }
+    var reader = new FileReader();
+    reader.onload = function(e) { setPreview({url:e.target.result, type:f.type}); };
+    reader.readAsDataURL(f);
   }
 
   async function extract() {
-    if (!file || !docType) { setError("Seleziona il tipo di documento"); return; }
+    if (!file) return;
     setLoading(true); setError("");
     try {
       var b64 = await new Promise(function(res, rej) {
@@ -722,88 +678,80 @@ function AIImportSection({ onImported, onSkip }) {
         r.onerror = rej;
         r.readAsDataURL(file);
       });
-      var isPDF = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+      var isPDF = file.type === "application/pdf";
       var mediaType = isPDF ? "application/pdf" : (file.type || "image/jpeg");
       var block = isPDF
         ? {type:"document",source:{type:"base64",media_type:mediaType,data:b64}}
         : {type:"image",source:{type:"base64",media_type:mediaType,data:b64}};
-
-      var prompts = {
-        volo: "Analizza questa conferma volo. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"volo\",\"provider\":\"compagnia\",\"booking\":\"codice\",\"flight\":\"FR1234\",\"company\":\"Ryanair\",\"dep\":\"BGY 11:55\",\"arr\":\"BCN 13:35\",\"date\":\"19 Apr\",\"dir\":\"andata\",\"baggage\":\"1 mano\",\"notes\":\"\"}",
-        hotel: "Analizza questa conferma hotel. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"hotel\",\"hotel\":\"Nome Hotel\",\"address\":\"indirizzo completo\",\"booking\":\"numero\",\"checkin\":\"11 Giu\",\"checkout\":\"14 Giu\",\"nights\":\"3\",\"room\":\"Camera Matrimoniale\",\"notes\":\"\"}",
-        noleggio: "Analizza questa conferma noleggio auto. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"noleggio\",\"company\":\"Goldcar\",\"booking\":\"codice\",\"car\":\"Opel Corsa\",\"pickup\":\"Aeroporto BCN\",\"pickupDate\":\"19 Apr 10:00\",\"dropoff\":\"Aeroporto BCN\",\"dropoffDate\":\"23 Apr\",\"driver\":\"COGNOME NOME\",\"notes\":\"\"}",
-        parcheggio: "Analizza questa conferma parcheggio. Rispondi SOLO con JSON su una riga senza markdown. Struttura: {\"type\":\"parcheggio\",\"company\":\"nome\",\"booking\":\"codice\",\"location\":\"indirizzo\",\"entry\":\"19 Apr 06:00\",\"exit\":\"23 Apr 14:00\",\"plate\":\"targa\",\"price\":\"totale\",\"notes\":\"\"}",
-      };
-
-      var resp = await fetch("/api/claude", {
+      var promptText = [
+        "Analizza questa conferma di prenotazione (volo Ryanair/Vueling/TAP/EasyJet/Wizz, hotel Booking.com, parcheggio ParkinGO, noleggio Gold Car). ",
+        "Rispondi SOLO con JSON valido senza markdown. ",
+        "Struttura: {type, provider, booking, flight, company, dep, arr, date, dir, baggage, hotel, room, nights, checkin, checkout, car, notes}. ",
+        "type = volo/hotel/auto/parcheggio. dep/arr = codice aeroporto + orario es BGY 11:51. Lascia vuoto ciò che non trovi."
+      ].join("");
+      var apiKey2 = (typeof process !== "undefined" && process.env && process.env.REACT_APP_ANTHROPIC_KEY)
+        || window._ak || "";
+      var resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey2,
+          "anthropic-version": "2023-06-01"
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1500,
-          messages: [{role:"user", content:[block, {type:"text", text:prompts[docType]}]}]
+          max_tokens: 1000,
+          messages: [{role:"user", content:[block, {type:"text",text:promptText}]}]
         })
       });
       if (!resp.ok) throw new Error("API " + resp.status);
       var data = await resp.json();
-      var text = (data.content||[]).filter(function(i){return i.type==="text";}).map(function(i){return i.text;}).join("");
+      var text = data.content.filter(function(i){return i.type==="text";}).map(function(i){return i.text;}).join("");
       var start = text.indexOf("{"), end = text.lastIndexOf("}");
-      if (start === -1) throw new Error("Nessun dato trovato nel documento");
-      var parsed = JSON.parse(text.substring(start, end+1));
+      if (start === -1 || end === -1) throw new Error("Nessun JSON trovato");
+      var parsed = JSON.parse(text.substring(start, end + 1));
       onImported(parsed);
     } catch(err) {
-      setError("Errore: " + (err.message||"Riprova"));
+      setError("Errore: " + (err.message||"Connessione fallita. Verifica di essere connesso a internet."));
     }
     setLoading(false);
   }
 
   return (
     <div style={{padding:20}}>
-      <div style={{fontSize:16,fontWeight:800,color:"#4a9eff",marginBottom:4}}>🤖 Importa da conferma</div>
-      <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>Carica PDF o screenshot della prenotazione</div>
-
-      <div style={{fontSize:11,color:"#7090c0",marginBottom:6,fontWeight:700}}>Tipo documento:</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
-        {DOC_TYPES.map(function(dt){
-          var sel = docType === dt.id;
-          return (
-            <div key={dt.id} onClick={function(){setDocType(dt.id);}}
-              style={{padding:"10px 8px",borderRadius:8,border:"2px solid "+(sel?dt.color:"#1e3a8a22"),
-                background:sel?dt.color+"22":"#0d0d1a",cursor:"pointer",textAlign:"center",
-                fontSize:13,fontWeight:sel?800:400,color:sel?dt.color:"#7090c0"}}>
-              {dt.label}
-            </div>
-          );
-        })}
-      </div>
-
-      <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:12,padding:"20px 16px",textAlign:"center",cursor:"pointer",marginBottom:14}}>
+      <div style={{fontSize:16,fontWeight:800,color:"#4a9eff",marginBottom:6}}>🤖 Importa da conferma</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>Carica PDF o screenshot — Ryanair, Vueling, TAP, EasyJet, Wizz, ParkinGO, Booking.com, Gold Car</div>
+      <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:12,padding:"24px 16px",textAlign:"center",cursor:"pointer",marginBottom:14}}>
         <input type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={function(e){handleFile(e.target.files[0]);}}/>
-        {file
-          ? <div><div style={{fontSize:20,marginBottom:4}}>✅</div><div style={{fontSize:12,color:"#4caf50",fontWeight:700}}>{file.name}</div></div>
-          : <div><div style={{fontSize:28,marginBottom:4}}>📎</div><div style={{fontSize:12,color:"#4a9eff"}}>Tocca per caricare PDF o immagine</div></div>
-        }
+        {file ? (
+          <div>
+            {preview && preview.type.startsWith("image/") && <img src={preview.url} style={{maxHeight:140,maxWidth:"100%",borderRadius:8,marginBottom:10}}/>}
+            {preview && preview.type==="application/pdf" && <div style={{fontSize:40,marginBottom:8}}>📄</div>}
+            <div style={{fontSize:13,color:"#4caf50",fontWeight:700}}>{file.name}</div>
+            <div style={{fontSize:11,color:"#7090c0",marginTop:4}}>Tocca per cambiare</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{fontSize:40,marginBottom:10}}>📎</div>
+            <div style={{fontSize:14,color:"#4a9eff",fontWeight:700}}>Tocca per caricare</div>
+            <div style={{fontSize:11,color:"#7090c0",marginTop:6}}>PDF o immagine</div>
+          </div>
+        )}
       </label>
-
-      {error && <div style={{background:"#1a0a0a",border:"1px solid #ff444433",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#ff6060",marginBottom:12}}>{error}</div>}
-
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onSkip} style={{flex:1,padding:11,background:"#1a1a2a",color:"#7090c0",border:"1px solid #1e3a8a33",borderRadius:8,cursor:"pointer",fontSize:13}}>
-          ✍️ Manuale
-        </button>
-        <button onClick={extract} disabled={!file||!docType||loading}
-          style={{flex:2,padding:11,background:(!file||!docType||loading)?"#1a1a2a":"#1e3a8a",color:(!file||!docType||loading)?"#555":"#4a9eff",border:"none",borderRadius:8,cursor:(!file||!docType||loading)?"not-allowed":"pointer",fontWeight:700,fontSize:13}}>
-          {loading ? "⏳ Estrazione..." : "🤖 Estrai dati"}
-        </button>
-      </div>
+      {error && <div style={{color:"#ff6060",fontSize:12,marginBottom:12,padding:"8px 12px",background:"#3a1a1a",borderRadius:8}}>{error}</div>}
+      <button onClick={extract} disabled={!file||loading}
+        style={{width:"100%",padding:13,background:file&&!loading?"#1e3a8a":"#1a1a2a",color:file&&!loading?"#fff":"#444",border:"none",borderRadius:10,cursor:file&&!loading?"pointer":"not-allowed",fontWeight:700,fontSize:14,marginBottom:10}}>
+        {loading ? "⏳ Estrazione..." : "🤖 Estrai automaticamente"}
+      </button>
+      <button onClick={onSkip} style={{width:"100%",padding:11,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:10,cursor:"pointer",fontSize:13}}>✍️ Inserisci manualmente</button>
     </div>
   );
 }
 
 // ── AddBookingForm ────────────────────────────────────────
-var EMPTY_FORM = {type:"volo",event:"",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",price:"",notes:"",hotel:"",room:"",nights:"",car:"",people:[],status:"confermata"};
+var EMPTY_FORM = {type:"volo",event:"",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",notes:"",hotel:"",room:"",nights:"",car:"",people:[],status:"confermata"};
 
-function AddBookingForm({ defaultEvent, onSave }) {
+function AddBookingForm({ defaultEvent, onSave, existingBookings }) {
   var [mode, setMode] = useState(defaultEvent ? "manual" : "ai");
   var [form, setForm] = useState(Object.assign({}, EMPTY_FORM, {event:defaultEvent||""}));
   var [step, setStep] = useState(defaultEvent ? 2 : 1);
@@ -930,6 +878,17 @@ function AddBookingForm({ defaultEvent, onSave }) {
         )}
         {step===3 && (
           <div>
+            {(function() {
+              if (!existingBookings || !normBookingCode(form.booking)) return null;
+              var dupIds = form.people.filter(function(pid) { return isDuplicateBookingCode(existingBookings, pid, form.booking); });
+              if (!dupIds.length) return null;
+              var dupNames = dupIds.map(function(pid) { var p = PEOPLE.find(function(x){return x.id===pid;}); return p ? p.name : pid; }).join(", ");
+              return (
+                <div style={{background:"#3a1a1a",border:"1px solid #ff444455",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#ff9090"}}>
+                  ⚠️ Codice "{form.booking}" già attivo per: {dupNames}. {dupIds.length===1?"Questa persona":"Queste persone"} non verrà{dupIds.length===1?"":"nno"} salvata{dupIds.length===1?"":"e"} di nuovo.
+                </div>
+              );
+            })()}
             <div style={{fontSize:13,fontWeight:800,color:"#4a9eff",marginBottom:12,paddingBottom:6,borderBottom:"1px solid #1e3a8a33"}}>👥 Persone ({form.people.length} selezionate)</div>
             <div style={{display:"flex",gap:8,marginBottom:12}}>
               <button onClick={function(){setForm(function(f){return Object.assign({},f,{people:PEOPLE.map(function(p){return p.id;})});});}} style={{padding:"4px 12px",background:"#1a4a1a",color:"#4caf50",border:"none",borderRadius:6,cursor:"pointer",fontSize:12}}>Tutti</button>
@@ -963,209 +922,7 @@ function AddBookingForm({ defaultEvent, onSave }) {
   );
 }
 
-// ── HotelRoomAssigner ─────────────────────────────────────
-function HotelRoomAssigner({ onSave, onClose, defaultEvent }) {
-  var [tab, setTab] = useState("excel"); // "excel" | "manual"
-  var [hotel, setHotel] = useState("");
-  var [address, setAddress] = useState("");
-  var [booking, setBooking] = useState("");
-  var [checkin, setCheckin] = useState("");
-  var [checkout, setCheckout] = useState("");
-  var [nights, setNights] = useState("");
-  var [selEvent, setSelEvent] = useState(defaultEvent||"");
-  var [rooms, setRooms] = useState([{id:1, type:"Matrimoniale", people:[]}]);
-  var [nextId, setNextId] = useState(2);
-  var [xlsError, setXlsError] = useState("");
-  var [xlsLoaded, setXlsLoaded] = useState(false);
-
-  async function handleExcel(file) {
-    if (!file) return;
-    setXlsError(""); setXlsLoaded(false);
-    try {
-      var XLSX = await import("xlsx");
-      var data = await file.arrayBuffer();
-      var wb = XLSX.read(data, {type:"array"});
-      var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:""});
-      // Find header row (skip instruction rows)
-      var headerIdx = rows.findIndex(function(r){ return String(r[0]).trim()==="Evento"; });
-      if (headerIdx === -1) throw new Error("Formato non riconosciuto. Usa l'Excel generato dalla chat.");
-      var dataRows = rows.slice(headerIdx+1).filter(function(r){ return r[1]||r[3]; });
-      if (dataRows.length === 0) throw new Error("Nessuna riga trovata nel file.");
-
-      // Extract hotel info from first row
-      var first = dataRows[0];
-      setSelEvent(first[0]||defaultEvent||"");
-      setHotel(first[4]||"");
-      setAddress(first[5]||"");
-      setCheckin(first[6]||"");
-      setCheckout(first[7]||"");
-      setNights(String(first[8]||""));
-      setBooking(String(first[9]||""));
-
-      // Group rows by camera type — each unique camera type becomes a room
-      var roomMap = {};
-      var roomOrder = [];
-      dataRows.forEach(function(r) {
-        var camType = String(r[3]||"Camera");
-        if (!roomMap[camType]) { roomMap[camType] = {type:camType, people:[]}; roomOrder.push(camType); }
-      });
-      var newRooms = roomOrder.map(function(t, i){ return {id:i+1, type:t, people:[]}; });
-      setRooms(newRooms);
-      setNextId(newRooms.length+1);
-      setXlsLoaded(true);
-    } catch(e) { setXlsError("Errore: "+(e.message||"Riprova")); }
-  }
-
-  function addRoom() {
-    setRooms(function(r){ return r.concat([{id:nextId, type:"Camera", people:[]}]); });
-    setNextId(function(n){ return n+1; });
-  }
-  function removeRoom(id) {
-    setRooms(function(r){ return r.filter(function(x){ return x.id!==id; }); });
-  }
-  function togglePerson(roomId, pid) {
-    setRooms(function(rs){ return rs.map(function(r){
-      if (r.id !== roomId) return r;
-      var has = r.people.includes(pid);
-      return Object.assign({}, r, {people: has ? r.people.filter(function(p){return p!==pid;}) : r.people.concat([pid])});
-    });});
-  }
-  function updateRoom(id, key, val) {
-    setRooms(function(rs){ return rs.map(function(r){ return r.id===id ? Object.assign({},r,{[key]:val}) : r; }); });
-  }
-  function handleSave() {
-    if (!hotel || !selEvent) { alert("Inserisci nome hotel ed evento"); return; }
-    var bookings = [];
-    rooms.forEach(function(room) {
-      room.people.forEach(function(pid) {
-        bookings.push({ type:"hotel", event:selEvent, person:pid, hotel:hotel, address:address,
-          booking:booking, room:room.type, nights:nights, checkin:checkin, checkout:checkout, status:"confermata" });
-      });
-    });
-    if (bookings.length === 0) { alert("Assegna almeno una persona a una camera"); return; }
-    onSave(bookings); onClose();
-  }
-
-  var allAssigned = rooms.reduce(function(acc,r){ return acc.concat(r.people); }, []);
-  var inp = {width:"100%",padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:6,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
-  var totalAssigned = rooms.reduce(function(n,r){return n+r.people.length;},0);
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3000,overflowY:"auto",padding:"20px 16px"}}>
-      <div style={{maxWidth:560,margin:"0 auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div style={{fontSize:16,fontWeight:800,color:"#4caf50"}}>🏨 Assegna Camere Hotel</div>
-          <button onClick={onClose} style={{background:"#3a1a1a",color:"#ff6060",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontWeight:700}}>✕</button>
-        </div>
-
-        {/* Tabs */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:14}}>
-          {[{id:"excel",label:"📊 Da Excel",color:"#4caf50"},{id:"manual",label:"✏️ Manuale",color:"#4a9eff"}].map(function(t){
-            var sel = tab===t.id;
-            return <button key={t.id} onClick={function(){setTab(t.id);}}
-              style={{padding:"10px",borderRadius:8,border:"2px solid "+(sel?t.color:"#1e3a8a22"),background:sel?t.color+"22":"#0d0d1a",
-                color:sel?t.color:"#7090c0",fontWeight:sel?800:400,fontSize:13,cursor:"pointer"}}>
-              {t.label}
-            </button>;
-          })}
-        </div>
-
-        {/* Excel tab */}
-        {tab==="excel" && (
-          <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #4caf5033"}}>
-            <div style={{fontSize:12,color:"#7090c0",marginBottom:10}}>
-              Carica l'Excel generato dalla chat di Claude — le camere vengono create automaticamente.
-            </div>
-            <label style={{display:"block",background:"#0d1a2a",border:"2px dashed "+(xlsLoaded?"#4caf50":"#1e3a8a"),borderRadius:8,padding:"14px",textAlign:"center",cursor:"pointer"}}>
-              <input type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={function(e){handleExcel(e.target.files[0]); e.target.value="";}}/>
-              {xlsLoaded
-                ? <span style={{fontSize:12,color:"#4caf50",fontWeight:700}}>✅ Excel caricato — {rooms.length} camere trovate</span>
-                : <span style={{fontSize:12,color:"#4a9eff"}}>📊 Tocca per caricare il file Excel</span>
-              }
-            </label>
-            {xlsError && <div style={{marginTop:8,fontSize:11,color:"#ff6060"}}>{xlsError}</div>}
-          </div>
-        )}
-
-        {/* Dati hotel — sempre visibili */}
-        <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #1e3a8a33"}}>
-          <div style={{fontSize:11,fontWeight:700,color:"#4a9eff",marginBottom:10}}>📋 Dati Hotel</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-            <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Evento</label>
-              <select value={selEvent} onChange={function(e){setSelEvent(e.target.value);}} style={Object.assign({},inp,{fontSize:12})}>
-                <option value="">-- Seleziona --</option>
-                {EVENTS.map(function(ev){ return React.createElement("option",{key:ev.id,value:ev.id},ev.label); })}
-              </select>
-            </div>
-            <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>N° Conferma</label>
-              <input value={booking} onChange={function(e){setBooking(e.target.value);}} placeholder="6370734724" style={Object.assign({},inp,{fontSize:12})}/>
-            </div>
-          </div>
-          <div style={{marginBottom:8}}>
-            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Nome Hotel</label>
-            <input value={hotel} onChange={function(e){setHotel(e.target.value);}} placeholder="es. Hotel Lido" style={inp}/>
-          </div>
-          <div style={{marginBottom:8}}>
-            <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Indirizzo (per Google Maps)</label>
-            <input value={address} onChange={function(e){setAddress(e.target.value);}} placeholder="es. Rua do Alentejo 12, Estoril" style={inp}/>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            {[["checkin","Check-in","11 Giu",checkin,setCheckin],["checkout","Check-out","14 Giu",checkout,setCheckout],["nights","Notti","3",nights,setNights]].map(function(f){
-              return <div key={f[0]}>
-                <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>{f[1]}</label>
-                <input value={f[3]} onChange={function(e){f[4](e.target.value);}} placeholder={f[2]} style={Object.assign({},inp,{fontSize:12})}/>
-              </div>;
-            })}
-          </div>
-        </div>
-
-        {/* Camere */}
-        {rooms.map(function(room, ri){
-          return (
-            <div key={room.id} style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:10,border:"1px solid #4caf5033"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:6,padding:"2px 10px",fontSize:11,fontWeight:700,flexShrink:0}}>Camera {ri+1}</span>
-                <input value={room.type} onChange={function(e){updateRoom(room.id,"type",e.target.value);}}
-                  placeholder="Tipo camera" style={{flex:1,padding:"5px 8px",background:"#0d0d1a",border:"1px solid #1e3a8a33",borderRadius:5,color:"#e8e8f0",fontSize:11,outline:"none"}}/>
-                {rooms.length > 1 && <button onClick={function(){removeRoom(room.id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>✕</button>}
-              </div>
-              <div style={{fontSize:10,color:"#7090c0",marginBottom:6}}>Seleziona persone:</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
-                {PEOPLE.map(function(p){
-                  var sel = room.people.includes(p.id);
-                  var inOther = !sel && allAssigned.includes(p.id);
-                  return (
-                    <div key={p.id} onClick={function(){if(!inOther) togglePerson(room.id, p.id);}}
-                      style={{padding:"5px 8px",borderRadius:6,border:"1px solid "+(sel?"#4caf50":inOther?"#333":"#1e3a8a22"),
-                        background:sel?"#1a4a1a":inOther?"#111":"#0d0d1a",
-                        cursor:inOther?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:5,opacity:inOther?0.4:1}}>
-                      <div style={{width:20,height:20,borderRadius:"50%",background:sel?"#4caf50":"#1a1a2a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff",flexShrink:0}}>{p.name.charAt(0)}</div>
-                      <div style={{fontSize:10,fontWeight:sel?700:400,color:sel?"#4caf50":"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name.split(" ")[0]}</div>
-                      {sel && <span style={{marginLeft:"auto",fontSize:10,color:"#4caf50"}}>✓</span>}
-                    </div>
-                  );
-                })}
-              </div>
-              {room.people.length > 0 && <div style={{marginTop:6,fontSize:10,color:"#4caf50"}}>{room.people.length} {room.people.length===1?"persona":"persone"} assegnate</div>}
-            </div>
-          );
-        })}
-
-        <button onClick={addRoom} style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4caf50",border:"1px dashed #4caf5044",borderRadius:8,cursor:"pointer",fontSize:12,marginBottom:12}}>
-          ➕ Aggiungi Camera
-        </button>
-
-        <button onClick={handleSave} style={{width:"100%",padding:"13px",background:totalAssigned>0?"#1a4a1a":"#1a1a2a",color:totalAssigned>0?"#4caf50":"#444",border:"2px solid "+(totalAssigned>0?"#4caf5044":"transparent"),borderRadius:8,cursor:totalAssigned>0?"pointer":"not-allowed",fontSize:14,fontWeight:700}}>
-          💾 Salva {totalAssigned>0?"("+totalAssigned+" prenotazioni)":""}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function AddBookingModal({ defaultEvent, onSave, onClose }) {
+function AddBookingModal({ defaultEvent, onSave, onClose, existingBookings }) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,overflowY:"auto",padding:"20px 16px"}}>
       <div style={{maxWidth:560,margin:"0 auto"}}>
@@ -1173,7 +930,7 @@ function AddBookingModal({ defaultEvent, onSave, onClose }) {
           <div style={{fontSize:18,fontWeight:800,color:"#4caf50"}}>➕ Nuova Prenotazione</div>
           <button onClick={onClose} style={{background:"#3a1a1a",color:"#ff6060",border:"none",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>✕ Chiudi</button>
         </div>
-        <AddBookingForm defaultEvent={defaultEvent} onSave={function(bs){onSave(bs);onClose();}}/>
+        <AddBookingForm defaultEvent={defaultEvent} existingBookings={existingBookings} onSave={function(bs){onSave(bs);onClose();}}/>
       </div>
     </div>
   );
@@ -1237,8 +994,7 @@ function ExtraPersonSelector({ preview, setPreview, selEvent }) {
 }
 
 // ── Excel Import ──────────────────────────────────────────
-function ExcelImport({ onImport, onClose, people }) {
-  var memberList = (people && people.length > 0) ? people : (typeof PEOPLE !== "undefined" ? PEOPLE : []);
+function ExcelImport({ onImport, onClose }) {
   var [file, setFile] = useState(null);
   var [loading, setLoading] = useState(false);
   var [preview, setPreview] = useState(null);
@@ -1275,36 +1031,24 @@ function ExcelImport({ onImport, onClose, people }) {
         ? {type:"document", source:{type:"base64", media_type:"application/pdf", data:b64}}
         : {type:"image", source:{type:"base64", media_type:(file.type&&file.type.startsWith("image/")?file.type:"image/jpeg"), data:b64}};
 
-      var prompt;
-      var bookingType = file.name.toLowerCase().includes("hotel") || file.name.toLowerCase().includes("booking") ? "hotel"
-        : file.name.toLowerCase().includes("park") || file.name.toLowerCase().includes("parcheggio") ? "parcheggio"
-        : file.name.toLowerCase().includes("car") || file.name.toLowerCase().includes("noleggio") || file.name.toLowerCase().includes("goldcar") ? "noleggio"
-        : "volo";
+      var prompt = "Analizza questa conferma di prenotazione volo (Ryanair, Wizz, EasyJet, Vueling, TAP, Iberia). " +
+        "Estrai TUTTI i passeggeri. " +
+        "Rispondi SOLO con array JSON valido senza markdown. " +
+        "Formato: [{person:COGNOME NOME, flight:FR1234, company:Ryanair, dep:BGY 11:55, arr:BCN 13:35, date:19 Apr, dir:andata, baggage:1 mano, booking:ABC123}] " +
+        "Per person usa COGNOME NOME maiuscolo. " +
+        "Per dep e arr usa CODICE HH:MM. " +
+        "Per dir: andata o ritorno. " +
+        "Un oggetto per ogni passeggero anche se stesso volo.";
 
-      if (bookingType === "volo") {
-        prompt = "Analizza questa conferma di prenotazione volo (Ryanair, Wizz, EasyJet, Vueling, TAP, Iberia). " +
-          "Estrai TUTTI i passeggeri. " +
-          "Rispondi SOLO con array JSON valido senza markdown, senza testo prima o dopo. " +
-          "Formato: [{person:\"COGNOME NOME\", flight:\"FR1234\", company:\"Ryanair\", dep:\"BGY 11:55\", arr:\"BCN 13:35\", date:\"19 Apr\", dir:\"andata\", baggage:\"1 mano\", booking:\"ABC123\"}] " +
-          "Per person usa COGNOME NOME maiuscolo. Per dep e arr usa CODICE HH:MM. Per dir: andata o ritorno. Un oggetto per ogni passeggero.";
-      } else if (bookingType === "hotel") {
-        prompt = "Analizza questa conferma di prenotazione hotel (Booking.com o simili). " +
-          "Rispondi SOLO con array JSON valido senza markdown, senza testo prima o dopo. " +
-          "Formato: [{hotel:\"Nome Hotel\", address:\"Indirizzo completo\", booking:\"numero conferma\", checkin:\"11 Giu\", checkout:\"14 Giu\", nights:\"3\", room:\"tipo camera\"}] " +
-          "Un oggetto per ogni camera. Se ci sono più camere dello stesso tipo creane uno per ognuna.";
-      } else if (bookingType === "noleggio") {
-        prompt = "Analizza questa conferma di noleggio auto. " +
-          "Rispondi SOLO con un array JSON valido senza markdown, senza testo prima o dopo. " +
-          "Formato: [{company:\"Goldcar\", pickup:\"Aeroporto Barcellona\", dropoff:\"Aeroporto Barcellona\", pickupDate:\"19 Apr\", dropoffDate:\"23 Apr\", car:\"Opel Corsa o simile\", booking:\"ABC123\", driver:\"COGNOME NOME\"}]";
-      } else {
-        prompt = "Analizza questa conferma di parcheggio. " +
-          "Rispondi SOLO con un array JSON valido senza markdown, senza testo prima o dopo. " +
-          "Formato: [{company:\"nome parcheggio\", location:\"indirizzo\", entry:\"19 Apr 06:00\", exit:\"23 Apr 14:00\", plate:\"targa\", booking:\"numero conferma\", price:\"totale\"}]";
-      }
-
-      var resp = await fetch("/api/claude", {
+      var apiKey = (typeof process !== "undefined" && process.env && process.env.REACT_APP_ANTHROPIC_KEY)
+        || window._ak || "";
+      var resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01"
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 2000,
@@ -1361,55 +1105,22 @@ function ExcelImport({ onImport, onClose, people }) {
       var allBookings = [];
       wb.SheetNames.forEach(function(sheetName) {
         var rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:""});
-        // Find header row anywhere in the sheet (skip instruction banner rows)
-        var headerIdx = rows.findIndex(function(r){ return String(r[0]).trim()==="Evento"; });
-        if (headerIdx === -1) return;
-        var headerRow = rows[headerIdx].map(function(h){ return String(h||"").trim(); });
-        // Map column name -> index, so layout can vary (volo vs hotel vs auto vs parcheggio)
-        var colIdx = {};
-        headerRow.forEach(function(h, i){ colIdx[h] = i; });
-        function col(name, fallback) {
-          return colIdx.hasOwnProperty(name) ? colIdx[name] : fallback;
-        }
-        rows.slice(headerIdx+1).forEach(function(row) {
-          if (!row[0] && !row[1]) return;
-          // Stop at "TOTALE" summary rows
-          if (String(row[0]||"").toUpperCase().indexOf("TOTALE")===0) return;
-          var type = String(row[col("Tipo",2)]||"").trim() || "volo";
-          var priceRaw = col("Prezzo (€)",-1) >= 0 ? row[col("Prezzo (€)",-1)] : "";
-          function safeCol(name, fallback) {
-            var idx = col(name, fallback);
-            if (idx < 0 || idx >= row.length) return "";
-            return String(row[idx]||"").trim();
-          }
-          var rawEvent = String(row[0]||"").trim();
-          // Use selEvent if the Excel value doesn't match any known EVENTS id
-          var resolvedEvent = EVENTS.find(function(e){return e.id===rawEvent;}) ? rawEvent : selEvent;
-          allBookings.push({
-            event:   resolvedEvent || rawEvent,
-            person:  String(row[1]||"").trim(),
-            type:    type,
-            dir:     safeCol("Dir.",3) || "andata",
-            flight:  safeCol("Volo",4),
-            company: safeCol("Compagnia",5),
-            dep:     safeCol("Partenza",6),
-            arr:     safeCol("Arrivo",7),
-            date:    safeCol("Data",8),
-            baggage: safeCol("Bagaglio",9),
-            hotel:   safeCol("Hotel",-1),
-            address: safeCol("Indirizzo",-1),
-            room:    safeCol("Camera",-1),
-            nights:  safeCol("Notti",-1),
-            checkin: safeCol("Check-in",-1),
-            checkout:safeCol("Check-out",-1),
-            car:     safeCol("Auto",-1) || safeCol("Parcheggio",-1),
-            booking: safeCol("N° Pren.",10),
-            price:   priceRaw !== "" && priceRaw !== undefined ? String(priceRaw) : "",
-            notes:   safeCol("Note",11),
-            status:  safeCol("Stato",12) || "confermata",
-            _matched: true,
+        // Check if it's our standard import format (has "Evento" header)
+        if (rows.length > 0 && String(rows[0][0]).trim() === "Evento") {
+          rows.slice(1).forEach(function(row) {
+            if (!row[0] && !row[1]) return;
+            allBookings.push({
+              event: row[0]||selEvent, person: row[1]||"",
+              type: row[2]||"volo", dir: row[3]||"andata",
+              flight: row[4]||"", company: row[5]||"",
+              dep: row[6]||"", arr: row[7]||"",
+              date: row[8]||"", baggage: row[9]||"",
+              booking: row[10]||"", notes: row[11]||"",
+              status: row[12]||"confermata",
+              _matched: true,
+            });
           });
-        });
+        }
       });
       if (allBookings.length === 0) setError("Nessuna prenotazione trovata. Usa il formato standard dei file di importazione.");
       else setPreview(allBookings);
@@ -1566,115 +1277,57 @@ function ExcelImport({ onImport, onClose, people }) {
             <div style={{fontSize:14,fontWeight:800,color:"#4caf50",marginBottom:12}}>
               ✅ Trovate {preview.length} prenotazioni
             </div>
-            <div style={{maxHeight:400,overflowY:"auto",marginBottom:16}}>
-              {(function(){
-                // For hotel bookings, group by room name and show camera header
-                var isHotel = preview.length > 0 && preview[0].type === "hotel";
-                if (isHotel) {
-                  // Build groups: {roomName, bookingNum, rows:[{b, originalIdx}]}
-                  var groups = [];
-                  preview.forEach(function(b, i) {
-                    var key = (b.room||"Camera") + "|" + (b.booking||"");
-                    var g = groups.find(function(g){ return g.key===key; });
-                    if (!g) { g={key:key, room:b.room||"Camera", booking:b.booking, hotel:b.hotel, rows:[]}; groups.push(g); }
-                    g.rows.push({b:b, idx:i});
-                  });
-                  return groups.map(function(g, gi) {
-                    var tc = "#4caf50";
-                    var roomColor = ["#4caf50","#4a9eff","#ff9800","#9c27b0","#ff4444"][gi % 5];
-                    return (
-                      <div key={g.key} style={{marginBottom:12,border:"1px solid "+roomColor+"44",borderRadius:10,overflow:"hidden"}}>
-                        {/* Camera header */}
-                        <div style={{background:roomColor+"22",padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <div>
-                            <span style={{fontSize:13,fontWeight:800,color:roomColor}}>🏨 {g.room}</span>
-                            <span style={{fontSize:10,color:"#7090c0",marginLeft:8}}>{g.hotel}</span>
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            {g.booking && <span style={{fontSize:10,color:"#ff9800",fontFamily:"monospace"}}>#{g.booking}</span>}
-                            <span style={{fontSize:10,color:roomColor,fontWeight:700,background:roomColor+"22",borderRadius:4,padding:"2px 6px"}}>
-                              {g.rows.length} {g.rows.length===1?"persona":"persone"}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Person rows */}
-                        {g.rows.map(function(item, ri) {
-                          var b = item.b; var i = item.idx;
-                          return (
-                            <div key={ri} style={{background:"#0d0d1a",borderBottom:ri<g.rows.length-1?"1px solid #1e3a8a22":"none",padding:"8px 12px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                              <span style={{fontSize:11,color:"#7090c0",minWidth:24}}>#{ri+1}</span>
-                              <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
-                                style={{flex:1,minWidth:140,padding:"5px 8px",background:"#12121f",border:"1px solid "+((!b.person)?"#ff444488":"#1e3a8a44"),borderRadius:6,color:(!b.person)?"#ff6060":"#e8e8f0",fontSize:12,fontWeight:700,outline:"none"}}>
-                                <option value="">⚠️ Scegli persona</option>
-                                {memberList.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
-                              </select>
-                              <div style={{display:"flex",gap:4,marginLeft:"auto"}}>
-                                <label title="Allega PDF" style={{cursor:"pointer",padding:"3px 7px",background:"#1e3a8a22",color:b.attachment?"#4caf50":"#4a9eff",borderRadius:5,fontSize:11}}>
-                                  <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){attachFile(i,e.target.files[0]);e.target.value="";}}/>
-                                  {b.attachment?"📎✓":"📎"}
-                                </label>
-                                <button onClick={function(){removePreviewItem(i);}} title="Rimuovi" style={{padding:"3px 7px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,cursor:"pointer",fontSize:11}}>✕</button>
-                              </div>
-                            </div>
-                          );
-                        })}
+            <div style={{maxHeight:300,overflowY:"auto",marginBottom:16}}>
+              {preview.map(function(b,i){
+                var person = PEOPLE.find(function(p){return p.id===b.person;});
+                var tc = b.type==="volo"?"#4a9eff":b.type==="hotel"?"#4caf50":"#ff9800";
+                return (
+                  <div key={i} style={{background:"#0d0d1a",borderRadius:8,marginBottom:6,border:"1px solid #ffffff11",borderLeft:"3px solid "+(b._matched===false?"#ff6060":tc)}}>
+                    {/* Row summary */}
+                    <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontSize:14}}>{b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗"}</span>
+                      {/* Person selector */}
+                      <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
+                        style={{padding:"2px 6px",background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:5,color:b._matched===false?"#ff6060":"#e8e8f0",fontSize:11,fontWeight:700,maxWidth:110,outline:"none"}}>
+                        <option value="">-- Persona --</option>
+                        {PEOPLE.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
+                      </select>
+                      {b.flight&&<span style={{color:tc,fontSize:11}}>{b.flight}</span>}
+                      {b.dep&&<span style={{color:"#7090c0",fontSize:10}}>{b.dep}{b.arr&&"→"+b.arr}</span>}
+                      {b.date&&<span style={{color:"#7090c0",fontSize:10}}>{b.date}</span>}
+                      {b.booking&&<span style={{color:"#ff9800",fontSize:10,fontFamily:"monospace"}}>#{b.booking}</span>}
+                      <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+                        {/* Attach file */}
+                        <label title="Allega PDF/immagine" style={{cursor:"pointer",padding:"3px 7px",background:"#1e3a8a22",color:b.attachment?"#4caf50":"#4a9eff",borderRadius:5,fontSize:11}}>
+                          <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){attachFile(i,e.target.files[0]);e.target.value="";}}/>
+                          {b.attachment?"📎✓":"📎"}
+                        </label>
+                        {/* Delete row */}
+                        <button onClick={function(){removePreviewItem(i);}} title="Rimuovi" style={{padding:"3px 7px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,cursor:"pointer",fontSize:11}}>✕</button>
                       </div>
-                    );
-                  });
-                }
-                // For volo/auto/parcheggio: flat list as before
-                return preview.map(function(b,i){
-                  var tc = b.type==="volo"?"#4a9eff":b.type==="hotel"?"#4caf50":"#ff9800";
-                  return (
-                    <div key={i} style={{background:"#0d0d1a",borderRadius:8,marginBottom:6,border:"1px solid #ffffff11",borderLeft:"3px solid "+((!b.person)?"#ff4444":tc)}}>
-                      <div style={{display:"flex",gap:8,padding:"8px 10px",fontSize:12,alignItems:"center",flexWrap:"wrap"}}>
-                        <span style={{fontSize:14}}>{b.type==="volo"?"✈":b.type==="hotel"?"🏨":"🚗"}</span>
-                        <select value={b.person||""} onChange={function(e){updatePreviewItem(i,"person",e.target.value);updatePreviewItem(i,"_matched",true);}}
-                          style={{padding:"2px 6px",background:"#12121f",border:"1px solid "+((!b.person)?"#ff444488":"#1e3a8a44"),borderRadius:5,color:(!b.person)?"#ff6060":"#e8e8f0",fontSize:11,fontWeight:700,maxWidth:130,outline:"none"}}>
-                          <option value="">⚠️ Scegli persona</option>
-                          {memberList.map(function(p){return React.createElement("option",{key:p.id,value:p.id},p.name);})}
-                        </select>
-                        {b.flight&&<span style={{color:tc,fontSize:11}}>{b.flight}</span>}
-                        {b.dep&&<span style={{color:"#7090c0",fontSize:10}}>{b.dep}{b.arr&&" → "+b.arr}</span>}
-                        {b.date&&<span style={{color:"#7090c0",fontSize:10}}>{b.date}</span>}
-                        {b.booking&&<span style={{color:"#ff9800",fontSize:10,fontFamily:"monospace"}}>#{b.booking}</span>}
-                        <div style={{marginLeft:"auto",display:"flex",gap:4}}>
-                          <label title="Allega PDF/immagine" style={{cursor:"pointer",padding:"3px 7px",background:"#1e3a8a22",color:b.attachment?"#4caf50":"#4a9eff",borderRadius:5,fontSize:11}}>
-                            <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){attachFile(i,e.target.files[0]);e.target.value="";}}/>
-                            {b.attachment?"📎✓":"📎"}
-                          </label>
-                          <button onClick={function(){removePreviewItem(i);}} title="Rimuovi" style={{padding:"3px 7px",background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:5,cursor:"pointer",fontSize:11}}>✕</button>
-                        </div>
-                      </div>
-                      {b.attachment&&(
-                        <div style={{padding:"4px 10px 8px",fontSize:10,color:"#4caf50",display:"flex",alignItems:"center",gap:6}}>
-                          📎 {b.attachment.name} ({b.attachment.size}MB)
-                          <button onClick={function(){updatePreviewItem(i,"attachment",null);}} style={{background:"none",border:"none",color:"#ff6060",cursor:"pointer",fontSize:10}}>✕</button>
-                        </div>
-                      )}
                     </div>
-                  );
-                });
-              })()}
+                    {b.attachment&&(
+                      <div style={{padding:"4px 10px 8px",fontSize:10,color:"#4caf50",display:"flex",alignItems:"center",gap:6}}>
+                        📎 {b.attachment.name} ({b.attachment.size}MB)
+                        <button onClick={function(){updatePreviewItem(i,"attachment",null);}} style={{background:"none",border:"none",color:"#ff6060",cursor:"pointer",fontSize:10}}>✕</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <button onClick={function(){setPreview(function(p){return p.concat([{event:selEvent,person:"",type:"volo",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",notes:"",status:"confermata",_matched:false}]);});}}
               style={{width:"100%",padding:"8px",background:"#0d1a2a",color:"#4a9eff",border:"1px dashed #1e3a8a",borderRadius:6,cursor:"pointer",fontSize:12,marginBottom:8,fontWeight:700}}>
               ➕ Aggiungi riga manualmente
             </button>
-            {preview.some(function(b){return !b.person;}) && (
-              <div style={{background:"#3a1a00",border:"1px solid #ff440033",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#ff6060"}}>
-                ⚠️ Assegna una persona a ogni riga prima di importare.
-              </div>
-            )}
-            {preview.some(function(b){return b._matched===false && b.person;}) && (
+            {preview.some(function(b){return b._matched===false;}) && (
               <div style={{background:"#2a1a00",border:"1px solid #ff980033",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#ff9800"}}>
                 ⚠️ Alcune persone non sono state riconosciute automaticamente. Puoi importare comunque e correggere manualmente.
               </div>
             )}
             <div style={{display:"flex",gap:10}}>
               <button onClick={function(){setPreview(null);}} style={{flex:1,padding:11,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>← Rianalizza</button>
-              <button onClick={confirmImport} disabled={preview.some(function(b){return !b.person;})}
-                style={{flex:2,padding:11,background:preview.some(function(b){return !b.person;})?"#1a2a1a":"#14532d",color:preview.some(function(b){return !b.person;})?"#4a6a4a":"#4caf50",border:"none",borderRadius:8,cursor:preview.some(function(b){return !b.person;})?"not-allowed":"pointer",fontWeight:700,fontSize:14}}>
+              <button onClick={confirmImport} style={{flex:2,padding:11,background:"#14532d",color:"#4caf50",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
                 💾 Importa {preview.length} prenotazioni
               </button>
             </div>
@@ -1896,20 +1549,6 @@ export default function App() {
   var [toast, setToast] = useState(null);
   var [fbLoaded, setFbLoaded] = useState(false);
   var [personEventFilter, setPersonEventFilter] = useState(null);
-  var [docViewer, setDocViewer] = useState(null); // {fileData, fileName}
-  var [hotelModal, setHotelModal] = useState(null); // null | eventId
-  var [viewAll, setViewAll] = useState(false);
-  var [showTeamSummary, setShowTeamSummary] = useState(true);
-  var [showEventTable, setShowEventTable] = useState(null);
-  var [showMasterImport, setShowMasterImport] = useState(false); // open by default
-  var [bookingDetail, setBookingDetail] = useState(null);
-
-  // Register global doc opener for iOS-compatible inline viewer
-  useEffect(function(){
-    window.__showDoc = function(fileData, fileName) { setDocViewer({fileData:fileData, fileName:fileName}); };
-    window.__showBookingDetail = function(b) { setBookingDetail(b); };
-    return function(){ window.__showDoc = null; window.__showBookingDetail = null; };
-  }, []);
 
   // Firebase sync
   useEffect(function() {
@@ -1976,15 +1615,10 @@ export default function App() {
   }
 
   function deleteBooking(b) {
-    // Delete all bookings with same booking number AND same event+type (linked bookings)
-    var toDelete = bookings.filter(function(x){
-      if (b.booking && x.booking && b.booking !== "-" && x.booking === b.booking && x.event === b.event && x.type === b.type) return true;
-      return x === b;
-    });
-    toDelete.forEach(function(x){ if (x._id) fbDel("bookings", x._id); });
-    setBookings(function(prev){return prev.filter(function(x){ return !toDelete.includes(x); });});
+    if (b._id) fbDel("bookings", b._id);
+    setBookings(function(prev){return prev.filter(function(x){return x!==b;});});
     setConfirmDelete(null);
-    showToast("Eliminate " + toDelete.length + " prenotazioni ✓");
+    showToast("Prenotazione eliminata");
   }
 
   var handleEdit = useCallback(function(b){setEditIdx(bookings.indexOf(b));setEditB(b);}, [bookings]);
@@ -2035,15 +1669,6 @@ export default function App() {
     if(!selEvent) return [];
     var b=bookings.filter(function(b){return b.event===selEvent;});
     if(filterType!=="all") b=b.filter(function(b){return b.type===filterType;});
-    // Sort: andata first, then ritorno; within each group by date/time
-    b.sort(function(a,b2){
-      if(a.type==="volo" && b2.type==="volo"){
-        var dirA = (a.dir||"").toLowerCase().includes("ritorno") ? 1 : 0;
-        var dirB = (b2.dir||"").toLowerCase().includes("ritorno") ? 1 : 0;
-        return dirA - dirB;
-      }
-      return 0;
-    });
     return b;
   },[selEvent,filterType,bookings]);
   var filteredPeople = useMemo(function(){
@@ -2072,7 +1697,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",costsOnly:true},{k:"bookingsdb",l:"🔑",adminOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -2085,114 +1710,64 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e8e8f0",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
-      {showMasterImport && <MasterImportModal onClose={function(){setShowMasterImport(false);}} onDone={function(imported){setBookings(imported); setShowMasterImport(false); showToast("Import completato: "+imported.length+" prenotazioni ✓");}}/>}
-      {showEventTable && <EventTableModal eventId={showEventTable} bookings={bookings} people={people} onClose={function(){setShowEventTable(null);}}/>}
-      {bookingDetail && <BookingDetailModal b={bookingDetail} allBookings={bookings} people={people} onClose={function(){setBookingDetail(null);}}
-        onEdit={isAdmin?handleEdit:null}
-        onDelete={isAdmin?function(b){setConfirmDelete(b);}:null}
-      />}
-      {hotelModal !== null && <HotelRoomAssigner
-        defaultEvent={hotelModal||undefined}
-        onSave={function(bs){ bs.forEach(function(b){ fbAdd("bookings",b).then(function(ref){ if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}); }); showToast("Salvate "+bs.length+" prenotazioni hotel ✓"); }}
-        onClose={function(){setHotelModal(null);}}
-      />}
-      {docViewer && <DocViewer fileData={docViewer.fileData} fileName={docViewer.fileName} onClose={function(){setDocViewer(null);}}/>}
       {editB && <EditModal booking={editB} onSave={handleSave} onClose={function(){setEditB(null); setEditIdx(null);}} onDelete={function(){setConfirmDelete(editB);setEditB(null);}}
         onDuplicate={function(b, peopleIds) {
-          peopleIds.forEach(function(pid) {
+          var candidates = peopleIds.map(function(pid) {
             var nb = Object.assign({}, b, {person: pid});
             delete nb._id;
+            return nb;
+          });
+          var res = dedupeBookings(bookings, candidates);
+          res.toAdd.forEach(function(nb) {
             fbAdd("bookings", nb).then(function(ref){
               if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},nb)]);});
             }).catch(function(e){console.error(e);});
           });
-          showToast("Duplicato per "+peopleIds.length+" "+(peopleIds.length===1?"persona":"persone")+" ✓");
+          var msg = res.toAdd.length>0 ? ("Duplicato per "+res.toAdd.length+" "+(res.toAdd.length===1?"persona":"persone")+" ✓") : "Nessuna prenotazione duplicata";
+          if (res.skipped.length) msg += " — "+res.skipped.length+" già presenti (stesso codice), saltate";
+          showToast(msg);
           setEditB(null); setEditIdx(null);
         }}
       />}
       {pdfPreview && <PDFPreview data={pdfPreview.data} name={pdfPreview.name} onClose={function(){setPdfPreview(null);}}/>}
       {showExcelImport && <ExcelImport
-        people={people}
-        onImport={function(importedBs) {
-          var saved = 0; var failed = 0;
-          importedBs.forEach(function(b) {
-            // Remove any undefined/empty fields that would cause Firestore to reject
-            var clean = {};
-            Object.keys(b).forEach(function(k){ if(b[k]!==undefined && b[k]!=="") clean[k]=b[k]; });
-            if (!clean.event) clean.event = "";
-            if (!clean.person) clean.person = "";
-            if (!clean.type) clean.type = "volo";
-            if (!clean.status) clean.status = "confermata";
-            fbAdd("bookings", clean).then(function(ref) {
-              if(ref) {
-                saved++;
-                setBookings(function(p){return p.concat([Object.assign({_id:ref.id},clean)]);});
-                if (clean.price && parseFloat(clean.price) > 0) {
-                  var cat = clean.type==="volo"?"Voli":clean.type==="hotel"?"Hotel":clean.type==="auto"?"Auto/Noleggio":"Parcheggio";
-                  fbAdd("eventCosts", {
-                    event: clean.event,
-                    category: cat,
-                    amount: parseFloat(clean.price),
-                    notes: (clean.flight||clean.hotel||clean.car||"") + (clean.person?" — "+clean.person:""),
-                    date: new Date().toISOString().substring(0,10),
-                    manual: false,
-                  });
-                }
-              } else {
-                failed++;
-                console.error("fbAdd returned null for booking:", clean);
-              }
-            }).catch(function(e){
-              failed++;
-              console.error("fbAdd error:", e, clean);
-            });
+        onImport={function(newBookings) {
+          var res = dedupeBookings(bookings, newBookings);
+          res.toAdd.forEach(function(b) {
+            fbAdd("bookings", b).then(function(ref) {
+              if(ref) setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});
+            }).catch(function(e){console.error(e);});
           });
-          showToast("Importazione avviata: " + importedBs.length + " prenotazioni ✓");
+          var msg = "Importate " + res.toAdd.length + " prenotazioni ✓";
+          if (res.skipped.length) msg += " — " + res.skipped.length + " già esistenti (stesso codice), saltate";
+          showToast(msg);
         }}
         onClose={function(){setShowExcelImport(false);}}
       />}
-      {addModal!==null && <AddBookingModal defaultEvent={addModal||undefined}
-        onSave={function(bs){bs.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat(bs);});});});}}
+      {addModal!==null && <AddBookingModal defaultEvent={addModal||undefined} existingBookings={bookings}
+        onSave={function(bs){
+          var res = dedupeBookings(bookings, bs);
+          res.toAdd.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat([b]);});});});
+          if (res.skipped.length) showToast(res.skipped.length===1 ? "1 prenotazione già presente (stesso codice), saltata" : res.skipped.length+" prenotazioni già presenti (stesso codice), saltate");
+        }}
         onClose={function(){setAddModal(null);}}/>}
-      {confirmDelete && (function(){
-        var linked = bookings.filter(function(x){
-          if (confirmDelete.booking && x.booking && confirmDelete.booking !== "-" && x.booking === confirmDelete.booking && x.event === confirmDelete.event && x.type === confirmDelete.type) return true;
-          return x === confirmDelete;
-        });
-        function deleteOne() {
-          if (confirmDelete._id) fbDel("bookings", confirmDelete._id);
-          setBookings(function(prev){return prev.filter(function(x){ return x!==confirmDelete; });});
-          setConfirmDelete(null);
-          showToast("Prenotazione eliminata ✓");
-        }
-        return (
+      {confirmDelete && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"#1a0a0a",borderRadius:14,padding:28,maxWidth:380,width:"100%",border:"2px solid #ff4444",textAlign:"center"}}>
             <div style={{fontSize:32,marginBottom:12}}>🗑️</div>
             <div style={{fontWeight:800,fontSize:16,marginBottom:8,color:"#ff6060"}}>Elimina prenotazione?</div>
-            <div style={{fontSize:13,color:"#b0b0c0",marginBottom:8}}>
+            <div style={{fontSize:13,color:"#b0b0c0",marginBottom:20}}>
               {confirmDelete.type==="volo"&&(confirmDelete.flight+" "+confirmDelete.dep+" → "+confirmDelete.arr)}
-              {confirmDelete.type==="hotel"&&(confirmDelete.hotel+(confirmDelete.room?" — "+confirmDelete.room:""))}
+              {confirmDelete.type==="hotel"&&confirmDelete.hotel}
               {(confirmDelete.type==="auto"||confirmDelete.type==="parcheggio")&&confirmDelete.car}
             </div>
-            {linked.length > 1 && (
-              <div style={{background:"#3a0a0a",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#ff9800"}}>
-                ⚠️ Ci sono <b>{linked.length} prenotazioni</b> con lo stesso N° — vuoi eliminare solo questa o tutte?
-              </div>
-            )}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              <button onClick={function(){setConfirmDelete(null);}} style={{flex:1,padding:11,background:"#0d0d1a",color:"#aaa",border:"1px solid #333",borderRadius:8,cursor:"pointer",minWidth:80}}>Annulla</button>
-              {linked.length > 1 && (
-                <button onClick={deleteOne} style={{flex:1,padding:11,background:"#4a2000",color:"#ff9800",border:"1px solid #ff980044",borderRadius:8,cursor:"pointer",fontWeight:700,minWidth:80}}>Solo questa</button>
-              )}
-              <button onClick={function(){deleteBooking(confirmDelete);}} style={{flex:1,padding:11,background:"#7f1d1d",color:"#ff6060",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,minWidth:80}}>
-                🗑️ {linked.length>1?"Tutte ("+linked.length+")":"Elimina"}
-              </button>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={function(){setConfirmDelete(null);}} style={{flex:1,padding:11,background:"#0d0d1a",color:"#aaa",border:"1px solid #333",borderRadius:8,cursor:"pointer"}}>Annulla</button>
+              <button onClick={function(){deleteBooking(confirmDelete);}} style={{flex:1,padding:11,background:"#7f1d1d",color:"#ff6060",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>🗑️ Elimina</button>
             </div>
           </div>
         </div>
-        );
-      })()}
+      )}
       {confirmDeleteUser && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"#1a0a0a",borderRadius:14,padding:28,maxWidth:360,width:"100%",border:"2px solid #ff4444",textAlign:"center"}}>
@@ -2266,302 +1841,51 @@ export default function App() {
 
       <div style={{maxWidth:1200,margin:"0 auto",padding:"20px 14px"}}>
 
-        {view==="overview" && (function(){
-          var EVENT_START_DATES = {
-            "TEST1_BCN":    new Date(2026,3,19),
-            "TEST2_JEREZ":  new Date(2026,4,3),
-            "R1_BARCELLONA":new Date(2026,4,20),
-            "R2_ESTORIL":   new Date(2026,5,11),
-            "R3_JEREZ":     new Date(2026,6,2),
-            "R4_MAGNY":     new Date(2026,6,23),
-            "TEST3_VALENCIA":new Date(2026,7,17),
-            "R5_VALENCIA":  new Date(2026,8,3),
-            "R6_ARAGON":    new Date(2026,8,24),
-            "R7_MISANO":    new Date(2026,9,15),
-          };
-          function daysTo(evId) {
-            var start = EVENT_START_DATES[evId];
-            if (!start) return null;
-            return Math.ceil((start - TODAY) / (1000*60*60*24));
-          }
-
-          // Parse a booking's arrival date+time (Italian month abbreviations, year 2026)
-          var MONTHS_IT = {Gen:0,Feb:1,Mar:2,Apr:3,Mag:4,Giu:5,Lug:6,Ago:7,Set:8,Ott:9,Nov:10,Dic:11};
-          function parseArrDateTime(b) {
-            if (!b.date || !b.arr) return null;
-            var parts = b.date.trim().split(/\s+/);
-            var day, monthAbbr;
-            for (var i=0;i<parts.length;i++){
-              if (/^\d{1,2}$/.test(parts[i])) { day = parseInt(parts[i],10); monthAbbr = parts[i+1]; break; }
-            }
-            if (day===undefined || !monthAbbr) return null;
-            var month = MONTHS_IT[monthAbbr.substring(0,3)];
-            if (month===undefined) return null;
-            var tm = b.arr.match(/(\d{1,2}):(\d{2})\s*$/);
-            if (!tm) return null;
-            return new Date(2026, month, day, parseInt(tm[1],10), parseInt(tm[2],10));
-          }
-
-          // Determine which event is "current": last event whose start date has passed
-          var startedEvents = EVENTS.filter(function(ev){ var d=daysTo(ev.id); return d!==null && d<=0; });
-          var currentEv = startedEvents.length ? startedEvents[startedEvents.length-1] : null;
-          var futureEv = EVENTS.find(function(ev){ var d=daysTo(ev.id); return d!==null && d>0; });
-
-          var nextEv;
-          var eventInProgress = false;
-          if (currentEv) {
-            // Hard fallback: if current event started more than 7 days ago, it's definitely over
-            var daysSinceStart = currentEv ? -(daysTo(currentEv.id)) : 0;
-            if (daysSinceStart > 7) {
-              nextEv = futureEv || currentEv;
-            } else {
-              var returnFlights = bookings.filter(function(b){
-              return b.event===currentEv.id && b.type==="volo" && (b.dir||"").toLowerCase().indexOf("ritorno")!==-1;
-            });
-            if (returnFlights.length > 0) {
-              var allLanded = returnFlights.every(function(b){
-                var dt = parseArrDateTime(b);
-                if (!dt) return true; // can't parse = assume landed
-                return TODAY > dt;
-              });
-              if (!allLanded) { nextEv = currentEv; eventInProgress = true; }
-              else { nextEv = futureEv || currentEv; }
-            } else {
-              // No return flight data: keep current event for its duration, then move on
-              nextEv = (daysTo(currentEv.id)===0) ? currentEv : (futureEv || currentEv);
-              if (nextEv===currentEv) eventInProgress = true;
-            }
-            } // end daysSinceStart check
-          } else {
-            nextEv = futureEv;
-          }
-          var nextDays = nextEv ? daysTo(nextEv.id) : null;
-
-          // My bookings for next event
-          var myNextBs = nextEv && currentUser ? bookings.filter(function(b){
-            return b.event === nextEv.id && b.person === currentUser.id;
-          }).sort(function(a,b2){
-            if(a.type==="volo" && b2.type==="volo"){
-              return ((a.dir||"").includes("ritorno")?1:0) - ((b2.dir||"").includes("ritorno")?1:0);
-            }
-            return 0;
-          }) : [];
-
-          // Expiry warning
-          var expiringDocs = people.filter(function(p){
-            if (!p.docExpiry || p.docExpiry === "NaT") return false;
-            var parts = p.docExpiry.split("/");
-            if (parts.length !== 3) return false;
-            var d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
-            var diff = Math.ceil((d - TODAY) / (1000*60*60*24));
-            return diff >= 0 && diff <= 90;
-          });
-
-          var CITY_WEATHER = {
-            "Barcellona":"Barcelona","Estoril":"Estoril","Jerez":"Jerez de la Frontera",
-            "Magny-Cours":"Magny-Cours","Valencia":"Valencia","Aragon":"Alcañiz","Misano":"Misano Adriatico",
-          };
-
-          // Circuit SVG paths (simplified outlines)
-          function getCircuitSVG(circuit) { return null; }
-
-          return (
+        {view==="overview" && (
           <div>
-            {/* Logo header */}
-            <div style={{textAlign:"center",marginBottom:16,paddingTop:4}}>
-              <div style={{fontSize:11,color:"#7090c0",letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>FIM Junior GP 2026</div>
-              <div style={{fontSize:18,fontWeight:900,color:"#fff",letterSpacing:1}}>TEAM ECHOVIT PASINI RACING</div>
-            </div>
-
-            {/* Banner scadenze */}
-            {expiringDocs.length > 0 && (
-              <div style={{background:"#1a0a00",border:"2px solid #ff980066",borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start"}}>
-                <div style={{fontSize:20,flexShrink:0}}>⚠️</div>
-                <div>
-                  <div style={{fontSize:12,fontWeight:800,color:"#ff9800",marginBottom:6}}>Documenti in scadenza entro 90 giorni</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {expiringDocs.map(function(p){
-                      var parts = p.docExpiry.split("/");
-                      var d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
-                      var diff = Math.ceil((d - TODAY) / (1000*60*60*24));
-                      var color = diff <= 30 ? "#ff4444" : "#ff9800";
-                      return (
-                        <span key={p.id} onClick={function(){setView("person");setSelPerson(p.id);}}
-                          style={{background:color+"22",color:color,borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,cursor:"pointer",border:"1px solid "+color+"44"}}>
-                          {p.name.split(" ")[0]} — {p.docExpiry} ({diff}gg)
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Banner prenotazioni mancanti per il prossimo evento (solo admin) */}
-            {(isAdmin || (currentUser && (currentUser.canSeeCosts || currentUser.id==="ILARIO"))) && nextEv && !eventInProgress && (function(){
-              var CHECK_CATS = [
-                {key:"volo", full:"Volo"},
-                {key:"hotel", full:"Hotel"},
-              ];
-              var nextEvPeopleIds = bookings.filter(function(b){return b.event===nextEv.id;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;});
-              var nextEvPeople = people.filter(function(p){return nextEvPeopleIds.includes(p.id);});
-              var missingPeople = nextEvPeople.filter(function(p){
-                return CHECK_CATS.some(function(c){
-                  return !bookings.some(function(b){return b.event===nextEv.id && b.person===p.id && b.type===c.key && b.status!=="cancellata";});
-                });
-              });
-              if (nextEvPeople.length===0 || missingPeople.length===0) return null;
-              return (
-                <div onClick={function(){setView("checklist");}}
-                  style={{background:"#1a0a00",border:"2px solid #ff444466",borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start",cursor:"pointer"}}>
-                  <div style={{fontSize:20,flexShrink:0}}>📋</div>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:800,color:"#ff6060",marginBottom:6}}>Prenotazioni incomplete — {nextEv.label}</div>
-                    <div style={{fontSize:11,color:"#c08080",marginBottom:6}}>{missingPeople.length} {missingPeople.length===1?"persona":"persone"} con volo/hotel mancante. Tocca per la checklist completa →</div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                      {missingPeople.slice(0,8).map(function(p){
-                        return <span key={p.id} style={{background:"#ff444422",color:"#ff6060",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,border:"1px solid #ff444444"}}>{p.name.split(" ")[0]}</span>;
-                      })}
-                      {missingPeople.length>8 && <span style={{color:"#c08080",fontSize:11}}>+{missingPeople.length-8} altri</span>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Prossimo evento HERO */}
-            {nextEv && (function(){
-              var circuitSVG = getCircuitSVG(nextEv.circuit);
-              return (
-              <div onClick={function(){setView("event");setSelEvent(nextEv.id);}}
-                style={{background:"linear-gradient(135deg,#0d1b4b,#1e3a8a22)",border:"2px solid #1e3a8a",borderRadius:16,padding:"20px 18px",marginBottom:16,cursor:"pointer",position:"relative",overflow:"hidden",minHeight:140}}>
-                {/* Circuit SVG background */}
-                {circuitSVG && (
-                  <div style={{position:"absolute",top:"50%",right:8,transform:"translateY(-50%)",width:140,height:110,opacity:0.35,pointerEvents:"none"}}
-                    dangerouslySetInnerHTML={{__html:circuitSVG}}/>
-                )}
-                <div style={{position:"relative",zIndex:1}}>
-                  <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>🏁 {eventInProgress?"Evento in corso":"Prossimo Evento"}</div>
-                  <div style={{fontSize:22,fontWeight:900,color:"#fff",marginBottom:4}}>{nextEv.label}</div>
-                  <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>📍 {nextEv.circuit} · 📅 {nextEv.dates}</div>
-                  <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                    <div style={{background: eventInProgress?"#4caf5022":nextDays<=7?"#ff444422":nextDays<=30?"#ff980022":"#4a9eff22",
-                      border:"1px solid "+(eventInProgress?"#4caf50":nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff")+"44",
-                      borderRadius:10,padding:"8px 16px",textAlign:"center"}}>
-                      <div style={{fontSize:eventInProgress?18:28,fontWeight:900,color:eventInProgress?"#4caf50":nextDays<=7?"#ff4444":nextDays<=30?"#ff9800":"#4a9eff",lineHeight:1}}>{eventInProgress?"IN CORSO":nextDays===0?"OGGI":nextDays===1?"1":nextDays}</div>
-                      <div style={{fontSize:10,color:"#7090c0"}}>{eventInProgress?"✈️ rientro in corso":nextDays===0?"":nextDays===1?"giorno":"giorni"}</div>
-                    </div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>👥 {pCount(nextEv.id)} persone</span>
-                      <span style={{background:"#1e3a8a33",color:"#4a9eff",borderRadius:6,padding:"4px 10px",fontSize:11}}>✈️ {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="volo";}).length} voli</span>
-                      <span style={{background:"#14532d33",color:"#4caf50",borderRadius:6,padding:"4px 10px",fontSize:11}}>🏨 {bookings.filter(function(b){return b.event===nextEv.id&&b.type==="hotel";}).length} hotel</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              );
-            })()}
-
-            {/* Le mie prenotazioni per il prossimo evento */}
-            {nextEv && currentUser && (
-              <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:16,border:"1px solid #4caf5033"}}>
-                <div style={{fontSize:12,fontWeight:800,color:"#4caf50",marginBottom:10}}>🎒 Le mie prenotazioni — {nextEv.label}</div>
-
-                {/* 1. Documenti */}
-                <EventDocuments eventId={nextEv.id} isAdmin={isAdmin}/>
-
-                {/* 2. QR Pasti */}
-                <PersonMealQR personId={currentUser.id} eventId={nextEv.id}/>
-                <TeamMealQR eventId={nextEv.id} isAdmin={false}/>
-
-                {/* 3-7. Prenotazioni ordinate: parcheggio, volo andata, auto, hotel, ritorno */}
-                {(function(){
-                  var order = ["parcheggio","volo_andata","auto","hotel","volo_ritorno"];
-                  var sorted = order.map(function(key){
-                    if (key==="volo_andata") return myNextBs.filter(function(b){return b.type==="volo"&&b.dir!=="ritorno";});
-                    if (key==="volo_ritorno") return myNextBs.filter(function(b){return b.type==="volo"&&b.dir==="ritorno";});
-                    return myNextBs.filter(function(b){return b.type===key;});
-                  });
-                  var all = [].concat.apply([], sorted);
-                  if (all.length === 0) return <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessuna prenotazione per questo evento</div>;
-                  return all.map(function(b,i){ return <BookingCard key={i} b={b} compact/>; });
-                })()}
-              </div>
-            )}
-
-            {/* Stats row */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
-              {[
-                {label:"Persone",value:people.length,color:"#4a9eff",icon:"👥",view:"person"},
-                {label:"Eventi",value:EVENTS.length,color:"#4caf50",icon:"🏁",view:"event"},
-                {label:"Voli",value:bookings.filter(function(b){return b.type==="volo";}).length,color:"#ff9800",icon:"✈️",view:null},
-                {label:"Hotel",value:bookings.filter(function(b){return b.type==="hotel";}).length,color:"#9c27b0",icon:"🏨",view:null},
-              ].map(function(s){
-                return <div key={s.label} onClick={s.view?function(){setView(s.view);}:null}
-                  style={{background:"#12121f",borderRadius:10,padding:"12px 8px",border:"1px solid "+s.color+"33",textAlign:"center",cursor:s.view?"pointer":"default"}}>
-                  <div style={{fontSize:18}}>{s.icon}</div>
-                  <div style={{fontSize:22,fontWeight:800,color:s.color}}>{s.value}</div>
-                  <div style={{fontSize:10,color:"#7090c0",marginTop:1}}>{s.label}</div>
-                </div>;
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:28}}>
+              {[{label:"Persone",value:people.length,color:"#4a9eff",icon:"👥"},{label:"Eventi",value:EVENTS.length,color:"#4caf50",icon:"🏁"},{label:"Voli",value:bookings.filter(function(b){return b.type==="volo";}).length,color:"#ff9800",icon:"✈"},{label:"Hotel",value:bookings.filter(function(b){return b.type==="hotel";}).length,color:"#9c27b0",icon:"🏨"}].map(function(s){
+                return <div key={s.label} style={{background:"#12121f",borderRadius:10,padding:16,border:"1px solid "+s.color+"33",textAlign:"center"}}><div style={{fontSize:22}}>{s.icon}</div><div style={{fontSize:26,fontWeight:800,color:s.color}}>{s.value}</div><div style={{fontSize:11,color:"#7090c0",marginTop:2}}>{s.label}</div></div>;
               })}
             </div>
-
-            {/* Calendario + Staff */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <div style={{background:"#12121f",borderRadius:12,padding:14,border:"1px solid #1e3a8a33"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#4a9eff"}}>📅 Calendario</div>
-                  <button onClick={function(){setShowPast(function(v){return !v;});}} style={{fontSize:9,padding:"2px 6px",background:showPast?"#1e3a8a":"#1a2a1a",color:showPast?"#4a9eff":"#4caf50",border:"none",borderRadius:4,cursor:"pointer"}}>
-                    {showPast?"↑ Passa":"↓ Tutti"}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              <div style={{background:"#12121f",borderRadius:12,padding:18,border:"1px solid #1e3a8a33"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#4a9eff"}}>📅 Calendario</div>
+                  <button onClick={function(){setShowPast(function(v){return !v;});}} style={{fontSize:10,padding:"3px 8px",background:showPast?"#1e3a8a":"#1a2a1a",color:showPast?"#4a9eff":"#4caf50",border:"none",borderRadius:4,cursor:"pointer"}}>
+                    {showPast?"Nascondi passati":"Mostra tutti"}
                   </button>
                 </div>
-                {ACTIVE_EVENTS.map(function(ev){
-                  var days = daysTo(ev.id);
-                  var isPast = days !== null && days < 0;
-                  var isNext = nextEv && ev.id === nextEv.id;
-                  var countdownColor = isPast?"#555":days<=7?"#ff4444":days<=30?"#ff9800":"#4caf50";
-                  var countdownLabel = isPast?"✓":days===0?"OGGI!":days===1?"domani":days+"gg";
-                  return(
+                {ACTIVE_EVENTS.map(function(ev){return(
                   <div key={ev.id} onClick={function(){setView("event");setSelEvent(ev.id);}}
-                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 9px",borderRadius:7,marginBottom:4,
-                      background:isNext?"#1e3a8a22":"#0d0d1a",cursor:"pointer",
-                      border:"1px solid "+(isNext?"#1e3a8a55":"#ffffff11"),opacity:isPast?0.5:1}}
-                    onMouseEnter={function(e){e.currentTarget.style.background="#1e3a8a22";}}
-                    onMouseLeave={function(e){e.currentTarget.style.background=isNext?"#1e3a8a22":"#0d0d1a";}}>
-                    <div style={{overflow:"hidden"}}>
-                      <div style={{fontWeight:700,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ev.label}</div>
-                      <div style={{fontSize:9,color:"#7090c0"}}>{ev.dates}</div>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                      {days !== null && <span style={{background:countdownColor+"22",color:countdownColor,borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700}}>{countdownLabel}</span>}
-                      <span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700}}>{pCount(ev.id)}p</span>
+                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 11px",borderRadius:8,marginBottom:5,background:"#0d0d1a",cursor:"pointer",border:"1px solid #ffffff11"}}
+                    onMouseEnter={function(e){e.currentTarget.style.background="#1e3a8a22";}} onMouseLeave={function(e){e.currentTarget.style.background="#0d0d1a";}}>
+                    <div><span style={{fontWeight:700,fontSize:12}}>{ev.label}</span><span style={{marginLeft:6,fontSize:10,color:"#7090c0"}}>{ev.circuit}</span></div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:10,color:"#7090c0"}}>{ev.dates}</span>
+                      <span style={{background:"#1e3a8a",color:"#4a9eff",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}}>{pCount(ev.id)}p</span>
                     </div>
                   </div>
                 );})}
               </div>
-
-              <div style={{background:"#12121f",borderRadius:12,padding:14,border:"1px solid #1e3a8a33"}}>
-                <div style={{fontSize:12,fontWeight:700,marginBottom:12,color:"#4caf50"}}>👥 Staff</div>
-                {people.slice(0,10).map(function(p){return(
+              <div style={{background:"#12121f",borderRadius:12,padding:18,border:"1px solid #1e3a8a33"}}>
+                <div style={{fontSize:13,fontWeight:700,marginBottom:14,color:"#4caf50"}}>👥 Staff & Piloti</div>
+                {people.slice(0,11).map(function(p){return(
                   <div key={p.id} onClick={function(){setView("person");setSelPerson(p.id);}}
-                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px",borderRadius:6,marginBottom:3,background:"#0d0d1a",cursor:"pointer",border:"1px solid #ffffff11"}}
-                    onMouseEnter={function(e){e.currentTarget.style.background="#1a4a1a33";}}
-                    onMouseLeave={function(e){e.currentTarget.style.background="#0d0d1a";}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <div style={{width:22,height:22,borderRadius:"50%",background:"#1e3a8a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#4a9eff",flexShrink:0}}>{p.name.charAt(0)}</div>
-                      <span style={{fontWeight:600,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:70}}>{p.name.split(" ")[0]}</span>
+                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 11px",borderRadius:8,marginBottom:4,background:"#0d0d1a",cursor:"pointer",border:"1px solid #ffffff11"}}
+                    onMouseEnter={function(e){e.currentTarget.style.background="#1a4a1a33";}} onMouseLeave={function(e){e.currentTarget.style.background="#0d0d1a";}}>
+                    <span style={{fontWeight:700,fontSize:12}}>{p.name}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{fontSize:10,color:"#7090c0"}}>{p.role}</span>
+                      <span style={{background:"#1a4a1a",color:"#4caf50",borderRadius:4,padding:"1px 5px",fontSize:10,fontWeight:700}}>{evCount(p.id)}ev</span>
                     </div>
-                    <span style={{background:"#1a4a1a",color:"#4caf50",borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700}}>{evCount(p.id)}ev</span>
                   </div>
                 );})}
-                <div style={{textAlign:"center",marginTop:6}}>
-                  <button onClick={function(){setView("person");}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:10}}>Tutti →</button>
-                </div>
+                <div style={{textAlign:"center",marginTop:8}}><button onClick={function(){setView("person");}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"5px 14px",borderRadius:6,cursor:"pointer",fontSize:11}}>Vedi tutti →</button></div>
               </div>
             </div>
           </div>
-          );
-        })()}
+        )}
 
         {view==="person" && !selPerson && (
           <div>
@@ -2678,33 +2002,14 @@ export default function App() {
         {view==="event" && selEvent && (function(){
           var ev=EVENTS.find(function(e){return e.id===selEvent;});
           var types=["all","volo","hotel","auto","parcheggio"];
-          var canViewAll = currentUser && (currentUser.id==="LUCA" || currentUser.id==="ILARIO" || isAdmin);
-          var showingAll = canViewAll && viewAll;
-          // Filter bookings: if viewAll → everyone, else → only current user
-          var visibleBs = showingAll ? eventBs : eventBs.filter(function(b){ return currentUser && b.person===currentUser.id; });
           var people2=[];
-          visibleBs.forEach(function(b){if(!people2.includes(b.person)) people2.push(b.person);});
+          eventBs.forEach(function(b){if(!people2.includes(b.person)) people2.push(b.person);});
           var evNK="event_"+selEvent;
           return(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
                 <button onClick={function(){setSelEvent(null);}} style={{background:"none",border:"1px solid #1e3a8a",color:"#4a9eff",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>← Eventi</button>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  {canViewAll && (
-                    <button onClick={function(){setViewAll(function(v){return !v;});}}
-                      style={{background:showingAll?"#1e3a8a":"#12121f",color:showingAll?"#4a9eff":"#7090c0",border:"1px solid "+(showingAll?"#1e3a8a":"#333"),padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>
-                      {showingAll?"👁️ Tutti":"👤 Solo io"}
-                    </button>
-                  )}
-                  {showingAll && canViewAll && (
-                    <button onClick={function(){setShowEventTable(selEvent);}}
-                      style={{background:"#1a1a2a",color:"#ff9800",border:"1px solid #ff980044",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>
-                      📊 Tabella
-                    </button>
-                  )}
-                  {isAdmin && <button onClick={function(){setHotelModal(selEvent);}} style={{background:"#0d2a1a",color:"#4caf50",border:"1px solid #4caf5033",padding:"8px 12px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>🏨 Camere</button>}
-                  {isAdmin && <button onClick={function(){setAddModal(selEvent);}} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"8px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>➕ Aggiungi</button>}
-                </div>
+                {isAdmin && <button onClick={function(){setAddModal(selEvent);}} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"8px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>➕ Aggiungi</button>}
               </div>
               <div style={{background:"#12121f",borderRadius:12,padding:20,marginBottom:14,border:"1px solid #1e3a8a",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
                 <div>
@@ -2715,39 +2020,28 @@ export default function App() {
                   {types.map(function(t){return <button key={t} onClick={function(){setFilterType(t);}} style={{padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:filterType===t?"#1e3a8a":"#0d0d1a",color:filterType===t?"#fff":"#7090c0"}}>{t==="all"?"Tutti":t==="volo"?"✈":t==="hotel"?"🏨":t==="auto"?"🚗":"🅿️"}</button>;})}
                 </div>
               </div>
-              {isAdmin && showingAll && <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #f0c04033"}}>
+              {isAdmin && <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #f0c04033"}}>
                 <div style={{fontSize:11,color:"#c0a060",fontWeight:700,marginBottom:5}}>📋 Note generali evento</div>
                 <textarea value={eventNotes[evNK]||""} onChange={function(e){setNote(evNK,e.target.value);}} placeholder="Note logistiche..." style={{width:"100%",background:"#0d0d1a",border:"1px solid #f0c04022",borderRadius:6,color:"#e8c87a",fontSize:12,resize:"vertical",minHeight:48,padding:"7px 9px",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
               </div>}
-              {showingAll && <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>}
-              {isAdmin && showingAll && <div style={{marginBottom:12}}><TeamMealQR eventId={selEvent} isAdmin={isAdmin}/></div>}
-              {isAdmin && showingAll && <div style={{marginBottom:12}}><MealQRUploader eventId={selEvent}/></div>}
+              <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
+              {isAdmin && <div style={{marginBottom:12}}><MealQRUploader eventId={selEvent}/></div>}
               {filterType==="all" ? people2.map(function(pid){
                 var person2=people.find(function(p){return p.id===pid;});
-                var pBs=visibleBs.filter(function(b){return b.person===pid;});
+                var pBs=eventBs.filter(function(b){return b.person===pid;});
                 var nk=pid+"_"+selEvent;
                 return(
                   <div key={pid} style={{background:"#0d0d1a",borderRadius:10,padding:14,marginBottom:10,border:"1px solid #ffffff11"}}>
-                    {showingAll && <div style={{fontWeight:800,fontSize:13,marginBottom:8,color:"#4a9eff",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                    <div style={{fontWeight:800,fontSize:13,marginBottom:8,color:"#4a9eff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <span>{person2?person2.name:pid} <span style={{fontWeight:400,color:"#7090c0",fontSize:11}}>{person2?person2.role:""}</span></span>
-                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        <CompletenessBadge personId={pid} eventId={selEvent} bookings={bookings}/>
-                        <button onClick={function(){setPdfPreview({data:buildPDFData(pid,bookings,eventNotes),name:person2?person2.name:pid});}} style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",padding:"2px 8px",borderRadius:4,cursor:"pointer",fontSize:11}}>📄</button>
-                      </div>
-                    </div>}
-                    {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
-                    {showingAll && eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
+                      <button onClick={function(){setPdfPreview({data:buildPDFData(pid,bookings,eventNotes),name:person2?person2.name:pid});}} style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",padding:"2px 8px",borderRadius:4,cursor:"pointer",fontSize:11}}>📄</button>
+                    </div>
+                    {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
+                    {eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
                     <PersonMealQR personId={pid} eventId={selEvent}/>
-                {!showingAll && <TeamMealQR eventId={selEvent} isAdmin={false}/>}
-                    <PersonalReceipts personId={pid} eventId={selEvent} canEdit={isAdmin || (currentUser && currentUser.id===pid)}/>
                   </div>
                 );
-              }) : visibleBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson={showingAll} onEdit={isAdmin&&showingAll?handleEdit:null} onDelete={isAdmin&&showingAll?function(x){setConfirmDelete(x);}:null}/>;} )}
-              {people2.length===0 && (
-                <div style={{textAlign:"center",padding:"40px 20px",color:"#7090c0",fontSize:13}}>
-                  Nessuna prenotazione per questo evento
-                </div>
-              )}
+              }) : eventBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
             </div>
           );
         })()}
@@ -2760,7 +2054,12 @@ export default function App() {
               📥 Importa da PDF (AI) o Excel
             </button>
             <div style={{maxWidth:560}}>
-              <AddBookingForm onSave={function(bs){bs.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat(bs);});});});setView("overview");}}/>
+              <AddBookingForm existingBookings={bookings} onSave={function(bs){
+                var res = dedupeBookings(bookings, bs);
+                res.toAdd.forEach(function(b){fbAdd("bookings",b).then(function(ref){if(ref)setBookings(function(p){return p.concat([Object.assign({_id:ref.id},b)]);});}).catch(function(){setBookings(function(p){return p.concat([b]);});});});
+                if (res.skipped.length) showToast(res.skipped.length===1 ? "1 prenotazione già presente (stesso codice), saltata" : res.skipped.length+" prenotazioni già presenti (stesso codice), saltate");
+                setView("overview");
+              }}/>
             </div>
           </div>
         )}
@@ -2769,24 +2068,8 @@ export default function App() {
           <CostsDashboard bookings={bookings} people={people}/>
         )}
 
-        {view==="checklist" && (isAdmin || (currentUser && (currentUser.canSeeCosts || currentUser.id==="ILARIO"))) && (
-          <ChecklistDashboard bookings={bookings} people={people} setView={setView} setSelEvent={setSelEvent} setViewAll={function(){setViewAll(true);}}/>
-        )}
-
-        {view==="bookingsdb" && isAdmin && (
-          <BookingsDashboard bookings={bookings} setBookings={setBookings} people={people}/>
-        )}
-
         {view==="export" && isAdmin && (
-          <div>
-            <ExportView bookings={bookings} people={people} eventNotes={eventNotes}/>
-            <div style={{padding:"0 16px 24px"}}>
-              <button onClick={function(){setShowMasterImport(true);}}
-                style={{width:"100%",padding:16,background:"#1a0a2a",color:"#ce93d8",border:"2px solid #9c27b044",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:15}}>
-                🗂️ Import Master Excel (sostituisce tutto)
-              </button>
-            </div>
-          </div>
+          <ExportView bookings={bookings} people={people} eventNotes={eventNotes}/>
         )}
 
         {view==="flights" && isAdmin && (
@@ -2795,10 +2078,6 @@ export default function App() {
 
         {view==="team" && isAdmin && (
           <TeamManager people={people} setPeople={setPeople} setConfirmDeleteUser={setConfirmDeleteUser} showToast={showToast}/>
-        )}
-
-        {view==="pdf2xls" && isAdmin && (
-          <PDF2Excel />
         )}
 
         {view==="gallery" && (
@@ -2810,7 +2089,8 @@ export default function App() {
   );
 }
 
-
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
 
 // ── EventDocuments ────────────────────────────────────────
 function EventDocuments({ eventId, isAdmin }) {
@@ -2857,7 +2137,10 @@ function EventDocuments({ eventId, isAdmin }) {
   }
 
   function download(doc) {
-    openDoc(doc.data, doc.name);
+    var a = document.createElement("a");
+    a.href = doc.data;
+    a.download = doc.name;
+    a.click();
   }
 
   async function deleteDoc(id) {
@@ -2885,7 +2168,7 @@ function EventDocuments({ eventId, isAdmin }) {
                 <div style={{fontSize:12,fontWeight:700,color:"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
                 <div style={{fontSize:10,color:"#7090c0"}}>{doc.size} MB · {doc.uploadedAt?doc.uploadedAt.substring(0,10):""}</div>
               </div>
-              <button onClick={function(){ openDoc(doc.data, doc.name); }} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>👁️ Apri</button>
+              <button onClick={function(){download(doc);}} style={{background:"#1e3a8a",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:700,flexShrink:0}}>⬇ Scarica</button>
               {isAdmin&&<button onClick={function(){if(window.confirm("Eliminare "+doc.name+"?")) deleteDoc(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11,flexShrink:0}}>🗑️</button>}
             </div>
           );})}
@@ -2905,244 +2188,6 @@ function EventDocuments({ eventId, isAdmin }) {
   );
 }
 
-
-// ── PersonMealQR ───────────────────────────────────────────
-// ── CompletenessBadge ──────────────────────────────────────
-// Small ✅/⚠️ indicator showing whether a person has volo+hotel+QR pasti for this event.
-function CompletenessBadge({ personId, eventId, bookings }) {
-  var [hasMealQR, setHasMealQR] = useState(null); // null = loading
-  useEffect(function(){
-    var unsub = db.collection("mealQR").where("event","==",eventId).where("personId","==",personId).onSnapshot(function(snap){
-      setHasMealQR(snap.docs.length > 0);
-    }, function(e){console.error(e); setHasMealQR(false);});
-    return function(){unsub();};
-  },[personId,eventId]);
-
-  if (hasMealQR === null) return null;
-
-  var hasVolo = bookings.some(function(b){return b.event===eventId && b.person===personId && b.type==="volo" && b.status!=="cancellata";});
-  var hasHotel = bookings.some(function(b){return b.event===eventId && b.person===personId && b.type==="hotel" && b.status!=="cancellata";});
-  var missing = [];
-  if (!hasVolo) missing.push("Volo");
-  if (!hasHotel) missing.push("Hotel");
-  if (!hasMealQR) missing.push("QR Pasti");
-
-  if (missing.length === 0) {
-    return <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>✅</span>;
-  }
-  return (
-    <span title={"Manca: "+missing.join(", ")} style={{background:"#ff980022",color:"#ff9800",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>
-      ⚠️ {missing.join(", ")}
-    </span>
-  );
-}
-
-function PersonMealQR({ personId, eventId }) {
-  var [qrs, setQrs] = useState([]);
-  var [checkins, setCheckins] = useState({}); // "day_mealType" -> bool
-  var [expanded, setExpanded] = useState(false);
-  var MEAL_TYPES = [
-    {key:"breakfast", label:"☕", full:"Colazione", color:"#ff9800"},
-    {key:"lunch",     label:"🍽️", full:"Pranzo",    color:"#4caf50"},
-    {key:"dinner",    label:"🌙", full:"Cena",       color:"#4a9eff"},
-  ];
-
-  // Build list of days for this event from EVENTS dates string, e.g. "11-14 Giu"
-  var ev = EVENTS.find(function(e){return e.id===eventId;});
-  var eventDays = useMemo(function(){
-    if (!ev || !ev.dates) return [];
-    var m = ev.dates.match(/(\d+)-(\d+)\s+(\w+)/);
-    if (!m) return [];
-    var startDay=parseInt(m[1],10), endDay=parseInt(m[2],10), monthAbbr=m[3];
-    var days=[];
-    for (var d=startDay; d<=endDay; d++) days.push(d+" "+monthAbbr);
-    return days;
-  },[ev]);
-
-  var checkinId = personId+"_"+eventId;
-  useEffect(function(){
-    var unsub = db.collection("mealQR")
-      .where("event","==",eventId)
-      .where("personId","==",personId)
-      .onSnapshot(function(snap){
-        setQrs(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
-      }, function(e){console.error(e);});
-    var unsub2 = db.collection("mealCheckins").doc(checkinId).onSnapshot(function(doc){
-      setCheckins(doc.exists ? (doc.data().meals||{}) : {});
-    }, function(e){console.error(e);});
-    return function(){unsub(); unsub2();};
-  },[personId,eventId]);
-
-  function toggleMeal(dayKey, mealKey) {
-    var k = dayKey+"_"+mealKey;
-    var updated = Object.assign({}, checkins, {[k]: !checkins[k]});
-    setCheckins(updated);
-    db.collection("mealCheckins").doc(checkinId).set({
-      event: eventId, personId: personId, meals: updated,
-    }, {merge:true});
-  }
-
-  if (qrs.length === 0) return null;
-  function openQR(doc) {
-    openDoc(doc.fileData, doc.fileName || "qr-pasto.pdf");
-  }
-  var hasSingle = qrs.length === 1;
-  var doneCount = Object.keys(checkins).filter(function(k){return checkins[k];}).length;
-  var totalCount = eventDays.length * MEAL_TYPES.length;
-
-  return (
-    <div style={{marginTop:10}}>
-      {hasSingle ? (
-        <button onClick={function(){openQR(qrs[0]);}}
-          style={{width:"100%",padding:"10px",borderRadius:8,border:"2px solid #4caf5044",background:"#1a4a1a",color:"#4caf50",cursor:"pointer",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:6}}>
-          🍽️ QR Code Pasti — Tocca per aprire
-        </button>
-      ) : (
-        <div style={{display:"flex",gap:6,marginBottom:6}}>
-          {MEAL_TYPES.map(function(mt){
-            var doc = qrs.find(function(q){return q.mealType===mt.key;});
-            if (!doc) return null;
-            return (
-              <button key={mt.key} onClick={function(){openQR(doc);}}
-                style={{flex:1,padding:"8px 6px",borderRadius:6,border:"1px solid "+mt.color+"44",background:mt.color+"11",color:mt.color,cursor:"pointer",fontSize:11,fontWeight:700}}>
-                {mt.label} {mt.full}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {eventDays.length > 0 && (
-        <div>
-          <button onClick={function(){setExpanded(function(v){return !v;});}}
-            style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a22",borderRadius:6,cursor:"pointer",fontSize:11,color:"#7090c0",fontWeight:700}}>
-            <span>✅ Check-in pasti ({doneCount}/{totalCount})</span>
-            <span>{expanded?"▲":"▼"}</span>
-          </button>
-          {expanded && (
-            <div style={{marginTop:6,border:"1px solid #1e3a8a22",borderRadius:8,overflow:"hidden"}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",background:"#1e3a8a22"}}>
-                <div style={{padding:"6px 4px",fontSize:9,color:"#7090c0",fontWeight:700}}></div>
-                {MEAL_TYPES.map(function(mt){
-                  return <div key={mt.key} style={{padding:"6px 2px",fontSize:9,color:mt.color,fontWeight:700,textAlign:"center"}}>{mt.label}</div>;
-                })}
-              </div>
-              {eventDays.map(function(day,di){
-                return (
-                  <div key={day} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",background:di%2===0?"#0d0d1a":"transparent",borderTop:"1px solid #1e3a8a11"}}>
-                    <div style={{padding:"7px 6px",fontSize:10,color:"#e8e8f0",fontWeight:700}}>{day}</div>
-                    {MEAL_TYPES.map(function(mt){
-                      var done = !!checkins[day+"_"+mt.key];
-                      return (
-                        <div key={mt.key} style={{padding:"5px 2px",display:"flex",justifyContent:"center"}}>
-                          <button onClick={function(){toggleMeal(day, mt.key);}}
-                            style={{width:26,height:26,borderRadius:6,border:"1px solid "+(done?mt.color:"#333"),
-                              background:done?mt.color+"22":"transparent",color:done?mt.color:"#444",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {done?"✓":""}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── PersonalReceipts ───────────────────────────────────────
-// Personal expense receipts per person per event. Visible to the person themselves + Luca/Ilario.
-function PersonalReceipts({ personId, eventId, canEdit }) {
-  var [items, setItems] = useState([]);
-  var [uploading, setUploading] = useState(false);
-  var [form, setForm] = useState({name:"",amount:""});
-
-  useEffect(function(){
-    var unsub = db.collection("personalReceipts")
-      .where("event","==",eventId)
-      .where("personId","==",personId)
-      .onSnapshot(function(snap){
-        setItems(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
-      }, function(e){console.error(e);});
-    return function(){unsub();};
-  },[personId,eventId]);
-
-  async function upload(file) {
-    if (!file) return;
-    var b64 = await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result);};r.onerror=rej;r.readAsDataURL(file);});
-    await db.collection("personalReceipts").add({
-      event: eventId, personId: personId,
-      name: form.name || file.name,
-      amount: parseFloat(form.amount)||0,
-      fileData: b64,
-      date: new Date().toISOString().substring(0,10),
-    });
-    setUploading(false);
-    setForm({name:"",amount:""});
-  }
-
-  async function removeItem(id) {
-    await db.collection("personalReceipts").doc(id).delete();
-  }
-
-  if (!canEdit && items.length===0) return null;
-
-  var total = items.reduce(function(s,r){return s+(r.amount||0);},0);
-
-  return (
-    <div style={{marginTop:10,background:"#0d0d1a",borderRadius:8,padding:"10px 12px",border:"1px solid #9c27b022"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:items.length>0||uploading?8:0}}>
-        <div style={{fontSize:10,color:"#9c27b0",fontWeight:700,textTransform:"uppercase"}}>
-          🧾 Spese personali {total>0 && <span style={{color:"#4caf50"}}>— €{total.toFixed(2)}</span>}
-        </div>
-        {canEdit && (
-          <button onClick={function(){setUploading(function(v){return !v;});}}
-            style={{background:"#2a0a3a",color:"#9c27b0",border:"1px solid #9c27b033",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
-            {uploading?"✕ Annulla":"➕ Carica"}
-          </button>
-        )}
-      </div>
-      {uploading && (
-        <div style={{background:"#12121f",borderRadius:8,padding:10,marginBottom:8,border:"1px solid #9c27b033"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
-            <input value={form.name} onChange={function(e){setForm(function(f){return Object.assign({},f,{name:e.target.value});});}} placeholder="Descrizione"
-              style={{padding:"6px 8px",background:"#0d0d1a",border:"1px solid #9c27b033",borderRadius:6,color:"#e8e8f0",fontSize:11,outline:"none"}}/>
-            <input type="number" value={form.amount} onChange={function(e){setForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} placeholder="Importo €"
-              style={{padding:"6px 8px",background:"#0d0d1a",border:"1px solid #9c27b033",borderRadius:6,color:"#e8e8f0",fontSize:11,outline:"none"}}/>
-          </div>
-          <label style={{display:"block",background:"#0d0d1a",border:"2px dashed #9c27b044",borderRadius:6,padding:"10px",textAlign:"center",cursor:"pointer"}}>
-            <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={function(e){upload(e.target.files[0]);}}/>
-            <span style={{fontSize:11,color:"#9c27b0"}}>📷 Scatta foto o carica PDF</span>
-          </label>
-        </div>
-      )}
-      {items.length>0 && (
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-          {items.map(function(r){
-            var isImg = r.fileData && r.fileData.startsWith("data:image");
-            return(
-              <div key={r._id} onClick={function(){openDoc(r.fileData, r.name||"scontrino");}}
-                style={{background:"#12121f",borderRadius:8,padding:8,border:"1px solid #9c27b022",cursor:"pointer",position:"relative"}}>
-                {isImg
-                  ? <img src={r.fileData} style={{width:"100%",height:55,objectFit:"cover",borderRadius:4,marginBottom:4}} alt="scontrino"/>
-                  : <div style={{height:55,background:"#1a0a2a",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:4,fontSize:22}}>📄</div>
-                }
-                <div style={{fontSize:10,color:"#e8e8f0",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"Scontrino"}</div>
-                {r.amount>0 && <div style={{fontSize:10,color:"#4caf50",fontWeight:700}}>€{r.amount.toFixed(2)}</div>}
-                {canEdit && <button onClick={function(e){e.stopPropagation();removeItem(r._id);}}
-                  style={{position:"absolute",top:4,right:4,background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:9}}>✕</button>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── MealQRSection ─────────────────────────────────────────
 // Mapping numero file → person ID
@@ -3215,7 +2260,7 @@ function MealQRSection({ personId, person, events, currentUserId }) {
                       <div style={{fontSize:12,fontWeight:700,color:meal.color,marginBottom:6}}>{meal.emoji} {meal.label}</div>
                       {doc ? (
                         <button onClick={function(){
-                            try{openDoc(doc.data, doc.name||"qr-pasto.pdf");}catch(e){}
+                            try{var ar=doc.data.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(doc.data,"_blank");}
                           }}
                           style={{display:"block",width:"100%",padding:"8px 4px",background:meal.color+"22",color:meal.color,borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:700}}>
                           👁️ Apri PDF
@@ -3238,82 +2283,6 @@ function MealQRSection({ personId, person, events, currentUserId }) {
 }
 
 
-
-// ── TeamMealQR — QR unico per tutto il team ────────────────
-function TeamMealQR({ eventId, isAdmin }) {
-  var [qr, setQr] = useState(null);
-  var [uploading, setUploading] = useState(false);
-  var [open, setOpen] = useState(false);
-
-  useEffect(function(){
-    var unsub = db.collection("teamQR").where("event","==",eventId)
-      .onSnapshot(function(snap){
-        setQr(snap.empty ? null : Object.assign({_id:snap.docs[0].id}, snap.docs[0].data()));
-      }, function(e){console.error(e);});
-    return function(){unsub();};
-  },[eventId]);
-
-  async function handleUpload(file) {
-    if (!file) return;
-    setUploading(true);
-    try {
-      var b64 = await new Promise(function(res,rej){
-        var r = new FileReader();
-        r.onload = function(e){ var result=e.target.result; var idx=result.indexOf(","); res(idx>=0?result.substring(idx+1):result); };
-        r.onerror=rej; r.readAsDataURL(file);
-      });
-      var mime = file.type || "application/pdf";
-      var data = {event:eventId, fileName:file.name, fileData:"data:"+mime+";base64,"+b64, uploadedAt:new Date().toISOString().substring(0,10)};
-      var snap = await db.collection("teamQR").where("event","==",eventId).get();
-      if (!snap.empty) await snap.docs[0].ref.set(data);
-      else await db.collection("teamQR").add(data);
-    } catch(e){ alert("Errore: "+e.message); }
-    setUploading(false);
-  }
-
-  async function handleDelete() {
-    if (!qr || !qr._id) return;
-    await db.collection("teamQR").doc(qr._id).delete();
-    setQr(null);
-  }
-
-  return (
-    <div style={{background:"#0d1a0d",borderRadius:10,padding:12,border:"1px solid #4caf5033"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:qr?8:0}}>
-        <div style={{fontWeight:700,fontSize:12,color:"#4caf50"}}>🍽️ QR Pasti — Team</div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          {qr && <button onClick={function(){setOpen(true);}} style={{background:"#0d2a1a",color:"#4caf50",border:"1px solid #4caf5033",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:11,fontWeight:700}}>👁️ Mostra QR</button>}
-          {isAdmin && (
-            <label style={{cursor:"pointer",background:"#1a3a1a",color:"#4caf50",border:"1px solid #4caf5033",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700}}>
-              <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){if(e.target.files[0]) handleUpload(e.target.files[0]); e.target.value="";}}/>
-              {uploading?"⏳...": qr?"🔄 Sostituisci":"📤 Carica QR"}
-            </label>
-          )}
-          {isAdmin && qr && <button onClick={handleDelete} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:11}}>🗑️</button>}
-        </div>
-      </div>
-      {!qr && <div style={{fontSize:11,color:"#7090c0",fontStyle:"italic"}}>Nessun QR team caricato</div>}
-      {qr && <div style={{fontSize:10,color:"#7090c0"}}>📎 {qr.fileName} · {qr.uploadedAt}</div>}
-
-          {open && qr && (
-            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.97)",zIndex:9000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}} onClick={function(){setOpen(false);}}>
-              <div style={{background:"#fff",borderRadius:12,padding:16,maxWidth:380,width:"90%",textAlign:"center"}} onClick={function(e){e.stopPropagation();}}>
-                <div style={{fontWeight:800,fontSize:14,color:"#1a1a2a",marginBottom:8}}>🍽️ QR Pasti — {eventId}</div>
-                {qr.fileData.includes("pdf") ? (
-                  <div>
-                    <div style={{fontSize:12,color:"#555",marginBottom:8}}>PDF — apri per vedere tutte le pagine</div>
-                    <button onClick={function(){ setOpen(false); openDoc(qr.fileData, qr.fileName||"qr-pasti.pdf"); }} style={{width:"100%",padding:12,background:"#1e3a8a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,marginBottom:8}}>📄 Apri PDF</button>
-                  </div>
-                ) : (
-                  <img src={qr.fileData} style={{maxWidth:"100%",borderRadius:8}} alt="QR Pasti"/>
-                )}
-                <button onClick={function(){setOpen(false);}} style={{width:"100%",padding:10,background:"#333",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700}}>Chiudi</button>
-              </div>
-            </div>
-          )}
-    </div>
-  );
-}
 
 // ── MealQRUploader (admin) ─────────────────────────────────
 function MealQRUploader({ eventId }) {
@@ -3473,7 +2442,7 @@ function MealQRUploader({ eventId }) {
                 <span style={{flex:1,color:"#e8e8f0",fontWeight:700}}>{p?p.name:doc.personId}</span>
                 <span style={{color:"#555",fontSize:10}}>{doc.uploadedAt}</span>
                 <button onClick={function(){
-                  try{openDoc(doc.fileData, doc.fileName||"qr-pasto.pdf");}catch(e){}
+                  try{var ar=doc.fileData.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(doc.fileData,"_blank");}
                 }} style={{background:"#1e3a8a22",color:"#4a9eff",border:"none",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:10,flexShrink:0}}>👁️</button>
                 <button onClick={function(){if(window.confirm("Eliminare QR di "+(p?p.name:doc.personId)+"?")) deleteQR(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
               </div>
@@ -3489,119 +2458,11 @@ function MealQRUploader({ eventId }) {
 
 
 // ── CostsDashboard ────────────────────────────────────────
-// ── ChecklistDashboard ────────────────────────────────────
-// Shows, per event, a matrix of person x category (volo/hotel/auto/parcheggio/QR pasti)
-// highlighting what's missing for each person attending that event.
-function ChecklistDashboard({ bookings, people, setView, setSelEvent, setViewAll }) {
-  var [selEvent, setSelEventLocal] = useState("");
-  var [mealQRByPerson, setMealQRByPerson] = useState({});
-
-  useEffect(function(){
-    if (!selEvent) { setMealQRByPerson({}); return; }
-    var unsub = db.collection("mealQR").where("event","==",selEvent).onSnapshot(function(snap){
-      var obj = {};
-      snap.docs.forEach(function(d){ var data=d.data(); obj[data.personId]=true; });
-      setMealQRByPerson(obj);
-    }, function(e){console.error(e);});
-    return function(){unsub();};
-  },[selEvent]);
-
-  var CATEGORIES = [
-    {key:"volo", label:"✈️", full:"Volo"},
-    {key:"hotel", label:"🏨", full:"Hotel"},
-    {key:"auto", label:"🚗", full:"Auto"},
-    {key:"parcheggio", label:"🅿️", full:"Parcheggio"},
-    {key:"meal", label:"🍽️", full:"QR Pasti"},
-  ];
-
-  // People attending this event = anyone with at least one booking for it
-  var eventPeopleIds = selEvent ? bookings.filter(function(b){return b.event===selEvent;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;}) : [];
-  var eventPeople = people.filter(function(p){ return eventPeopleIds.includes(p.id); });
-
-  function hasCategory(pid, cat) {
-    if (cat==="meal") return !!mealQRByPerson[pid];
-    return bookings.some(function(b){ return b.event===selEvent && b.person===pid && b.type===cat && b.status!=="cancellata"; });
-  }
-
-  function missingList(pid) {
-    return CATEGORIES.filter(function(c){ return !hasCategory(pid, c.key); }).map(function(c){return c.full;});
-  }
-
-  var ev = EVENTS.find(function(e){return e.id===selEvent;});
-  var totalMissing = eventPeople.reduce(function(sum,p){ return sum + missingList(p.id).length; }, 0);
-
-  return (
-    <div>
-      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:4}}>📋 Checklist Prenotazioni</div>
-      <div style={{fontSize:11,color:"#7090c0",marginBottom:16}}>Verifica rapidamente cosa manca per ogni persona, per evento.</div>
-
-      <select value={selEvent} onChange={function(e){setSelEventLocal(e.target.value);}}
-        style={{width:"100%",padding:"10px 12px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:8,color:"#e8e8f0",fontSize:13,outline:"none",marginBottom:16}}>
-        <option value="">-- Seleziona evento --</option>
-        {EVENTS.map(function(e){return React.createElement("option",{key:e.id,value:e.id},e.label+" ("+e.dates+")");})}
-      </select>
-
-      {!selEvent && (
-        <div style={{textAlign:"center",padding:30,color:"#7090c0",fontSize:13}}>Seleziona un evento per vedere la checklist.</div>
-      )}
-
-      {selEvent && eventPeople.length===0 && (
-        <div style={{textAlign:"center",padding:30,color:"#7090c0",fontSize:13}}>Nessuna persona ha ancora prenotazioni per questo evento.</div>
-      )}
-
-      {selEvent && eventPeople.length>0 && (
-        <div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,background:totalMissing>0?"#3a2a00":"#0d2a1a",borderRadius:10,padding:"10px 14px",border:"1px solid "+(totalMissing>0?"#ff980044":"#4caf5044")}}>
-            <span style={{fontSize:12,fontWeight:700,color:totalMissing>0?"#ff9800":"#4caf50"}}>
-              {totalMissing>0 ? "⚠️ "+totalMissing+" elementi mancanti" : "✅ Tutto completo!"}
-            </span>
-            <span style={{fontSize:11,color:"#7090c0"}}>{eventPeople.length} persone</span>
-          </div>
-
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead>
-                <tr>
-                  <th style={{textAlign:"left",padding:"8px 10px",color:"#7090c0",fontSize:11,position:"sticky",left:0,background:"#0a0a0f"}}>Persona</th>
-                  {CATEGORIES.map(function(c){return <th key={c.key} style={{padding:"8px 6px",color:"#7090c0",fontSize:14,textAlign:"center"}} title={c.full}>{c.label}</th>;})}
-                </tr>
-              </thead>
-              <tbody>
-                {eventPeople.map(function(p,pi){
-                  var missing = missingList(p.id);
-                  return (
-                    <tr key={p.id} onClick={function(){setView("event");setSelEvent(selEvent);if(setViewAll)setViewAll();}}
-                      style={{background:pi%2===0?"#12121f":"transparent",cursor:"pointer"}}>
-                      <td style={{padding:"8px 10px",fontWeight:700,color:missing.length>0?"#ff9800":"#e8e8f0"}}>
-                        {p.name.split(" ")[0]}
-                        {missing.length>0 && <div style={{fontSize:9,color:"#ff6060",fontWeight:400,marginTop:1}}>Manca: {missing.join(", ")}</div>}
-                      </td>
-                      {CATEGORIES.map(function(c){
-                        var has = hasCategory(p.id, c.key);
-                        return <td key={c.key} style={{padding:"8px 6px",textAlign:"center"}}>
-                          <span style={{fontSize:14,color:has?"#4caf50":"#ff4444"}}>{has?"✅":"❌"}</span>
-                        </td>;
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
 function CostsDashboard({ bookings, people }) {
-  var [manualCosts, setManualCosts] = useState({});
+  var [selEvent, setSelEvent] = useState("all");
+  var [costs, setCosts] = useState({});
   var [editingCost, setEditingCost] = useState(null);
   var [costForm, setCostForm] = useState({event:"",category:"Voli",amount:"",notes:""});
-  var [receipts, setReceipts] = useState({});
-  var [uploadingEvent, setUploadingEvent] = useState(null);
-  var [receiptForm, setReceiptForm] = useState({name:"",amount:""});
 
   useEffect(function(){
     var unsub = db.collection("eventCosts").onSnapshot(function(snap){
@@ -3611,23 +2472,14 @@ function CostsDashboard({ bookings, people }) {
         if (!obj[data.event]) obj[data.event] = [];
         obj[data.event].push(Object.assign({_id:d.id},data));
       });
-      setManualCosts(obj);
+      setCosts(obj);
     }, function(e){console.error(e);});
-    var unsub2 = db.collection("receipts").onSnapshot(function(snap){
-      var obj = {};
-      snap.docs.forEach(function(d){
-        var data = d.data();
-        if (!obj[data.event]) obj[data.event] = [];
-        obj[data.event].push(Object.assign({_id:d.id},data));
-      });
-      setReceipts(obj);
-    }, function(e){console.error(e);});
-    return function(){unsub(); unsub2();};
+    return function(){unsub();};
   },[]);
 
   async function saveCost() {
     if (!costForm.event || !costForm.amount) return;
-    var data = {event:costForm.event, category:costForm.category, amount:parseFloat(costForm.amount)||0, notes:costForm.notes, date:new Date().toISOString().substring(0,10), manual:true};
+    var data = {event:costForm.event, category:costForm.category, amount:parseFloat(costForm.amount)||0, notes:costForm.notes, date:new Date().toISOString().substring(0,10)};
     if (editingCost) {
       await db.collection("eventCosts").doc(editingCost).set(data,{merge:true});
     } else {
@@ -3637,56 +2489,17 @@ function CostsDashboard({ bookings, people }) {
     setCostForm({event:"",category:"Voli",amount:"",notes:""});
   }
 
-  async function uploadReceipt(evId, file) {
-    if (!file) return;
-    var b64 = await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result);};r.onerror=rej;r.readAsDataURL(file);});
-    await db.collection("receipts").add({
-      event: evId,
-      name: receiptForm.name || file.name,
-      amount: parseFloat(receiptForm.amount)||0,
-      fileData: b64,
-      date: new Date().toISOString().substring(0,10),
-    });
-    setUploadingEvent(null);
-    setReceiptForm({name:"",amount:""});
-  }
-
-  function getAutoCosts(evId) {
-    var evBs = bookings.filter(function(b){ return b.event===evId && b.price && parseFloat(b.price)>0; });
-    var byCat = {};
-    evBs.forEach(function(b){
-      var cat = b.type==="volo"?"Voli":b.type==="hotel"?"Hotel":b.type==="auto"?"Auto/Noleggio":"Parcheggio";
-      if(!byCat[cat]) byCat[cat]={total:0, items:[]};
-      var p=parseFloat(b.price)||0;
-      byCat[cat].total+=p;
-      var person = people.find(function(p2){return p2.id===b.person;});
-      byCat[cat].items.push({label:(person?person.name.split(" ")[0]:b.person)+" — "+(b.flight||b.hotel||b.car||b.type), amount:p});
-    });
-    return byCat;
-  }
-
+  var totalCost = Object.values(costs).flat().reduce(function(s,c){return s+(c.amount||0);},0);
   var inp = {width:"100%",padding:"7px 9px",background:"#0d0d1a",border:"1px solid #ff980033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none",boxSizing:"border-box"};
-
-  var grandTotal = EVENTS.reduce(function(tot, ev){
-    var auto = Object.values(getAutoCosts(ev.id)).reduce(function(s,c){return s+c.total;},0);
-    var manual = (manualCosts[ev.id]||[]).reduce(function(s,c){return s+(c.amount||0);},0);
-    var rec = (receipts[ev.id]||[]).reduce(function(s,r){return s+(r.amount||0);},0);
-    return tot+auto+manual+rec;
-  },0);
 
   return (
     <div>
-      <div style={{fontSize:18,fontWeight:800,color:"#ff9800",marginBottom:4}}>💰 Dashboard Costi</div>
-      <div style={{fontSize:11,color:"#7090c0",marginBottom:14}}>Prezzi automatici dalle prenotazioni + spese extra + scontrini per evento.</div>
+      <div style={{fontSize:18,fontWeight:800,color:"#ff9800",marginBottom:6}}>💰 Dashboard Costi</div>
 
-      <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #4caf5033",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#ff9800"}}>💶 Totale stagione</div>
-        <div style={{fontSize:22,fontWeight:900,color:"#4caf50"}}>€{grandTotal.toFixed(2)}</div>
-      </div>
-
-      <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #ff980033"}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#ff9800",marginBottom:10}}>➕ {editingCost?"Modifica spesa":"Aggiungi spesa extra"}</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+      {/* Add cost form */}
+      <div style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:16,border:"1px solid #ff980033"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#ff9800",marginBottom:10}}>➕ {editingCost?"Modifica spesa":"Aggiungi spesa"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
           <div>
             <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Evento</label>
             <select value={costForm.event} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{event:e.target.value});});}} style={inp}>
@@ -3697,7 +2510,7 @@ function CostsDashboard({ bookings, people }) {
           <div>
             <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Categoria</label>
             <select value={costForm.category} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{category:e.target.value});});}} style={inp}>
-              {["Voli","Hotel","Auto/Noleggio","Parcheggio","Visti/Documenti","Trasferimenti","Pasti","Altro"].map(function(c){return React.createElement("option",{key:c},c);})}
+              {["Voli","Hotel","Auto/Noleggio","Parcheggio","Visti/Documenti","Trasferimenti","Altro"].map(function(c){return React.createElement("option",{key:c},c);})}
             </select>
           </div>
           <div>
@@ -3706,115 +2519,59 @@ function CostsDashboard({ bookings, people }) {
           </div>
           <div>
             <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Note</label>
-            <input value={costForm.notes} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{notes:e.target.value});});}} placeholder="es. taxi aeroporto" style={inp}/>
+            <input value={costForm.notes} onChange={function(e){setCostForm(function(f){return Object.assign({},f,{notes:e.target.value});});}} placeholder="es. 5 biglietti Ryanair" style={inp}/>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
-          {editingCost && <button onClick={function(){setEditingCost(null);setCostForm({event:"",category:"Voli",amount:"",notes:""}); }} style={{flex:1,padding:8,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:7,cursor:"pointer"}}>Annulla</button>}
+          {editingCost && <button onClick={function(){setEditingCost(null);setCostForm({event:"",category:"Voli",amount:"",notes:""}); }} style={{flex:1,padding:9,background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:7,cursor:"pointer"}}>Annulla</button>}
           <button onClick={saveCost} disabled={!costForm.event||!costForm.amount}
-            style={{flex:2,padding:8,background:(costForm.event&&costForm.amount)?"#b45309":"#222",color:(costForm.event&&costForm.amount)?"#fff":"#555",border:"none",borderRadius:7,cursor:(costForm.event&&costForm.amount)?"pointer":"not-allowed",fontWeight:700}}>
-            {editingCost?"💾 Salva":"➕ Aggiungi"}
+            style={{flex:2,padding:9,background:(costForm.event&&costForm.amount)?"#b45309":"#222",color:(costForm.event&&costForm.amount)?"#fff":"#555",border:"none",borderRadius:7,cursor:(costForm.event&&costForm.amount)?"pointer":"not-allowed",fontWeight:700}}>
+            {editingCost?"💾 Salva modifica":"➕ Aggiungi"}
           </button>
         </div>
       </div>
 
-      {EVENTS.map(function(ev){
-        var autoCosts = getAutoCosts(ev.id);
-        var evManual = manualCosts[ev.id]||[];
-        var evReceipts = receipts[ev.id]||[];
-        var autoTotal = Object.values(autoCosts).reduce(function(s,c){return s+c.total;},0);
-        var manualTotal = evManual.reduce(function(s,c){return s+(c.amount||0);},0);
-        var receiptsTotal = evReceipts.reduce(function(s,r){return s+(r.amount||0);},0);
-        var evTotal = autoTotal+manualTotal+receiptsTotal;
+      {/* Totale */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#ff9800"}}>💶 Totale stagione</div>
+        <div style={{fontSize:18,fontWeight:800,color:"#4caf50"}}>€{totalCost.toFixed(2)}</div>
+      </div>
+
+      {/* Cost list per event */}
+      {EVENTS.filter(function(ev){return costs[ev.id]&&costs[ev.id].length>0;}).map(function(ev){
+        var evCosts = costs[ev.id]||[];
+        var evTotal = evCosts.reduce(function(s,c){return s+(c.amount||0);},0);
+        var byCat = {};
+        evCosts.forEach(function(c){if(!byCat[c.category])byCat[c.category]=0;byCat[c.category]+=c.amount||0;});
         return(
-          <div key={ev.id} style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:14,border:"1px solid #ff980022"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontWeight:800,fontSize:14}}>{ev.label} <span style={{fontWeight:400,fontSize:11,color:"#7090c0"}}>{ev.dates}</span></div>
-              <div style={{fontSize:16,fontWeight:900,color:"#4caf50"}}>€{evTotal.toFixed(2)}</div>
+          <div key={ev.id} style={{background:"#12121f",borderRadius:10,padding:16,marginBottom:12,border:"1px solid #ff980022"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontWeight:800,fontSize:13}}>{ev.label} <span style={{fontWeight:400,fontSize:11,color:"#7090c0"}}>{ev.dates}</span></div>
+              <div style={{fontSize:14,fontWeight:800,color:"#4caf50"}}>€{evTotal.toFixed(2)}</div>
             </div>
-            {Object.keys(autoCosts).length>0 && (
-              <div style={{marginBottom:10}}>
-                <div style={{fontSize:10,color:"#4a9eff",fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>📋 Dalle prenotazioni</div>
-                {Object.keys(autoCosts).map(function(cat){
-                  var catData = autoCosts[cat];
-                  return(
-                    <div key={cat} style={{marginBottom:5}}>
-                      <div style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:"#0d1a2a",borderRadius:6,marginBottom:2}}>
-                        <span style={{fontSize:11,fontWeight:700,color:"#4a9eff"}}>{cat}</span>
-                        <span style={{fontSize:11,fontWeight:700,color:"#4caf50"}}>€{catData.total.toFixed(2)}</span>
-                      </div>
-                      {catData.items.map(function(item,i){
-                        return <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"2px 12px",fontSize:10,color:"#7090c0"}}>
-                          <span>{item.label}</span><span>€{item.amount.toFixed(2)}</span>
-                        </div>;
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {evManual.length>0 && (
-              <div style={{marginBottom:10}}>
-                <div style={{fontSize:10,color:"#ff9800",fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>✏️ Spese extra</div>
-                {evManual.map(function(c){return(
-                  <div key={c._id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:3,fontSize:11}}>
-                    <span style={{background:"#b4530922",color:"#ff9800",borderRadius:4,padding:"1px 5px",fontSize:10,flexShrink:0}}>{c.category}</span>
-                    <span style={{fontWeight:700,color:"#4caf50",flexShrink:0}}>€{(c.amount||0).toFixed(2)}</span>
-                    {c.notes&&<span style={{color:"#7090c0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</span>}
-                    <button onClick={function(){setCostForm({event:c.event,category:c.category,amount:String(c.amount),notes:c.notes||""});setEditingCost(c._id);}} style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:10,flexShrink:0}}>✏️</button>
-                    <button onClick={async function(){await db.collection("eventCosts").doc(c._id).delete();}} style={{background:"none",border:"1px solid #ff444433",color:"#ff6060",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
-                  </div>
-                );})}
-              </div>
-            )}
-            <div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <div style={{fontSize:10,color:"#9c27b0",fontWeight:700,textTransform:"uppercase"}}>
-                  🧾 Scontrini {evReceipts.length>0&&<span style={{color:"#4caf50"}}> — €{receiptsTotal.toFixed(2)}</span>}
-                </div>
-                <button onClick={function(){setUploadingEvent(ev.id);setReceiptForm({name:"",amount:""}); }}
-                  style={{background:"#2a0a3a",color:"#9c27b0",border:"1px solid #9c27b033",borderRadius:5,padding:"3px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
-                  ➕ Carica
-                </button>
-              </div>
-              {uploadingEvent===ev.id && (
-                <div style={{background:"#0d0d1a",borderRadius:8,padding:10,marginBottom:8,border:"1px solid #9c27b033"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
-                    <input value={receiptForm.name} onChange={function(e){setReceiptForm(function(f){return Object.assign({},f,{name:e.target.value});});}} placeholder="Descrizione" style={Object.assign({},inp,{borderColor:"#9c27b033"})}/>
-                    <input type="number" value={receiptForm.amount} onChange={function(e){setReceiptForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} placeholder="Importo €" style={Object.assign({},inp,{borderColor:"#9c27b033"})}/>
-                  </div>
-                  <label style={{display:"block",background:"#12121f",border:"2px dashed #9c27b044",borderRadius:6,padding:"10px",textAlign:"center",cursor:"pointer",marginBottom:6}}>
-                    <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={function(e){uploadReceipt(ev.id,e.target.files[0]);}}/>
-                    <span style={{fontSize:11,color:"#9c27b0"}}>📷 Tocca per foto o PDF</span>
-                  </label>
-                  <button onClick={function(){setUploadingEvent(null);}} style={{width:"100%",padding:"6px",background:"transparent",color:"#7090c0",border:"1px solid #333",borderRadius:5,cursor:"pointer",fontSize:11}}>Annulla</button>
-                </div>
-              )}
-              {evReceipts.length>0 && (
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                  {evReceipts.map(function(r){
-                    var isImg = r.fileData && r.fileData.startsWith("data:image");
-                    return(
-                      <div key={r._id} onClick={function(){openDoc(r.fileData, r.name||"scontrino");}}
-                        style={{background:"#0d0d1a",borderRadius:8,padding:8,border:"1px solid #9c27b022",cursor:"pointer",position:"relative"}}>
-                        {isImg
-                          ? <img src={r.fileData} style={{width:"100%",height:60,objectFit:"cover",borderRadius:4,marginBottom:4}} alt="scontrino"/>
-                          : <div style={{height:60,background:"#1a0a2a",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:4,fontSize:24}}>📄</div>
-                        }
-                        <div style={{fontSize:10,color:"#e8e8f0",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name||"Scontrino"}</div>
-                        {r.amount>0 && <div style={{fontSize:10,color:"#4caf50",fontWeight:700}}>€{r.amount.toFixed(2)}</div>}
-                        <div style={{fontSize:9,color:"#555"}}>{r.date}</div>
-                        <button onClick={async function(e){e.stopPropagation();await db.collection("receipts").doc(r._id).delete();}}
-                          style={{position:"absolute",top:4,right:4,background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"2px 5px",cursor:"pointer",fontSize:9}}>✕</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+              {Object.keys(byCat).map(function(cat){return(
+                <span key={cat} style={{background:"#b4530922",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>
+                  {cat}: €{byCat[cat].toFixed(2)}
+                </span>
+              );})}
             </div>
+            {evCosts.map(function(c){return(
+              <div key={c._id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12}}>
+                <span style={{background:"#b4530922",color:"#ff9800",borderRadius:4,padding:"1px 6px",fontSize:10,flexShrink:0}}>{c.category}</span>
+                <span style={{fontWeight:700,color:"#4caf50",flexShrink:0}}>€{(c.amount||0).toFixed(2)}</span>
+                {c.notes&&<span style={{color:"#7090c0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.notes}</span>}
+                <span style={{color:"#555",fontSize:10,flexShrink:0}}>{c.date}</span>
+                <button onClick={function(){setCostForm({event:c.event,category:c.category,amount:String(c.amount),notes:c.notes||""});setEditingCost(c._id);}}
+                  style={{background:"none",border:"1px solid #1e3a8a44",color:"#4a9eff",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>✏️</button>
+                <button onClick={async function(){await db.collection("eventCosts").doc(c._id).delete();}}
+                  style={{background:"none",border:"1px solid #ff444433",color:"#ff6060",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
+              </div>
+            );})}
           </div>
         );
       })}
+      {Object.keys(costs).length===0 && <div style={{textAlign:"center",color:"#7090c0",padding:24,fontSize:13}}>Nessuna spesa inserita ancora.</div>}
     </div>
   );
 }
@@ -3823,65 +2580,6 @@ function CostsDashboard({ bookings, people }) {
 function ExportView({ bookings, people, eventNotes }) {
   var [exporting, setExporting] = useState(false);
   var [exported, setExported] = useState(false);
-  var [mealEvent, setMealEvent] = useState("");
-  var [mealExporting, setMealExporting] = useState(false);
-  var [mealData, setMealData] = useState(null);
-  var MEAL_TYPES = [
-    {key:"breakfast", label:"Colazione"},
-    {key:"lunch",     label:"Pranzo"},
-    {key:"dinner",    label:"Cena"},
-  ];
-
-  async function loadMealReport(evId) {
-    if (!evId) return;
-    setMealExporting(true);
-    try {
-      var ev = EVENTS.find(function(e){return e.id===evId;});
-      var eventDays = [];
-      if (ev && ev.dates) {
-        var m = ev.dates.match(/(\d+)-(\d+)\s+(\w+)/);
-        if (m) {
-          var startDay=parseInt(m[1],10), endDay=parseInt(m[2],10), monthAbbr=m[3];
-          for (var d=startDay; d<=endDay; d++) eventDays.push(d+" "+monthAbbr);
-        }
-      }
-      var qrSnap = await db.collection("mealQR").where("event","==",evId).get();
-      var checkinSnap = await db.collection("mealCheckins").where("event","==",evId).get();
-      var qrByPerson = {};
-      qrSnap.docs.forEach(function(d){ var data=d.data(); if(!qrByPerson[data.personId]) qrByPerson[data.personId]=[]; qrByPerson[data.personId].push(data); });
-      var checkinByPerson = {};
-      checkinSnap.docs.forEach(function(d){ var data=d.data(); checkinByPerson[data.personId]=data.meals||{}; });
-
-      var rows = [];
-      Object.keys(qrByPerson).forEach(function(pid){
-        var person = people.find(function(p){return p.id===pid;});
-        var meals = checkinByPerson[pid]||{};
-        eventDays.forEach(function(day){
-          MEAL_TYPES.forEach(function(mt){
-            var used = !!meals[day+"_"+mt.key];
-            if (!used) {
-              rows.push({person: person?person.name:pid, day: day, meal: mt.label});
-            }
-          });
-        });
-      });
-      setMealData(rows);
-    } catch(e) { console.error(e); alert("Errore: "+e.message); }
-    setMealExporting(false);
-  }
-
-  async function exportMealReport() {
-    if (!mealData || !mealEvent) return;
-    var XLSX = await import("xlsx");
-    var ev = EVENTS.find(function(e){return e.id===mealEvent;});
-    var wb = XLSX.utils.book_new();
-    var rows = [["Persona","Giorno","Pasto non utilizzato"]];
-    mealData.forEach(function(r){ rows.push([r.person, r.day, r.meal]); });
-    var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{wch:24},{wch:12},{wch:18}];
-    XLSX.utils.book_append_sheet(wb, ws, "Pasti non usati");
-    XLSX.writeFile(wb, "Pasti_non_usati_"+(ev?ev.label.replace(/\s+/g,"_"):mealEvent)+".xlsx");
-  }
 
   async function exportToExcel() {
     setExporting(true);
@@ -3940,52 +2638,6 @@ function ExportView({ bookings, people, eventNotes }) {
           {exporting?"⏳ Esportazione...":exported?"✅ Scaricato!":"📥 Scarica Excel"}
         </button>
         <div style={{marginTop:10,fontSize:11,color:"#7090c0",textAlign:"center"}}>{bookings.length} prenotazioni · {people.length} membri</div>
-      </div>
-
-      {/* Meal usage report */}
-      <div style={{background:"#12121f",borderRadius:12,padding:24,border:"1px solid #9c27b033",maxWidth:560,marginTop:16}}>
-        <div style={{fontSize:14,fontWeight:700,marginBottom:8,color:"#9c27b0"}}>🍽️ Report Pasti Non Utilizzati</div>
-        <div style={{fontSize:12,color:"#7090c0",marginBottom:14,lineHeight:1.6}}>
-          Estrai l'elenco di chi non ha spuntato colazione, pranzo o cena per un evento — utile a fine weekend per verificare con l'hospitality.
-        </div>
-        <select value={mealEvent} onChange={function(e){setMealEvent(e.target.value); setMealData(null); loadMealReport(e.target.value);}}
-          style={{width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #9c27b033",borderRadius:7,color:"#e8e8f0",fontSize:13,outline:"none",marginBottom:12}}>
-          <option value="">-- Seleziona evento --</option>
-          {EVENTS.map(function(ev){return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" ("+ev.dates+")");})}
-        </select>
-        {mealExporting && <div style={{fontSize:12,color:"#9c27b0",textAlign:"center",padding:10}}>⏳ Caricamento dati pasti...</div>}
-        {mealData && !mealExporting && (
-          mealData.length===0 ? (
-            <div style={{textAlign:"center",padding:14,color:"#4caf50",fontSize:13,fontWeight:700}}>✅ Tutti i pasti sono stati utilizzati!</div>
-          ) : (
-            <div>
-              <div style={{maxHeight:220,overflowY:"auto",marginBottom:12,border:"1px solid #9c27b022",borderRadius:8}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                  <thead>
-                    <tr>
-                      <th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Persona</th>
-                      <th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Giorno</th>
-                      <th style={{background:"#2a0a3a",color:"#9c27b0",padding:"6px 10px",textAlign:"left"}}>Pasto non usato</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mealData.map(function(r,i){return(
-                      <tr key={i} style={{background:i%2===0?"#0d0d1a":"transparent"}}>
-                        <td style={{padding:"5px 10px",color:"#e8e8f0"}}>{r.person}</td>
-                        <td style={{padding:"5px 10px",color:"#7090c0"}}>{r.day}</td>
-                        <td style={{padding:"5px 10px",color:"#ff9800"}}>{r.meal}</td>
-                      </tr>
-                    );})}
-                  </tbody>
-                </table>
-              </div>
-              <button onClick={exportMealReport}
-                style={{width:"100%",padding:12,background:"#2a0a3a",color:"#9c27b0",border:"1px solid #9c27b044",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                📥 Scarica report Excel
-              </button>
-            </div>
-          )
-        )}
       </div>
     </div>
   );
@@ -4170,1188 +2822,6 @@ function FlightPlanner({ people, bookings }) {
   );
 }
 
-
-// ── PDF2Excel ──────────────────────────────────────────────
-function PDF2Excel() {
-  var [file, setFile] = useState(null);
-  var [docType, setDocType] = useState("");
-  var [evento, setEvento] = useState("");
-  var [loading, setLoading] = useState(false);
-  var [error, setError] = useState("");
-  var [rows, setRows] = useState(null);
-
-  var DOC_TYPES = [
-    {id:"volo",color:"#4a9eff",label:"✈️ Volo"},
-    {id:"hotel",color:"#4caf50",label:"🏨 Hotel"},
-    {id:"noleggio",color:"#ff9800",label:"🚗 Noleggio"},
-    {id:"parcheggio",color:"#9c27b0",label:"🅿️ Parcheggio"},
-  ];
-
-  function handleFile(f) {
-    if (!f) return;
-    setFile(f); setError(""); setRows(null);
-    if (!docType) {
-      var n = f.name.toLowerCase();
-      if (n.includes("booking")||n.includes("hotel")) setDocType("hotel");
-      else if (n.includes("goldcar")||n.includes("noleggio")||n.includes("car")) setDocType("noleggio");
-      else if (n.includes("park")) setDocType("parcheggio");
-      else setDocType("volo");
-    }
-  }
-
-  async function extract() {
-    if (!file||!docType||!evento) { setError("Seleziona tipo, evento e carica il file"); return; }
-    setLoading(true); setError(""); setRows(null);
-    try {
-      var b64 = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result.split(",")[1]);}; r.onerror=rej; r.readAsDataURL(file); });
-      var isPDF = file.name.toLowerCase().endsWith(".pdf")||file.type==="application/pdf";
-      var block = isPDF
-        ? {type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
-        : {type:"image",source:{type:"base64",media_type:file.type||"image/jpeg",data:b64}};
-
-      var prompts = {
-        volo: "Analizza questa conferma volo. Estrai TUTTI i passeggeri. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"persona\":\"COGNOME NOME\",\"volo\":\"FR1234\",\"compagnia\":\"Ryanair\",\"partenza\":\"BGY 11:55\",\"arrivo\":\"BCN 13:35\",\"data\":\"19 Apr\",\"direzione\":\"andata\",\"bagaglio\":\"1 mano\",\"prenotazione\":\"ABC123\"}]",
-        hotel: "Analizza questa conferma hotel. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"camera\":\"Camera Matrimoniale Superior\",\"hotel\":\"Nome Hotel\",\"checkin\":\"11 Giu\",\"checkout\":\"14 Giu\",\"notti\":\"3\",\"prenotazione\":\"6370734724\",\"indirizzo\":\"indirizzo completo\"}]",
-        noleggio: "Analizza questa conferma noleggio auto. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"conducente\":\"COGNOME NOME\",\"compagnia\":\"Goldcar\",\"auto\":\"Opel Corsa\",\"ritiro\":\"Aeroporto BCN\",\"consegna\":\"Aeroporto BCN\",\"data_ritiro\":\"19 Apr 10:00\",\"data_consegna\":\"23 Apr\",\"prenotazione\":\"ABC123\"}]",
-        parcheggio: "Analizza questa conferma parcheggio. Rispondi SOLO con array JSON su una riga senza markdown. Formato: [{\"parcheggio\":\"nome\",\"indirizzo\":\"indirizzo\",\"entrata\":\"19 Apr 06:00\",\"uscita\":\"23 Apr 14:00\",\"targa\":\"AA000BB\",\"prenotazione\":\"ABC123\",\"prezzo\":\"€120\"}]",
-      };
-
-      var resp = await fetch("/api/claude", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({model:"claude-sonnet-4-20250514", max_tokens:2000, messages:[{role:"user",content:[block,{type:"text",text:prompts[docType]}]}]})
-      });
-      if (!resp.ok) throw new Error("API "+resp.status);
-      var data = await resp.json();
-      var text = (data.content||[]).filter(function(i){return i.type==="text";}).map(function(i){return i.text;}).join("");
-      var s=text.indexOf("["),e=text.lastIndexOf("]");
-      if (s===-1) throw new Error("Nessun dato trovato nel documento");
-      var parsed = JSON.parse(text.substring(s,e+1));
-
-      // Build rows based on type — same columns as ExcelImport expects
-      var result = [];
-      if (docType==="volo") {
-        result.push(["Evento","Persona","Tipo","Dir.","Volo","Compagnia","Partenza","Arrivo","Data","Bagaglio","N° Pren.","Note","Stato"]);
-        parsed.forEach(function(r){ result.push([evento,r.persona||"","volo",r.direzione||"andata",r.volo||"",r.compagnia||"",r.partenza||"",r.arrivo||"",r.data||"",r.bagaglio||"1 mano",r.prenotazione||"","","confermata"]); });
-      } else if (docType==="hotel") {
-        result.push(["Evento","Persona","Tipo","Camera","Hotel","Indirizzo","Check-in","Check-out","Notti","N° Pren.","Note","Stato"]);
-        parsed.forEach(function(r){ result.push([evento,"","hotel",r.camera||"",r.hotel||"",r.indirizzo||"",r.checkin||"",r.checkout||"",r.notti||"",r.prenotazione||"","","confermata"]); });
-      } else if (docType==="noleggio") {
-        result.push(["Evento","Persona","Tipo","Compagnia","Auto","Ritiro","Consegna","Data Ritiro","Data Consegna","N° Pren.","Note","Stato"]);
-        parsed.forEach(function(r){ result.push([evento,r.conducente||"","noleggio",r.compagnia||"",r.auto||"",r.ritiro||"",r.consegna||"",r.data_ritiro||"",r.data_consegna||"",r.prenotazione||"","","confermata"]); });
-      } else {
-        result.push(["Evento","Persona","Tipo","Parcheggio","Indirizzo","Entrata","Uscita","Targa","N° Pren.","Prezzo","Note","Stato"]);
-        parsed.forEach(function(r){ result.push([evento,"","parcheggio",r.parcheggio||"",r.indirizzo||"",r.entrata||"",r.uscita||"",r.targa||"",r.prenotazione||"",r.prezzo||"","","confermata"]); });
-      }
-      setRows(result);
-    } catch(e) { setError("Errore: "+(e.message||"Riprova")); }
-    setLoading(false);
-  }
-
-  function downloadExcel() {
-    if (!rows) return;
-    import("xlsx").then(function(XLSX){
-      var wb = XLSX.utils.book_new();
-      var ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = rows[0].map(function(){ return {wch:18}; });
-      XLSX.utils.book_append_sheet(wb, ws, "Prenotazioni");
-      XLSX.writeFile(wb, "Import_"+docType+"_"+evento.replace(/\s+/g,"_")+".xlsx");
-    });
-  }
-
-  var inp = {width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
-
-  return (
-    <div style={{maxWidth:600,margin:"0 auto",padding:"0 0 40px"}}>
-      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:4}}>🤖 PDF → Excel</div>
-      <div style={{fontSize:12,color:"#7090c0",marginBottom:20}}>Carica il PDF, l'AI estrae i dati e genera un Excel pronto per l'import</div>
-
-      {/* Tipo */}
-      <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
-        <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>Tipo documento</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          {DOC_TYPES.map(function(dt){
-            var sel=docType===dt.id;
-            return <div key={dt.id} onClick={function(){setDocType(dt.id);}}
-              style={{padding:"10px",borderRadius:8,border:"2px solid "+(sel?dt.color:"#1e3a8a22"),background:sel?dt.color+"22":"#0d0d1a",cursor:"pointer",textAlign:"center",fontSize:13,fontWeight:sel?800:400,color:sel?dt.color:"#7090c0"}}>
-              {dt.label}
-            </div>;
-          })}
-        </div>
-      </div>
-
-      {/* Evento */}
-      <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
-        <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>Evento</div>
-        <select value={evento} onChange={function(e){setEvento(e.target.value);}} style={inp}>
-          <option value="">-- Seleziona evento --</option>
-          {EVENTS.map(function(ev){ return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" ("+ev.dates+")"); })}
-        </select>
-      </div>
-
-      {/* Upload */}
-      <div style={{background:"#12121f",borderRadius:12,padding:16,marginBottom:12,border:"1px solid #1e3a8a33"}}>
-        <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>Documento</div>
-        <label style={{display:"block",background:"#0d0d1a",border:"2px dashed "+(file?"#4caf50":"#1e3a8a"),borderRadius:10,padding:"20px",textAlign:"center",cursor:"pointer"}}>
-          <input type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={function(e){handleFile(e.target.files[0]);}}/>
-          {file
-            ? <div><div style={{fontSize:18,marginBottom:4}}>✅</div><div style={{fontSize:12,color:"#4caf50",fontWeight:700}}>{file.name}</div><div style={{fontSize:10,color:"#7090c0",marginTop:2}}>Tocca per cambiare</div></div>
-            : <div><div style={{fontSize:28,marginBottom:6}}>📄</div><div style={{fontSize:13,color:"#4a9eff"}}>Tocca per caricare PDF o immagine</div></div>
-          }
-        </label>
-      </div>
-
-      {error && <div style={{background:"#1a0a0a",border:"1px solid #ff444433",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#ff6060",marginBottom:12}}>{error}</div>}
-
-      <button onClick={extract} disabled={!file||!docType||!evento||loading}
-        style={{width:"100%",padding:13,background:(!file||!docType||!evento||loading)?"#1a1a2a":"#1e3a8a",color:(!file||!docType||!evento||loading)?"#444":"#4a9eff",border:"none",borderRadius:10,cursor:(!file||!docType||!evento||loading)?"not-allowed":"pointer",fontWeight:700,fontSize:14,marginBottom:14}}>
-        {loading?"⏳ Estrazione in corso...":"🤖 Estrai dati con AI"}
-      </button>
-
-      {rows && (
-        <div style={{background:"#12121f",borderRadius:12,padding:16,border:"1px solid #4caf5033"}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#4caf50",marginBottom:10}}>✅ {rows.length-1} righe estratte</div>
-          <div style={{overflowX:"auto",marginBottom:14}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
-              <thead>
-                <tr>{rows[0].map(function(h,i){ return <th key={i} style={{background:"#1e3a8a",color:"#4a9eff",padding:"5px 8px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>; })}</tr>
-              </thead>
-              <tbody>
-                {rows.slice(1).map(function(row,ri){ return (
-                  <tr key={ri}>{row.map(function(cell,ci){ return <td key={ci} style={{padding:"5px 8px",borderBottom:"1px solid #1e3a8a22",whiteSpace:"nowrap",background:ri%2===0?"#0d0d1a":"transparent"}}>{cell}</td>; })}</tr>
-                );})}
-              </tbody>
-            </table>
-          </div>
-          <button onClick={downloadExcel} style={{width:"100%",padding:12,background:"#14532d",color:"#4caf50",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-            📥 Scarica Excel
-          </button>
-          <div style={{fontSize:11,color:"#7090c0",marginTop:8,textAlign:"center"}}>Importa il file scaricato nella sezione 📥 → File Excel</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── FlightDetailModal ──────────────────────────────────────
-// ── BookingsDashboard — gestione per N° Prenotazione, suddivisa per evento ──
-function BookingsDashboard({ bookings, setBookings, people }) {
-  var [search, setSearch] = useState("");
-  var [selCode, setSelCode] = useState(null);
-  var [selEventFilter, setSelEventFilter] = useState(null); // null = show event list, else show that event's codes
-
-  // Group bookings by booking code + type
-  var groups = {};
-  bookings.forEach(function(b) {
-    var code = b.booking || "—";
-    var key = b.event + "|" + code + "|" + b.type;
-    if (!groups[key]) groups[key] = { code:code, type:b.type, event:b.event, items:[] };
-    groups[key].items.push(b);
-  });
-  var allGroups = Object.values(groups);
-
-  // Count codes per event, only show events that have bookings, in EVENTS order
-  var eventCounts = EVENTS.map(function(ev){
-    var codes = allGroups.filter(function(g){return g.event===ev.id;});
-    var peopleCount = bookings.filter(function(b){return b.event===ev.id;}).map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;}).length;
-    return {ev:ev, codeCount:codes.length, peopleCount:peopleCount};
-  }).filter(function(e){return e.codeCount>0;});
-
-  var typeIcon = {volo:"✈️", hotel:"🏨", auto:"🚗", parcheggio:"🅿️"};
-  var typeColor = {volo:"#4a9eff", hotel:"#9c27b0", auto:"#ff9800", parcheggio:"#4caf50"};
-
-  function personName(pid) {
-    var p = people.find(function(pp){return pp.id===pid;});
-    return p ? p.name : pid;
-  }
-
-  // ── EVENT LIST VIEW ──
-  if (!selEventFilter) {
-    var filteredEvents = eventCounts;
-    if (search.trim()) {
-      var s = search.trim().toUpperCase();
-      // If searching, show matching codes across all events directly
-      var matchGroups = allGroups.filter(function(g){
-        if (g.code.toUpperCase().includes(s)) return true;
-        return g.items.some(function(it){ var p=people.find(function(pp){return pp.id===it.person;}); return p && p.name.toUpperCase().includes(s); });
-      }).sort(function(a,b){return b.items.length-a.items.length;});
-
-      return (
-        <div style={{padding:16}}>
-          <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🔑 Gestione Prenotazioni</div>
-          <input value={search} onChange={function(e){setSearch(e.target.value);}}
-            placeholder="🔍 Cerca per codice o nome..."
-            style={{width:"100%",padding:12,background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:10,color:"#e8e8f0",fontSize:14,marginBottom:16,boxSizing:"border-box"}}/>
-          <div style={{fontSize:11,color:"#7090c0",marginBottom:8}}>{matchGroups.length} risultati per "{search}"</div>
-          {matchGroups.map(function(g,gi){
-            var tc = typeColor[g.type]||"#7090c0";
-            var ev = EVENTS.find(function(e){return e.id===g.event;});
-            return (
-              <div key={gi} onClick={function(){setSelCode(g);}}
-                style={{background:"#12121f",borderRadius:10,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid "+tc,cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:16}}>{typeIcon[g.type]||"📄"}</span>
-                    <span style={{fontWeight:800,color:"#ff9800",fontFamily:"monospace",fontSize:14}}>#{g.code}</span>
-                  </div>
-                  <span style={{fontSize:11,color:"#7090c0"}}>{ev?ev.label:g.event}</span>
-                </div>
-                <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
-                  {g.items.length} {g.items.length===1?"persona":"persone"}: {g.items.slice(0,4).map(function(it){return personName(it.person);}).join(", ")}{g.items.length>4?" +"+(g.items.length-4):""}
-                </div>
-              </div>
-            );
-          })}
-          {selCode && <BookingCodeEditor group={selCode} bookings={bookings} setBookings={setBookings} people={people} onClose={function(){setSelCode(null);}}/>}
-        </div>
-      );
-    }
-
-    return (
-      <div style={{padding:16}}>
-        <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🔑 Gestione Prenotazioni</div>
-        <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>Seleziona un evento per vedere i codici prenotazione</div>
-        <input value={search} onChange={function(e){setSearch(e.target.value);}}
-          placeholder="🔍 Cerca per codice o nome..."
-          style={{width:"100%",padding:12,background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:10,color:"#e8e8f0",fontSize:14,marginBottom:16,boxSizing:"border-box"}}/>
-        {filteredEvents.map(function(e){
-          return (
-            <div key={e.ev.id} onClick={function(){setSelEventFilter(e.ev.id);}}
-              style={{background:"#12121f",borderRadius:10,padding:"14px 16px",marginBottom:8,cursor:"pointer",border:"1px solid #1e3a8a33",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:14,color:"#e8e8f0"}}>🏁 {e.ev.label}</div>
-                <div style={{fontSize:11,color:"#7090c0"}}>{e.ev.dates} · {e.ev.circuit}</div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#ff9800"}}>{e.codeCount} codici</div>
-                <div style={{fontSize:10,color:"#555"}}>{e.peopleCount} persone</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // ── CODES LIST FOR SELECTED EVENT ──
-  var ev = EVENTS.find(function(e){return e.id===selEventFilter;});
-  var eventGroups = allGroups.filter(function(g){return g.event===selEventFilter;}).sort(function(a,b){return b.items.length-a.items.length;});
-  if (search.trim()) {
-    var s2 = search.trim().toUpperCase();
-    eventGroups = eventGroups.filter(function(g){
-      if (g.code.toUpperCase().includes(s2)) return true;
-      return g.items.some(function(it){ var p=people.find(function(pp){return pp.id===it.person;}); return p && p.name.toUpperCase().includes(s2); });
-    });
-  }
-
-  return (
-    <div style={{padding:16}}>
-      <button onClick={function(){setSelEventFilter(null); setSearch("");}} style={{background:"none",border:"none",color:"#4a9eff",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12,padding:0}}>← Tutti gli eventi</button>
-      <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>🏁 {ev?ev.label:selEventFilter}</div>
-      <div style={{fontSize:12,color:"#7090c0",marginBottom:16}}>{eventGroups.length} codici prenotazione</div>
-
-      <input value={search} onChange={function(e){setSearch(e.target.value);}}
-        placeholder="🔍 Cerca per codice o nome..."
-        style={{width:"100%",padding:12,background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:10,color:"#e8e8f0",fontSize:14,marginBottom:16,boxSizing:"border-box"}}/>
-
-      {/* Group by type within event */}
-      {["volo","hotel","auto","parcheggio"].map(function(t){
-        var typeGroups = eventGroups.filter(function(g){return g.type===t;});
-        if (typeGroups.length===0) return null;
-        return (
-          <div key={t} style={{marginBottom:18}}>
-            <div style={{fontSize:11,fontWeight:800,color:typeColor[t],marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>{typeIcon[t]} {t==="volo"?"Voli":t==="hotel"?"Hotel":t==="auto"?"Auto/Noleggio":"Parcheggio"} ({typeGroups.length})</div>
-            {typeGroups.map(function(g,gi){
-              var tc = typeColor[g.type]||"#7090c0";
-              return (
-                <div key={gi} onClick={function(){setSelCode(g);}}
-                  style={{background:"#12121f",borderRadius:10,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid "+tc,cursor:"pointer"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span style={{fontWeight:800,color:"#ff9800",fontFamily:"monospace",fontSize:14}}>#{g.code}</span>
-                    <span style={{fontSize:11,color:"#7090c0"}}>{g.items.length} {g.items.length===1?"persona":"persone"}</span>
-                  </div>
-                  <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
-                    {g.items.slice(0,5).map(function(it){return personName(it.person);}).join(", ")}{g.items.length>5?" +"+(g.items.length-5):""}
-                  </div>
-                  {g.type==="volo" && g.items[0].flight && (
-                    <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].flight} · {g.items[0].dep} → {g.items[0].arr} · {g.items[0].date}</div>
-                  )}
-                  {g.type==="hotel" && g.items[0].hotel && (
-                    <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].hotel} {g.items[0].room?"— "+g.items[0].room:""}</div>
-                  )}
-                  {(g.type==="auto"||g.type==="parcheggio") && g.items[0].car && (
-                    <div style={{fontSize:11,color:tc,marginTop:2}}>{g.items[0].car}</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-      {eventGroups.length===0 && <div style={{textAlign:"center",color:"#555",padding:40,fontSize:13}}>Nessuna prenotazione trovata</div>}
-
-      {selCode && <BookingCodeEditor group={selCode} bookings={bookings} setBookings={setBookings} people={people} onClose={function(){setSelCode(null);}}/>}
-    </div>
-  );
-}
-
-// ── BookingCodeEditor — modal di modifica per un gruppo di prenotazioni ──
-function BookingCodeEditor({ group, bookings, setBookings, people, onClose }) {
-  // Re-resolve current items from live bookings (in case of updates)
-  var liveItems = bookings.filter(function(b){
-    return (b.booking||"—")===group.code && b.type===group.type;
-  });
-  var [form, setForm] = useState(liveItems[0] || {});
-  var [scopeChoice, setScopeChoice] = useState("all"); // "all" | specific personId
-  var [saving, setSaving] = useState(false);
-
-  var typeFields = {
-    volo: [
-      {k:"event", l:"Evento", type:"event"},
-      {k:"dir", l:"Direzione", type:"select", opts:["andata","ritorno"]},
-      {k:"flight", l:"N° Volo"},
-      {k:"company", l:"Compagnia"},
-      {k:"date", l:"Data"},
-      {k:"dep", l:"Partenza"},
-      {k:"arr", l:"Arrivo"},
-      {k:"baggage", l:"Bagaglio"},
-      {k:"notes", l:"Note"},
-    ],
-    hotel: [
-      {k:"event", l:"Evento", type:"event"},
-      {k:"hotel", l:"Hotel"},
-      {k:"room", l:"Camera"},
-      {k:"address", l:"Indirizzo"},
-      {k:"checkin", l:"Check-in"},
-      {k:"checkout", l:"Check-out"},
-      {k:"nights", l:"Notti"},
-      {k:"notes", l:"Note"},
-    ],
-    auto: [
-      {k:"event", l:"Evento", type:"event"},
-      {k:"car", l:"Veicolo"},
-      {k:"company", l:"Compagnia"},
-      {k:"notes", l:"Note"},
-    ],
-    parcheggio: [
-      {k:"event", l:"Evento", type:"event"},
-      {k:"car", l:"Parcheggio"},
-      {k:"notes", l:"Note"},
-    ],
-  };
-  var fields = typeFields[group.type] || typeFields.volo;
-
-  function update(key, val) {
-    setForm(function(p){ return Object.assign({}, p, {_dirty:Object.assign({},p._dirty,{[key]:true})}, {[key]:val}); });
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      var targets = scopeChoice==="all" ? liveItems : liveItems.filter(function(it){return it.person===scopeChoice;});
-      var changedKeys = Object.keys(form._dirty || {});
-      if (changedKeys.length === 0) { onClose(); return; }
-
-      var updates = {};
-      changedKeys.forEach(function(k){ updates[k] = form[k]; });
-
-      for (var i=0; i<targets.length; i++) {
-        var item = targets[i];
-        if (item._id) {
-          await db.collection("bookings").doc(item._id).update(updates);
-        }
-      }
-      // Update local state
-      setBookings(function(prev){
-        return prev.map(function(b){
-          var isTarget = targets.some(function(t){ return t._id === b._id; });
-          return isTarget ? Object.assign({}, b, updates) : b;
-        });
-      });
-      onClose();
-    } catch(e) {
-      alert("Errore salvataggio: " + e.message);
-    }
-    setSaving(false);
-  }
-
-  function removePerson(personId) {
-    if (!window.confirm("Rimuovere "+personId+" da questa prenotazione?")) return;
-    var item = liveItems.find(function(it){return it.person===personId;});
-    if (!item || !item._id) return;
-    db.collection("bookings").doc(item._id).delete();
-    setBookings(function(prev){ return prev.filter(function(b){ return b._id !== item._id; }); });
-  }
-
-  var hasMultiple = liveItems.length > 1;
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:7000,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
-      <div style={{maxWidth:480,margin:"0 auto",width:"100%"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div>
-            <div style={{fontSize:12,color:"#7090c0"}}>Modifica prenotazione</div>
-            <div style={{fontWeight:800,fontSize:18,color:"#ff9800",fontFamily:"monospace"}}>#{group.code}</div>
-          </div>
-          <button onClick={onClose} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontWeight:700}}>✕</button>
-        </div>
-
-        {/* Persone collegate */}
-        <div style={{background:"#12121f",borderRadius:10,padding:12,marginBottom:16}}>
-          <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>👥 PERSONE COLLEGATE ({liveItems.length})</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {liveItems.map(function(it){
-              var p = people.find(function(pp){return pp.id===it.person;});
-              return (
-                <div key={it.person} style={{display:"flex",alignItems:"center",gap:4,background:"#0d0d1a",borderRadius:6,padding:"4px 8px",fontSize:12,color:"#e8e8f0"}}>
-                  {p?p.name:it.person}
-                  <button onClick={function(){removePerson(it.person);}} style={{background:"none",border:"none",color:"#ff6060",cursor:"pointer",fontSize:12,padding:0,marginLeft:4}}>✕</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Scope selector if multiple people */}
-        {hasMultiple && (
-          <div style={{background:"#1a1200",border:"1px solid #ff980033",borderRadius:10,padding:12,marginBottom:16}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#ff9800",marginBottom:8}}>⚠️ APPLICA MODIFICHE A:</div>
-            <select value={scopeChoice} onChange={function(e){setScopeChoice(e.target.value);}}
-              style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #ff980044",borderRadius:8,color:"#e8e8f0",fontSize:13}}>
-              <option value="all">Tutte le {liveItems.length} persone</option>
-              {liveItems.map(function(it){
-                var p = people.find(function(pp){return pp.id===it.person;});
-                return <option key={it.person} value={it.person}>Solo {p?p.name:it.person}</option>;
-              })}
-            </select>
-          </div>
-        )}
-
-        {/* Form fields */}
-        <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:16}}>
-          {fields.map(function(f){
-            if (f.type==="event") {
-              return (
-                <div key={f.k} style={{marginBottom:12}}>
-                  <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{f.l}</label>
-                  <select value={form[f.k]||""} onChange={function(e){update(f.k,e.target.value);}}
-                    style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #1e3a8a44",borderRadius:8,color:"#e8e8f0",fontSize:13}}>
-                    {EVENTS.map(function(ev){return <option key={ev.id} value={ev.id}>{ev.label}</option>;})}
-                  </select>
-                </div>
-              );
-            }
-            if (f.type==="select") {
-              return (
-                <div key={f.k} style={{marginBottom:12}}>
-                  <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{f.l}</label>
-                  <select value={form[f.k]||""} onChange={function(e){update(f.k,e.target.value);}}
-                    style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #1e3a8a44",borderRadius:8,color:"#e8e8f0",fontSize:13}}>
-                    {f.opts.map(function(o){return <option key={o} value={o}>{o}</option>;})}
-                  </select>
-                </div>
-              );
-            }
-            return (
-              <div key={f.k} style={{marginBottom:12}}>
-                <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{f.l}</label>
-                <input value={form[f.k]||""} onChange={function(e){update(f.k,e.target.value);}}
-                  style={{width:"100%",padding:10,background:"#0d0d1a",border:"1px solid #1e3a8a44",borderRadius:8,color:"#e8e8f0",fontSize:13,boxSizing:"border-box"}}/>
-              </div>
-            );
-          })}
-        </div>
-
-        <div style={{display:"flex",gap:10,paddingBottom:14}}>
-          <button onClick={onClose} style={{flex:1,padding:14,background:"#1a1a2a",color:"#aaa",border:"1px solid #333",borderRadius:10,cursor:"pointer",fontWeight:700}}>Annulla</button>
-          <button onClick={save} disabled={saving} style={{flex:2,padding:14,background:"#14532d",color:"#4caf50",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:14}}>
-            {saving?"⏳ Salvataggio...":"✅ Salva modifiche"}
-          </button>
-        </div>
-
-        <button onClick={async function(){
-          var msg = hasMultiple
-            ? "Eliminare l'INTERA prenotazione #"+group.code+"? Verranno rimosse tutte le "+liveItems.length+" persone collegate."
-            : "Eliminare questa prenotazione #"+group.code+"?";
-          if (!window.confirm(msg)) return;
-          setSaving(true);
-          try {
-            for (var i=0; i<liveItems.length; i++) {
-              if (liveItems[i]._id) await db.collection("bookings").doc(liveItems[i]._id).delete();
-            }
-            setBookings(function(prev){
-              return prev.filter(function(b){ return !liveItems.some(function(it){return it._id===b._id;}); });
-            });
-            onClose();
-          } catch(e) { alert("Errore: "+e.message); setSaving(false); }
-        }} style={{width:"100%",padding:12,background:"#3a0a0a",color:"#ff6060",border:"1px solid #ff444433",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,marginBottom:30}}>
-          🗑️ Elimina {hasMultiple?"intera prenotazione ("+liveItems.length+" persone)":"prenotazione"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-
-// ── MasterImportModal ─────────────────────────────────────
-// Reads Pasini_Racing_Master_2026.xlsx (multi-sheet) and replaces all Firestore bookings
-function MasterImportModal({ onClose, onDone }) {
-  var [step, setStep] = useState("upload"); // upload | preview | importing | done
-  var [preview, setPreview] = useState(null); // {eventId, count, rows}[]
-  var [allRows, setAllRows] = useState([]);
-  var [progress, setProgress] = useState(0);
-  var [error, setError] = useState("");
-
-  var EVENT_MAP = {
-    "Test 1 Barcellona":"TEST1_BCN","Test 2 Jerez":"TEST2_JEREZ",
-    "R1 Barcellona":"R1_BARCELLONA","R2 Estoril":"R2_ESTORIL",
-    "R3 Jerez":"R3_JEREZ","R4 Magny-Cours":"R4_MAGNY",
-    "Test 3 Valencia":"TEST3_VALENCIA","R5 Valencia":"R5_VALENCIA",
-    "R6 Aragón":"R6_ARAGON","R7 Misano":"R7_MISANO",
-  };
-
-  var PERSON_MAP = {
-    "Luca Tonolini":"LUCA","Ilario Pasini":"ILARIO","Davide Migone":"DAVIDE",
-    "Matteo Faggioli":"MATTEO","Tommaso Faggioli":"TOMMASO","Samuele Donnini":"SAMULE",
-    "Daniele Tarquinio":"DANIELE","Riccardo Bonometti":"RICCARDO","Josep Romeu":"PEP",
-    "Maurizio Chiari":"MAURI","Santiago Frasca":"SANTIAGO","Giacomo Lavaroni":"GIACOMO",
-    "Guillem Ordeig":"GUILLEM","Cristian Borrelli":"BORRELLI","Lorenzo Pritelli":"PRITELLI",
-    "Leonardo Casadei":"CASADEI","Erik Michielon":"ERIK","Simone Corsini":"SIMONE",
-    "Stefano Ambrosi":"STEFANO",
-    // short names fallback
-    "LUCA":"LUCA","ILARIO":"ILARIO","DAVIDE":"DAVIDE","MATTEO":"MATTEO","TOMMASO":"TOMMASO",
-    "SAMULE":"SAMULE","DANIELE":"DANIELE","RICCARDO":"RICCARDO","PEP":"PEP","MAURI":"MAURI",
-    "SANTIAGO":"SANTIAGO","GIACOMO":"GIACOMO","GUILLEM":"GUILLEM","BORRELLI":"BORRELLI",
-    "PRITELLI":"PRITELLI","CASADEI":"CASADEI","ERIK":"ERIK","SIMONE":"SIMONE","STEFANO":"STEFANO",
-  };
-
-  async function loadXLSX() {
-    if (!window.XLSX) {
-      await new Promise(function(res,rej){
-        var s=document.createElement("script");
-        s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-        s.onload=res; s.onerror=rej; document.head.appendChild(s);
-      });
-    }
-  }
-
-  async function handleFile(file) {
-    setError("");
-    try {
-      await loadXLSX();
-      var ab = await file.arrayBuffer();
-      var wb = window.XLSX.read(ab, {type:"array"});
-      var rows = [];
-      var summary = [];
-
-      wb.SheetNames.forEach(function(sheetName) {
-        var eventId = EVENT_MAP[sheetName];
-        if (!eventId) return;
-        var ws = wb.Sheets[sheetName];
-        var data = window.XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
-
-        // Find header row (row with "Nome" or "PERSONA")
-        var hdrRow = -1;
-        for (var i=0; i<Math.min(5,data.length); i++) {
-          var r = data[i].map(function(c){return String(c||"").trim();});
-          if (r.includes("Nome") || r.includes("PERSONA")) { hdrRow=i; break; }
-        }
-        if (hdrRow < 0) return;
-
-        var headers = data[hdrRow].map(function(c){return String(c||"").trim();});
-
-        // Fixed column indices based on master Excel structure (1-based → 0-based)
-        // Col 1=Nome, 2=Ruolo
-        // Andata: 3=Volo,4=Compagnia,5=Data,6=Partenza,7=Arrivo,8=N°Pren,9=Bagaglio,10=Note
-        // Ritorno: 11=Volo,12=Compagnia,13=Data,14=Partenza,15=Arrivo,16=N°Pren,17=Bagaglio,18=Note
-        // Hotel: 19=Hotel,20=Camera,21=Indirizzo,22=CheckIn,23=CheckOut,24=Notti,25=N°Pren,26=Note
-        // Auto: 27=Veicolo,28=Compagnia,29=N°Pren,30=Note
-        var C = {
-          name:0, role:1,
-          and_flight:2, and_comp:3, and_date:4, and_dep:5, and_arr:6, and_pren:7, and_bag:8, and_note:9,
-          rit_flight:10, rit_comp:11, rit_date:12, rit_dep:13, rit_arr:14, rit_pren:15, rit_bag:16, rit_note:17,
-          hotel:18, camera:19, addr:20, cin:21, cout:22, notti:23, hpren:24, hnote:25,
-          auto:26, acomp:27, apren:28, anote:29,
-        };
-
-        function v(row,ci){ return ci>=0 ? String(row[ci]||"").trim() : ""; }
-
-        var sheetRows = 0;
-        data.slice(hdrRow+1).forEach(function(row) {
-          var name = v(row, C.name);
-          if (!name || name==="🚛 Camion") return;
-          var personId = PERSON_MAP[name];
-          if (!personId) return;
-
-          // Volo andata — check for connecting flight (contains "+" or "→")
-          var andFlight = v(row,C.and_flight);
-          var andNote = v(row,C.and_note);
-          if (andFlight && andFlight!=="—") {
-            // Check if connecting flight info is in note (SCALO MADRID pattern)
-            var scaloMatch = andNote.match(/SCALO[^:]*:\s*(\S+)\s+(\d{1,2}:\d{2})→(\S+)\s+(\d{1,2}:\d{2})\s*\(([^)]+)\s+([A-Z0-9]+)\)\s*\+\s*(\S+)\s+(\d{1,2}:\d{2})→(\S+)\s+(\d{1,2}:\d{2})\s*\(([^)]+)\s+([A-Z0-9]+)\)/);
-            if (scaloMatch) {
-              // First leg
-              rows.push({event:eventId,person:personId,type:"volo",dir:"andata",
-                flight:scaloMatch[5].trim(), company:"Wizz",
-                date:v(row,C.and_date),
-                dep:scaloMatch[1]+" "+scaloMatch[2],
-                arr:scaloMatch[3]+" "+scaloMatch[4],
-                booking:scaloMatch[6],
-                baggage:v(row,C.and_bag),
-                notes:"Scalo Madrid - 1° tratta",status:"confermata"});
-              // Second leg
-              rows.push({event:eventId,person:personId,type:"volo",dir:"andata",
-                flight:scaloMatch[11].trim(), company:"Iberia",
-                date:v(row,C.and_date),
-                dep:scaloMatch[7]+" "+scaloMatch[8],
-                arr:scaloMatch[9]+" "+scaloMatch[10],
-                booking:scaloMatch[12],
-                baggage:v(row,C.and_bag),
-                notes:"Scalo Madrid - 2° tratta",status:"confermata"});
-              sheetRows += 2;
-            } else {
-              // Single flight
-              rows.push({event:eventId,person:personId,type:"volo",dir:"andata",
-                flight:andFlight,company:v(row,C.and_comp),date:v(row,C.and_date),
-                dep:v(row,C.and_dep),arr:v(row,C.and_arr),booking:v(row,C.and_pren),
-                baggage:v(row,C.and_bag),notes:andNote,status:"confermata"});
-              sheetRows++;
-            }
-          }
-          // Volo ritorno
-          var ritFlight = v(row,C.rit_flight);
-          if (ritFlight && ritFlight!=="—") {
-            rows.push({event:eventId,person:personId,type:"volo",dir:"ritorno",
-              flight:ritFlight,company:v(row,C.rit_comp),date:v(row,C.rit_date),
-              dep:v(row,C.rit_dep),arr:v(row,C.rit_arr),booking:v(row,C.rit_pren),
-              baggage:v(row,C.rit_bag),notes:v(row,C.rit_note),status:"confermata"});
-            sheetRows++;
-          }
-          // Hotel
-          var hotel = v(row,C.hotel);
-          if (hotel && hotel!=="—" && hotel!=="🚛 Camion") {
-            rows.push({event:eventId,person:personId,type:"hotel",
-              hotel:hotel,room:v(row,C.camera),address:v(row,C.addr),
-              checkin:v(row,C.cin),checkout:v(row,C.cout),nights:v(row,C.notti),
-              booking:v(row,C.hpren),status:"confermata"});
-            sheetRows++;
-          }
-          // Auto
-          var auto = v(row,C.auto);
-          if (auto && auto!=="—") {
-            rows.push({event:eventId,person:personId,type:"auto",
-              car:auto,company:v(row,C.acomp),booking:v(row,C.apren),
-              notes:v(row,C.anote),status:"confermata"});
-            sheetRows++;
-          }
-        });
-        summary.push({eventId:eventId, label:sheetName, count:sheetRows});
-      });
-
-      setAllRows(rows);
-      setPreview(summary);
-      setStep("preview");
-    } catch(e) {
-      setError("Errore lettura file: " + e.message);
-    }
-  }
-
-  async function doImport() {
-    setStep("importing");
-    setProgress(0);
-    try {
-      // Clean rows first
-      var toWrite = [];
-      allRows.forEach(function(row) {
-        var clean = {};
-        Object.keys(row).forEach(function(k){ if(row[k]!==undefined && row[k]!=="") clean[k]=row[k]; });
-        if (!clean.event||!clean.person||!clean.type) return;
-        toWrite.push(clean);
-      });
-
-      // Write one by one — slow but reliable
-      var imported = [];
-      for (var i=0; i<toWrite.length; i++) {
-        var ref = await db.collection("bookings").add(toWrite[i]);
-        imported.push(Object.assign({_id:ref.id}, toWrite[i]));
-        if (i % 5 === 0) setProgress(Math.floor(i/Math.max(toWrite.length,1)*100));
-      }
-      setProgress(100);
-      setTimeout(function(){ onDone(imported); }, 800);
-    } catch(e) {
-      setError("Errore import: " + e.message);
-      setStep("preview");
-    }
-  }
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:6000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{background:"#12121f",borderRadius:16,padding:24,maxWidth:420,width:"100%",border:"2px solid #9c27b044",maxHeight:"85vh",overflowY:"auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <div style={{fontWeight:800,fontSize:16,color:"#ce93d8"}}>🗂️ Import Master Excel</div>
-          <button onClick={onClose} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontWeight:700}}>✕</button>
-        </div>
-
-        {step==="upload" && (
-          <div>
-            <div style={{fontSize:12,color:"#7090c0",marginBottom:16,lineHeight:1.5}}>
-              ⚠️ Questa operazione <b style={{color:"#ff6060"}}>cancella tutte le prenotazioni esistenti</b> e le sostituisce con i dati del Master Excel.<br/><br/>
-              Carica il file <b style={{color:"#ce93d8"}}>Pasini_Racing_Master_2026.xlsx</b>
-            </div>
-            <label style={{display:"block",border:"2px dashed #9c27b044",borderRadius:10,padding:32,textAlign:"center",cursor:"pointer",color:"#ce93d8",fontSize:13,fontWeight:700}}>
-              <input type="file" accept=".xlsx" style={{display:"none"}} onChange={function(e){if(e.target.files[0]) handleFile(e.target.files[0]);}}/>
-              📂 Tocca per scegliere il file
-            </label>
-            <div style={{marginTop:12,borderTop:"1px solid #ffffff11",paddingTop:12}}>
-              <div style={{fontSize:11,color:"#7090c0",marginBottom:8}}>Oppure cancella solo i dati esistenti:</div>
-              <button onClick={async function(){
-                if (!window.confirm("Cancellare TUTTE le prenotazioni da Firestore?")) return;
-                setStep("importing"); setProgress(0);
-                try {
-                  var snap = await db.collection("bookings").get();
-                  var docs = snap.docs;
-                  var total = docs.length;
-                  for (var i=0; i<docs.length; i++) {
-                    await docs[i].ref.delete();
-                    if (i % 10 === 0) setProgress(Math.floor(i/Math.max(total,1)*100));
-                  }
-                  setProgress(100);
-                  setTimeout(function(){ onDone([]); }, 500);
-                } catch(e){ setError("Errore: "+e.message); setStep("upload"); }
-              }} style={{width:"100%",padding:12,background:"#3a0a0a",color:"#ff6060",border:"1px solid #ff444433",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                🗑️ Cancella tutto Firestore
-              </button>
-            </div>
-            {error && <div style={{marginTop:12,color:"#ff6060",fontSize:12}}>{error}</div>}
-          </div>
-        )}
-
-        {step==="preview" && preview && (
-          <div>
-            <div style={{fontSize:12,color:"#4caf50",fontWeight:700,marginBottom:12}}>✅ File letto — {allRows.length} prenotazioni trovate:</div>
-            {preview.map(function(ev){
-              return (
-                <div key={ev.eventId} style={{display:"flex",justifyContent:"space-between",padding:"6px 10px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:12}}>
-                  <span style={{color:"#e8e8f0"}}>{ev.label}</span>
-                  <span style={{color:ev.count>0?"#4caf50":"#555",fontWeight:700}}>{ev.count} pren.</span>
-                </div>
-              );
-            })}
-            <div style={{marginTop:16,padding:12,background:"#3a0a0a",borderRadius:8,fontSize:12,color:"#ff9800"}}>
-              ⚠️ Verranno cancellate tutte le prenotazioni esistenti in Firestore!
-            </div>
-            <div style={{display:"flex",gap:10,marginTop:16}}>
-              <button onClick={function(){setStep("upload");}} style={{flex:1,padding:12,background:"#1a1a2a",color:"#aaa",border:"1px solid #333",borderRadius:8,cursor:"pointer",fontWeight:700}}>← Indietro</button>
-              <button onClick={doImport} style={{flex:2,padding:12,background:"#4a0080",color:"#ce93d8",border:"none",borderRadius:8,cursor:"pointer",fontWeight:800,fontSize:14}}>
-                🗂️ Importa tutto ({allRows.length})
-              </button>
-            </div>
-            {error && <div style={{marginTop:8,color:"#ff6060",fontSize:12}}>{error}</div>}
-          </div>
-        )}
-
-        {step==="importing" && (
-          <div style={{textAlign:"center",padding:20}}>
-            <div style={{fontSize:32,marginBottom:12}}>⏳</div>
-            <div style={{fontWeight:700,color:"#ce93d8",marginBottom:16}}>Importazione in corso...</div>
-            <div style={{background:"#0d0d1a",borderRadius:8,height:12,overflow:"hidden"}}>
-              <div style={{height:"100%",background:"#9c27b0",borderRadius:8,width:progress+"%",transition:"width 0.3s"}}/>
-            </div>
-            <div style={{marginTop:8,fontSize:12,color:"#7090c0"}}>{progress}% — {Math.floor(progress/100*allRows.length)}/{allRows.length} prenotazioni</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── EventTableModal ───────────────────────────────────────
-// Fullscreen tabella riepilogo evento stile spreadsheet, esportabile come immagine.
-function EventTableModal({ eventId, bookings, people, onClose }) {
-  var ev = EVENTS.find(function(e){ return e.id===eventId; });
-  var tableRef = React.useRef(null);
-
-  // Build rows: one per person, with all their bookings for this event
-  var evBs = bookings.filter(function(b){ return b.event===eventId; });
-  var peopleIds = evBs.map(function(b){return b.person;}).filter(function(v,i,a){return a.indexOf(v)===i;});
-  var evPeople = people.filter(function(p){return peopleIds.includes(p.id);});
-
-  // Group by shared auto (same booking number)
-  function getAuto(pid) {
-    var ab = evBs.find(function(b){return b.person===pid && (b.type==="auto"||b.type==="parcheggio");});
-    return ab ? (ab.car||ab.company||"Auto") + " #" + (ab.booking||"-") : null;
-  }
-  // Sort people by auto group
-  var sorted = evPeople.slice().sort(function(a,b){
-    var aa = getAuto(a.id)||"zzz"; var bb = getAuto(b.id)||"zzz";
-    return aa.localeCompare(bb);
-  });
-
-  function getVolo(pid, dir) {
-    return evBs.filter(function(b){return b.person===pid && b.type==="volo" && b.dir===dir;});
-  }
-  function getHotel(pid) {
-    return evBs.filter(function(b){return b.person===pid && b.type==="hotel";});
-  }
-
-  // Export as image using html2canvas-like approach via canvas
-  async function exportImage() {
-    try {
-      var el = tableRef.current;
-      if (!el) return;
-      // Use html2canvas via CDN
-      if (!window.html2canvas) {
-        await new Promise(function(res, rej){
-          var s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
-        });
-      }
-      var canvas = await window.html2canvas(el, {
-        backgroundColor: "#0a0a0f",
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-      var link = document.createElement("a");
-      link.download = (ev ? ev.label.replace(/\s+/g,"_") : eventId) + "_tabella.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } catch(e) {
-      alert("Errore esportazione: " + e.message);
-    }
-  }
-
-  var th = function(label, w) {
-    return <th style={{padding:"6px 10px",background:"#1e3a8a",color:"#fff",fontWeight:700,fontSize:10,whiteSpace:"nowrap",minWidth:w||80,textAlign:"left",border:"1px solid #1e3a8a66"}}>{label}</th>;
-  };
-  var td = function(content, color, bold) {
-    return <td style={{padding:"5px 9px",fontSize:10,color:color||"#e8e8f0",fontWeight:bold?"700":"400",whiteSpace:"nowrap",border:"1px solid #1e3a8a22",background:"transparent"}}>{content||"—"}</td>;
-  };
-
-  var prevAuto = null;
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.97)",zIndex:5000,display:"flex",flexDirection:"column"}}>
-      {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"#0d1a2a",borderBottom:"1px solid #1e3a8a",flexShrink:0}}>
-        <div>
-          <div style={{fontWeight:800,fontSize:14,color:"#fff"}}>{ev?ev.label:eventId}</div>
-          <div style={{fontSize:10,color:"#7090c0"}}>{ev?ev.circuit+" · "+ev.dates:""} · {evPeople.length} persone</div>
-        </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={exportImage} style={{background:"#b45309",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontWeight:700,fontSize:12}}>
-            📥 Salva PNG
-          </button>
-          <button onClick={onClose} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontWeight:700,fontSize:13}}>✕ Chiudi</button>
-        </div>
-      </div>
-
-      {/* Scrollable table */}
-      <div style={{flex:1,overflowX:"auto",overflowY:"auto",padding:12}}>
-        <div ref={tableRef} style={{background:"#0a0a0f",padding:12,display:"inline-block",minWidth:"100%"}}>
-          {/* Event title for export */}
-          <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:8,letterSpacing:1}}>
-            🏁 {ev?ev.label:eventId} {ev?"· "+ev.circuit+" · "+ev.dates:""}
-          </div>
-
-          <table style={{borderCollapse:"collapse",fontSize:10,width:"100%"}}>
-            <thead>
-              <tr>
-                {th("PERSONA",110)}
-                {th("AUTO / NOTE",120)}
-                {th("ANDATA — N° VOL.",90)}
-                {th("COMPAGNIA",75)}
-                {th("DATA",70)}
-                {th("PARTENZA",80)}
-                {th("→ ARRIVO",80)}
-                {th("N° PREN.",90)}
-                {th("BAGAGLIO",65)}
-                {th("RITORNO — N° VOL.",90)}
-                {th("COMPAGNIA",75)}
-                {th("DATA",70)}
-                {th("PARTENZA",80)}
-                {th("→ ARRIVO",80)}
-                {th("N° PREN.",90)}
-                {th("HOTEL",110)}
-                {th("CAMERA",130)}
-                {th("CHECK-IN",75)}
-                {th("CHECK-OUT",75)}
-                {th("NOTTI",45)}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map(function(p, pi) {
-                var auto = getAuto(p.id);
-                var andataBs = getVolo(p.id,"andata");
-                var ritornoBs = getVolo(p.id,"ritorno");
-                var hotelBs = getHotel(p.id);
-                var isNewAutoGroup = auto !== prevAuto;
-                prevAuto = auto;
-                var rowBg = pi%2===0 ? "#12121f" : "#0d0d1a";
-                var groupBorder = isNewAutoGroup && auto ? "2px solid #ff980033" : "none";
-
-                // Max rows for this person (if multiple andatas or ritorni)
-                var maxRows = Math.max(1, andataBs.length, ritornoBs.length, hotelBs.length);
-                var rows = [];
-                for (var ri=0; ri<maxRows; ri++) {
-                  var a = andataBs[ri];
-                  var r = ritornoBs[ri];
-                  var h = hotelBs[ri];
-                  rows.push(
-                    <tr key={p.id+"-"+ri} style={{background:rowBg,borderTop:ri===0&&isNewAutoGroup&&auto?groupBorder:"none"}}>
-                      {ri===0 ? (
-                        <React.Fragment>
-                          <td rowSpan={maxRows} style={{padding:"5px 9px",fontSize:10,fontWeight:700,color:"#4a9eff",whiteSpace:"nowrap",border:"1px solid #1e3a8a22",verticalAlign:"top",borderLeft:isNewAutoGroup&&auto?"3px solid #ff9800":"1px solid #1e3a8a22"}}>
-                            {p.name.split(" ")[0]}
-                            {p.role&&<div style={{fontSize:8,color:"#7090c0",fontWeight:400}}>{p.role}</div>}
-                          </td>
-                          <td rowSpan={maxRows} style={{padding:"5px 9px",fontSize:9,color:"#ff9800",whiteSpace:"nowrap",border:"1px solid #1e3a8a22",verticalAlign:"top"}}>{auto||""}</td>
-                        </React.Fragment>
-                      ) : null}
-                      {td(a?a.flight:"", "#4a9eff", true)}
-                      {td(a?a.company:"", "#9090c0")}
-                      {td(a?a.date:"", "#7090c0")}
-                      {td(a?a.dep:"", "#4a9eff")}
-                      {td(a?a.arr:"", "#7090c0")}
-                      {td(a?a.booking:"", "#ff9800")}
-                      {td(a?a.baggage:"", "#7090c0")}
-                      {td(r?r.flight:"", "#4caf50", true)}
-                      {td(r?r.company:"", "#9090c0")}
-                      {td(r?r.date:"", "#7090c0")}
-                      {td(r?r.dep:"", "#4caf50")}
-                      {td(r?r.arr:"", "#7090c0")}
-                      {td(r?r.booking:"", "#ff9800")}
-                      {td(h?h.hotel:"", "#4caf50")}
-                      {td(h?h.room:"", "#7090c0")}
-                      {td(h?h.checkin:"", "#7090c0")}
-                      {td(h?h.checkout:"", "#7090c0")}
-                      {td(h?h.nights:"", "#7090c0")}
-                    </tr>
-                  );
-                }
-                return rows;
-              })}
-            </tbody>
-          </table>
-
-          <div style={{fontSize:9,color:"#555",marginTop:8,textAlign:"right"}}>
-            Generato da Pasini Racing App · {new Date().toLocaleDateString("it-IT")}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── BookingDetailModal ────────────────────────────────────
-// Generic detail modal for volo/hotel/auto/parcheggio, showing all people sharing the same booking.
-function BookingDetailModal({ b, allBookings, people, onClose, onEdit, onDelete }) {
-  var tc = TYPE_COLORS[b.type] || TYPE_COLORS.volo;
-  var cc = b.company ? COMPANY_COLORS[b.company] : null;
-  var row = function(label, value, color) {
-    if (!value) return null;
-    return (
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #1e3a8a22"}}>
-        <span style={{fontSize:11,color:"#7090c0",fontWeight:600}}>{label}</span>
-        <span style={{fontSize:13,fontWeight:700,color:color||"#e8e8f0",textAlign:"right",maxWidth:"65%"}}>{value}</span>
-      </div>
-    );
-  };
-
-  // People sharing this exact booking: same event + type + booking number (if present), else same event+type+identifying field
-  var sharedPeople = (allBookings||[]).filter(function(x){
-    if (x.event!==b.event || x.type!==b.type) return false;
-    if (b.booking && b.booking!=="-" && x.booking) return x.booking===b.booking;
-    // fallback: same hotel/car/flight identifying field
-    if (b.type==="hotel") return x.hotel===b.hotel && x.room===b.room;
-    if (b.type==="volo") return x.flight===b.flight && x.dir===b.dir;
-    return x.car===b.car;
-  });
-  var peopleNames = sharedPeople.map(function(x){
-    var p = people.find(function(p2){return p2.id===x.person;});
-    return p ? p.name : x.person;
-  }).filter(function(v,i,a){return a.indexOf(v)===i;});
-
-  var isAndata = !b.dir || b.dir !== "ritorno";
-  var dirColor = isAndata ? "#4a9eff" : "#4caf50";
-
-  // Related bookings for the SAME person + event (other categories) — only meaningful for single-person view
-  var person = people.find(function(p){return p.id===b.person;});
-  var related = (allBookings||[]).filter(function(x){
-    return x.event===b.event && x.person===b.person && x.type!==b.type;
-  });
-
-  function summaryCard(icon, color, title, lines) {
-    return (
-      <div style={{background:"#0d0d1a",borderRadius:10,padding:"10px 12px",marginBottom:8,borderLeft:"3px solid "+color}}>
-        <div style={{fontSize:11,fontWeight:800,color:color,marginBottom:4}}>{icon} {title}</div>
-        {lines.map(function(l,i){return <div key={i} style={{fontSize:12,color:"#e8e8f0",marginBottom:i<lines.length-1?2:0}}>{l}</div>;})}
-      </div>
-    );
-  }
-
-  var headerTitle, headerBadge;
-  if (b.type==="volo") {
-    headerTitle = b.flight||"—";
-    headerBadge = (
-      <span style={{background:dirColor+"22",color:dirColor,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>
-        {isAndata?"↗ ANDATA":"↙ RITORNO"}
-      </span>
-    );
-  } else if (b.type==="hotel") {
-    headerTitle = b.hotel||"Hotel";
-    headerBadge = <span style={{background:"#4caf5022",color:"#4caf50",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>🏨 {b.room||"Camera"}</span>;
-  } else if (b.type==="auto") {
-    headerTitle = b.car||"Auto a noleggio";
-    headerBadge = <span style={{background:"#ff980022",color:"#ff9800",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>🚗 Noleggio</span>;
-  } else {
-    headerTitle = b.car||"Parcheggio";
-    headerBadge = <span style={{background:"#9c27b022",color:"#9c27b0",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:800}}>🅿️ Parcheggio</span>;
-  }
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:4500,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(e){if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:"#12121f",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:560,border:"1px solid #1e3a8a",maxHeight:"85vh",overflowY:"auto"}}>
-        <div style={{width:40,height:4,background:"#333",borderRadius:2,margin:"0 auto 16px"}}/>
-
-        {/* Header */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-          <div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
-              {headerBadge}
-              {b.type==="volo" && b.company && <span style={{background:cc||"#333",color:"#fff",borderRadius:5,padding:"3px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={function(){openAirlineApp(b.company);}}>🌐 {b.company}</span>}
-              {b.type!=="volo" && b.company && <span style={{background:"#333",color:"#fff",borderRadius:5,padding:"3px 10px",fontSize:12,fontWeight:700}}>{b.company}</span>}
-            </div>
-            <div style={{fontSize:24,fontWeight:900,color:"#fff",letterSpacing:0.5}}>{headerTitle}</div>
-          </div>
-          <button onClick={onClose} style={{background:"#1a1a2a",border:"none",color:"#7090c0",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:18,flexShrink:0}}>✕</button>
-        </div>
-
-        {/* Flight route big display */}
-        {b.type==="volo" && (
-          <div style={{background:"#0d0d1a",borderRadius:12,padding:16,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{textAlign:"center",flex:1}}>
-              <div style={{fontSize:28,fontWeight:900,color:"#4a9eff"}}>{b.dep ? b.dep.split(" ")[0] : "—"}</div>
-              <div style={{fontSize:16,color:"#7090c0"}}>{b.dep ? b.dep.split(" ").slice(1).join(" ") : ""}</div>
-              <div style={{fontSize:11,color:"#555",marginTop:2}}>Partenza</div>
-            </div>
-            <div style={{flex:1,textAlign:"center"}}>
-              <div style={{fontSize:20}}>✈️</div>
-              <div style={{height:2,background:"#1e3a8a",margin:"4px 0"}}/>
-              <div style={{fontSize:10,color:"#7090c0"}}>{b.date||""}</div>
-            </div>
-            <div style={{textAlign:"center",flex:1}}>
-              <div style={{fontSize:28,fontWeight:900,color:"#4caf50"}}>{b.arr ? b.arr.split(" ")[0] : "—"}</div>
-              <div style={{fontSize:16,color:"#7090c0"}}>{b.arr ? b.arr.split(" ").slice(1).join(" ") : ""}</div>
-              <div style={{fontSize:11,color:"#555",marginTop:2}}>Arrivo</div>
-            </div>
-          </div>
-        )}
-
-        {/* Hotel quick info */}
-        {b.type==="hotel" && (
-          <div style={{background:"#0d0d1a",borderRadius:12,padding:16,marginBottom:16}}>
-            {b.address && (
-              <div onClick={function(){window.open("https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((b.hotel||"")+" "+b.address),"_blank");}}
-                style={{color:"#4caf50",fontSize:13,fontWeight:700,cursor:"pointer",textDecoration:"underline dotted",marginBottom:8}}>
-                📍 {b.address}
-              </div>
-            )}
-            <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
-              {b.checkin && <div><div style={{fontSize:10,color:"#7090c0"}}>Check-in</div><div style={{fontSize:14,fontWeight:700,color:"#4a9eff"}}>{b.checkin}</div></div>}
-              {b.checkout && <div><div style={{fontSize:10,color:"#7090c0"}}>Check-out</div><div style={{fontSize:14,fontWeight:700,color:"#ff9800"}}>{b.checkout}</div></div>}
-              {b.nights && <div><div style={{fontSize:10,color:"#7090c0"}}>Notti</div><div style={{fontSize:14,fontWeight:700,color:"#e8e8f0"}}>{b.nights}</div></div>}
-            </div>
-          </div>
-        )}
-
-        {/* People sharing this booking */}
-        {peopleNames.length > 0 && (
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#7090c0",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
-              👥 {peopleNames.length>1?"Persone in questa prenotazione":"Persona"} ({peopleNames.length})
-            </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {peopleNames.map(function(name,i){
-                return <span key={i} style={{background:tc.bg+"66",color:tc.accent,borderRadius:6,padding:"5px 12px",fontSize:12,fontWeight:700,border:"1px solid "+tc.accent+"33"}}>{name}</span>;
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Details */}
-        <div style={{marginBottom:16}}>
-          {b.type==="volo" && row("Data", b.date)}
-          {b.type==="volo" && row("Bagaglio", b.baggage, "#ff9800")}
-          {b.type!=="volo" && b.notes && row("Dettagli", b.notes)}
-          {row("N° Prenotazione", b.booking && b.booking!=="-" ? "#"+b.booking : null, "#ff9800")}
-          {row("Stato", b.status==="confermata"?"✅ Confermata":b.status==="da_confermare"?"⏳ Da confermare":"❌ Cancellata")}
-          {row("Prezzo", b.price ? "€"+b.price : null, "#4caf50")}
-          {b.type==="volo" && b.notes && row("Note", "📌 "+b.notes, "#c0a060")}
-        </div>
-
-        {/* Trip summary: other booking types for same person+event */}
-        {related.length>0 && (function(){
-          var hotelBs = related.filter(function(x){return x.type==="hotel";});
-          var autoBs = related.filter(function(x){return x.type==="auto";});
-          var parkBs = related.filter(function(x){return x.type==="parcheggio";});
-          var voloBs = related.filter(function(x){return x.type==="volo";});
-          if (hotelBs.length===0 && autoBs.length===0 && parkBs.length===0 && voloBs.length===0) return null;
-          return (
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#7090c0",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>🧳 Altre prenotazioni di {person?person.name.split(" ")[0]:""}</div>
-              {voloBs.map(function(v,i){
-                return summaryCard("✈️","#4a9eff", v.dir==="ritorno"?"Volo ritorno":"Volo andata", [
-                  [v.flight, v.company].filter(Boolean).join(" · "),
-                  [v.dep, v.arr].filter(Boolean).join(" → "),
-                ].filter(Boolean));
-              })}
-              {hotelBs.map(function(h,i){
-                return summaryCard("🏨","#4caf50","Hotel", [
-                  h.hotel||"Hotel",
-                  [h.room, h.nights?h.nights+" notti":null].filter(Boolean).join(" · "),
-                ].filter(Boolean));
-              })}
-              {autoBs.map(function(a,i){
-                return summaryCard("🚗","#ff9800","Noleggio auto", [
-                  a.car||"Auto a noleggio",
-                  [a.company, a.booking?"#"+a.booking:null].filter(Boolean).join(" · "),
-                ].filter(Boolean));
-              })}
-              {parkBs.map(function(p,i){
-                return summaryCard("🅿️","#9c27b0","Parcheggio", [
-                  p.car||"Parcheggio",
-                  [p.company, p.booking?"#"+p.booking:null].filter(Boolean).join(" · "),
-                ].filter(Boolean));
-              })}
-            </div>
-          );
-        })()}
-
-        {/* Actions */}
-        <div style={{display:"flex",gap:10}}>
-          {b.type==="volo" && b.company && (COMPANY_URLS[b.company]||COMPANY_DEEPLINKS[b.company]) && (
-            <button onClick={function(){openAirlineApp(b.company);}}
-              style={{flex:2,padding:12,background:"#1e3a8a",color:"#4a9eff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>
-              🌐 Apri {b.company}
-            </button>
-          )}
-          {b.type==="hotel" && b.address && (
-            <button onClick={function(){window.open("https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((b.hotel||"")+" "+b.address),"_blank");}}
-              style={{flex:2,padding:12,background:"#14532d",color:"#4caf50",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>
-              📍 Apri in Google Maps
-            </button>
-          )}
-          {onEdit && <button onClick={function(){onEdit(b);onClose();}}
-            style={{flex:1,padding:12,background:"#1a2a4a",color:"#4a9eff",border:"1px solid #1e3a8a",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>✏️</button>}
-          {onDelete && <button onClick={function(){onDelete(b);onClose();}}
-            style={{flex:1,padding:12,background:"#2a0a0a",color:"#ff6060",border:"1px solid #ff444433",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>🗑️</button>}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── GalleryView ────────────────────────────────────────────
 function GalleryView({ isAdmin }) {
