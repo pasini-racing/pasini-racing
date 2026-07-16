@@ -1965,7 +1965,7 @@ export default function App() {
                 );
               })}
               <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #4caf5022"}}>
-                <MealQRSection personId={selPerson} person={person} events={events} currentUserId={currentUser&&currentUser.id}/>
+                <MealQRSection events={events}/>
               </div>
             </div>
           );
@@ -2026,6 +2026,9 @@ export default function App() {
               </div>}
               <EventDocuments eventId={selEvent} isAdmin={isAdmin}/>
               {isAdmin && <div style={{marginBottom:12}}><MealQRUploader eventId={selEvent}/></div>}
+              <div style={{background:"#12121f",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #4caf5022"}}>
+                <MealQRSection events={[selEvent]}/>
+              </div>
               {filterType==="all" ? people2.map(function(pid){
                 var person2=people.find(function(p){return p.id===pid;});
                 var pBs=eventBs.filter(function(b){return b.person===pid;});
@@ -2038,7 +2041,6 @@ export default function App() {
                     </div>
                     {pBs.map(function(b,i){return <BookingCard key={i} b={b} compact onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
                     {eventNotes[nk] && <div style={{marginTop:6,padding:"5px 9px",background:"#1a1500",borderRadius:5,border:"1px solid #f0c04033",fontSize:11,color:"#e8c87a",fontStyle:"italic"}}>📋 {eventNotes[nk]}</div>}
-                    <PersonMealQR personId={pid} eventId={selEvent}/>
                   </div>
                 );
               }) : eventBs.map(function(b,i){return <BookingCard key={i} b={b} showPerson onEdit={isAdmin?handleEdit:null} onDelete={isAdmin?function(x){setConfirmDelete(x);}:null}/>;} )}
@@ -2190,42 +2192,25 @@ function EventDocuments({ eventId, isAdmin }) {
 
 
 // ── MealQRSection ─────────────────────────────────────────
-// Mapping numero file → person ID
-var MEAL_NUM_TO_ID = {
-  1:"ILARIO", 2:"LUCA", 3:"DAVIDE", 4:"MATTEO", 5:"TOMMASO",
-  6:"SAMULE", 7:"DANIELE", 8:"RICCARDO", 9:"PEP", 10:"SANTIAGO",
-  11:"GIACOMO", 12:"GUILLEM", 13:"BORRELLI", 14:"PRITELLI",
-  15:"CASADEI", 16:"ERIK", 17:"MAURI", 18:"SIMONE"
-};
-
-function MealQRSection({ personId, person, events, currentUserId }) {
+// Un solo QR pasti per evento, condiviso da tutta la squadra (niente più divisioni per persona o tipo pasto)
+function MealQRSection({ events }) {
   var [expanded, setExpanded] = useState(false);
-  var [mealDocs, setMealDocs] = useState({}); // { eventId: { breakfast, lunch, dinner } }
+  var [mealDocs, setMealDocs] = useState({}); // { eventId: { data, name } }
 
   useEffect(function(){
     var unsub = db.collection("mealQR")
-      .where("personId","==",personId)
       .onSnapshot(function(snap){
         var obj = {};
         snap.docs.forEach(function(d){
           var data = d.data();
-          if (!obj[data.event]) obj[data.event] = {};
-          obj[data.event][data.mealType||"breakfast"] = { data: data.fileData, name: data.fileName };
+          obj[data.event] = { data: data.fileData, name: data.fileName };
         });
         setMealDocs(obj);
       }, function(e){ console.error(e); });
     return function(){ unsub(); };
-  }, [personId]);
+  }, []);
 
   if (!events || events.length === 0) return null;
-  // Only show QR to the person themselves or admin
-  if (currentUserId && currentUserId !== personId && currentUserId !== "LUCA" && currentUserId !== "ILARIO") return null;
-
-  var meals = [
-    {key:"breakfast", label:"Colazione", emoji:"☕", color:"#ff9800"},
-    {key:"lunch",     label:"Pranzo",    emoji:"🍽️", color:"#4caf50"},
-    {key:"dinner",    label:"Cena",      emoji:"🌙", color:"#4a9eff"},
-  ];
 
   var hasDocs = Object.keys(mealDocs).length > 0;
 
@@ -2235,7 +2220,7 @@ function MealQRSection({ personId, person, events, currentUserId }) {
         onClick={function(){setExpanded(function(v){return !v;});}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:14}}>🍽️</span>
-          <span style={{fontSize:13,fontWeight:700,color:"#4caf50"}}>QR Code Pasti</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#4caf50"}}>QR Code Pasti (squadra)</span>
           {hasDocs
             ? <span style={{background:"#14532d",color:"#4caf50",borderRadius:10,padding:"1px 8px",fontSize:10,fontWeight:700}}>✓ Disponibili</span>
             : <span style={{background:"#1a1a1a",color:"#555",borderRadius:10,padding:"1px 8px",fontSize:10}}>In attesa</span>}
@@ -2244,36 +2229,22 @@ function MealQRSection({ personId, person, events, currentUserId }) {
       </div>
       {expanded && events.map(function(evId){
         var ev = EVENTS.find(function(e){return e.id===evId;});
-        var evDocs = mealDocs[evId] || {};
-        var hasEvDocs = Object.keys(evDocs).length > 0;
+        var doc = mealDocs[evId];
         return (
-          <div key={evId} style={{background:"#0d0d1a",borderRadius:8,padding:12,marginBottom:8,border:"1px solid "+(hasEvDocs?"#4caf5033":"#ffffff11")}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#7090c0",marginBottom:8}}>
-              🏁 {ev?ev.label:evId} {ev&&<span style={{fontWeight:400}}>— {ev.dates}</span>}
-            </div>
-            {hasEvDocs ? (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {meals.map(function(meal){
-                  var doc = evDocs[meal.key];
-                  return (
-                    <div key={meal.key} style={{background:"#12121f",borderRadius:8,padding:10,border:"2px solid "+meal.color+"33",textAlign:"center"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:meal.color,marginBottom:6}}>{meal.emoji} {meal.label}</div>
-                      {doc ? (
-                        <button onClick={function(){
-                            try{var ar=doc.data.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(doc.data,"_blank");}
-                          }}
-                          style={{display:"block",width:"100%",padding:"8px 4px",background:meal.color+"22",color:meal.color,borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:700}}>
-                          👁️ Apri PDF
-                        </button>
-                      ) : (
-                        <div style={{fontSize:10,color:"#555",fontStyle:"italic"}}>Non caricato</div>
-                      )}
-                    </div>
-                  );
-                })}
+          <div key={evId} style={{background:"#0d0d1a",borderRadius:8,padding:12,marginBottom:8,border:"1px solid "+(doc?"#4caf5033":"#ffffff11"),display:"flex",alignItems:"center",gap:10}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#7090c0"}}>
+                🏁 {ev?ev.label:evId} {ev&&<span style={{fontWeight:400}}>— {ev.dates}</span>}
               </div>
-            ) : (
-              <div style={{fontSize:12,color:"#555",fontStyle:"italic"}}>QR non ancora caricati dall'amministratore</div>
+              {!doc && <div style={{fontSize:11,color:"#555",fontStyle:"italic",marginTop:2}}>QR non ancora caricato dall'amministratore</div>}
+            </div>
+            {doc && (
+              <button onClick={function(){
+                  try{var ar=doc.data.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(doc.data,"_blank");}
+                }}
+                style={{background:"#4caf5022",color:"#4caf50",borderRadius:6,border:"none",padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:700,flexShrink:0}}>
+                👁️ Apri QR
+              </button>
             )}
           </div>
         );
@@ -2283,174 +2254,73 @@ function MealQRSection({ personId, person, events, currentUserId }) {
 }
 
 
-
 // ── MealQRUploader (admin) ─────────────────────────────────
+// Un solo QR per evento, condiviso da tutta la squadra
 function MealQRUploader({ eventId }) {
   var [uploading, setUploading] = useState(false);
   var [progress, setProgress] = useState("");
   var [done, setDone] = useState(false);
-  var [counts, setCounts] = useState({breakfast:0,lunch:0,dinner:0});
-  var [mode, setMode] = useState("bulk"); // "bulk" or "manual"
-  var [manualPerson, setManualPerson] = useState("");
-  var [manualType, setManualType] = useState("breakfast");
-  var [existing, setExisting] = useState([]);
+  var [existing, setExisting] = useState(null);
 
   useEffect(function(){
     var unsub = db.collection("mealQR").where("event","==",eventId)
       .onSnapshot(function(snap){
-        setExisting(snap.docs.map(function(d){return Object.assign({_id:d.id},d.data());}));
+        setExisting(snap.empty ? null : Object.assign({_id:snap.docs[0].id}, snap.docs[0].data()));
       }, function(e){console.error(e);});
     return function(){unsub();};
   },[eventId]);
 
-  var MEAL_TYPES = [
-    {key:"breakfast", label:"☕ Colazione", color:"#ff9800"},
-    {key:"lunch",     label:"🍽️ Pranzo",    color:"#4caf50"},
-    {key:"dinner",    label:"🌙 Cena",       color:"#4a9eff"},
-  ];
-
-  async function handleFolder(files, mealType) {
-    if (!files || files.length === 0) return;
+  async function handleUpload(file) {
+    if (!file) return;
     setUploading(true); setDone(false);
-    setProgress("Caricamento "+mealType+"...");
-    var uploaded = 0;
-    try {
-      var arr = Array.from(files);
-      for (var i = 0; i < arr.length; i++) {
-        var file = arr[i];
-        var fname = file.name;
-        if (fname.startsWith("._") || fname === ".DS_Store") continue;
-        var numMatch = fname.match(/([0-9]+)/);
-        if (!numMatch) continue;
-        var num = parseInt(numMatch[1]);
-        var personId = MEAL_NUM_TO_ID[num];
-        if (!personId) continue;
-        setProgress(mealType+" · "+fname+" ("+personId+") "+(i+1)+"/"+arr.length);
-        var b64 = await new Promise(function(res,rej){
-          var r = new FileReader();
-          r.onload = function(e){ var result=e.target.result; var idx=result.indexOf(","); res(idx>=0?result.substring(idx+1):result); };
-          r.onerror=rej; r.readAsDataURL(file);
-        });
-        var sizeMB = Math.round(b64.length*0.75/1024/1024*10)/10;
-        if (sizeMB > 5) continue;
-        var snap = await db.collection("mealQR").where("event","==",eventId).where("personId","==",personId).where("mealType","==",mealType).get();
-        var docData = {event:eventId,personId:personId,mealType:mealType,fileNum:num,fileName:fname,fileData:"data:application/pdf;base64,"+b64,uploadedAt:new Date().toISOString().substring(0,10)};
-        if (!snap.empty) await snap.docs[0].ref.set(docData);
-        else await db.collection("mealQR").add(docData);
-        uploaded++;
-      }
-      setCounts(function(prev){var n=Object.assign({},prev);n[mealType]=uploaded;return n;});
-      setProgress("✅ "+mealType+": "+uploaded+" PDF caricati");
-      setDone(true);
-    } catch(err){ setProgress("❌ Errore: "+err.message); }
-    setUploading(false);
-  }
-
-  async function handleManual(file) {
-    if (!file || !manualPerson) return;
-    setUploading(true);
     try {
       var b64 = await new Promise(function(res,rej){
         var r = new FileReader();
         r.onload = function(e){ var result=e.target.result; var idx=result.indexOf(","); res(idx>=0?result.substring(idx+1):result); };
         r.onerror=rej; r.readAsDataURL(file);
       });
-      var mime = file.type||"application/pdf";
-      var snap = await db.collection("mealQR").where("event","==",eventId).where("personId","==",manualPerson).where("mealType","==",manualType).get();
-      var docData = {event:eventId,personId:manualPerson,mealType:manualType,fileName:file.name,fileData:"data:"+mime+";base64,"+b64,uploadedAt:new Date().toISOString().substring(0,10)};
+      var sizeMB = Math.round(b64.length*0.75/1024/1024*10)/10;
+      if (sizeMB > 5) { setProgress("❌ File troppo grande (max 5MB)"); setUploading(false); return; }
+      var mime = file.type || "application/pdf";
+      var docData = {event:eventId, fileName:file.name, fileData:"data:"+mime+";base64,"+b64, uploadedAt:new Date().toISOString().substring(0,10)};
+      var snap = await db.collection("mealQR").where("event","==",eventId).get();
       if (!snap.empty) await snap.docs[0].ref.set(docData);
       else await db.collection("mealQR").add(docData);
-      setProgress("✅ QR caricato per "+manualPerson+" — "+manualType);
+      setProgress("✅ QR caricato — condiviso con tutta la squadra");
       setDone(true);
-    } catch(err){ setProgress("❌ "+err.message); }
+    } catch(err){ setProgress("❌ Errore: "+err.message); }
     setUploading(false);
   }
 
-  async function deleteQR(id) {
-    await db.collection("mealQR").doc(id).delete();
+  async function deleteQR() {
+    if (!existing) return;
+    await db.collection("mealQR").doc(existing._id).delete();
+    setProgress(""); setDone(false);
   }
 
   return (
     <div style={{background:"#0d1a0d",borderRadius:8,padding:14,border:"1px solid #4caf5033",marginBottom:12}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#4caf50"}}>📂 QR Code Pasti — {(EVENTS.find(function(e){return e.id===eventId;})||{label:eventId}).label}</div>
-        <div style={{display:"flex",gap:6}}>
-          <button onClick={function(){setMode("bulk");}} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="bulk"?"#14532d":"#0d0d1a",color:mode==="bulk"?"#4caf50":"#7090c0"}}>📦 Bulk</button>
-          <button onClick={function(){setMode("manual");}} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="manual"?"#14532d":"#0d0d1a",color:mode==="manual"?"#4caf50":"#7090c0"}}>✏️ Manuale</button>
-          <button onClick={function(){setMode("manage");}} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="manage"?"#14532d":"#0d0d1a",color:mode==="manage"?"#4caf50":"#7090c0"}}>🗂️ Gestisci</button>
-        </div>
-      </div>
-
-      {mode==="bulk" && (
-        <div>
-          <div style={{fontSize:11,color:"#7090c0",marginBottom:8}}>Carica PDF numerati per tutti i membri in una volta</div>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {MEAL_TYPES.map(function(mt){return(
-              <label key={mt.key} style={{display:"flex",alignItems:"center",gap:10,background:"#0d0d1a",border:"2px dashed "+mt.color+"44",borderRadius:8,padding:"10px 12px",cursor:uploading?"not-allowed":"pointer"}}>
-                <input type="file" accept=".pdf,image/*" multiple style={{display:"none"}} disabled={uploading} onChange={function(e){handleFolder(e.target.files,mt.key);e.target.value="";}}/>
-                <span style={{fontSize:14}}>{mt.label.split(" ")[0]}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:700,color:mt.color}}>{mt.label}</div>
-                  <div style={{fontSize:10,color:"#7090c0"}}>{counts[mt.key]>0?"✅ "+counts[mt.key]+" caricati":"Multi-selezione PDF numerati"}</div>
-                </div>
-                <span style={{fontSize:11,color:mt.color,fontWeight:700}}>Sfoglia →</span>
-              </label>
-            );})}
+      <div style={{fontSize:12,fontWeight:700,color:"#4caf50",marginBottom:10}}>📂 QR Code Pasti — {(EVENTS.find(function(e){return e.id===eventId;})||{label:eventId}).label}</div>
+      <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>Un unico QR per l'evento, condiviso da tutta la squadra (non più diviso per persona o pasto)</div>
+      {existing ? (
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#0d0d1a",borderRadius:7,marginBottom:8,border:"1px solid #4caf5033"}}>
+          <span style={{fontSize:18}}>📄</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#e8e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{existing.fileName}</div>
+            <div style={{fontSize:10,color:"#7090c0"}}>{existing.uploadedAt}</div>
           </div>
+          <button onClick={function(){
+              try{var ar=existing.fileData.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(existing.fileData,"_blank");}
+            }} style={{background:"#1e3a8a22",color:"#4a9eff",border:"none",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:11,flexShrink:0}}>👁️</button>
+          <button onClick={function(){if(window.confirm("Eliminare il QR condiviso di questo evento?")) deleteQR();}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:11,flexShrink:0}}>🗑️</button>
         </div>
+      ) : (
+        <div style={{fontSize:12,color:"#555",fontStyle:"italic",marginBottom:8}}>Nessun QR caricato per questo evento</div>
       )}
-
-      {mode==="manual" && (
-        <div>
-          <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>Carica o sostituisci il QR di un singolo membro</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-            <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Membro</label>
-              <select value={manualPerson} onChange={function(e){setManualPerson(e.target.value);}}
-                style={{width:"100%",padding:"8px",background:"#0d0d1a",border:"1px solid #4caf5033",borderRadius:6,color:manualPerson?"#e8e8f0":"#7090c0",fontSize:12,outline:"none"}}>
-                <option value="">-- Seleziona --</option>
-                {Object.entries(MEAL_NUM_TO_ID).map(function(e){
-                  var p=PEOPLE.find(function(p){return p.id===e[1];});
-                  return React.createElement("option",{key:e[0],value:e[1]},e[0]+" — "+(p?p.name:e[1]));
-                })}
-              </select>
-            </div>
-            <div>
-              <label style={{fontSize:10,color:"#7090c0",display:"block",marginBottom:3}}>Tipo pasto</label>
-              <select value={manualType} onChange={function(e){setManualType(e.target.value);}}
-                style={{width:"100%",padding:"8px",background:"#0d0d1a",border:"1px solid #4caf5033",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none"}}>
-                {MEAL_TYPES.map(function(mt){return React.createElement("option",{key:mt.key,value:mt.key},mt.label);})}
-              </select>
-            </div>
-          </div>
-          <label style={{display:"block",background:"#0d0d1a",border:"2px dashed #4caf5044",borderRadius:8,padding:12,textAlign:"center",cursor:(uploading||!manualPerson)?"not-allowed":"pointer",opacity:(uploading||!manualPerson)?0.5:1}}>
-            <input type="file" accept=".pdf,image/*" style={{display:"none"}} disabled={uploading||!manualPerson} onChange={function(e){handleManual(e.target.files[0]);e.target.value="";}}/>
-            <span style={{fontSize:12,color:"#4caf50"}}>{uploading?"⏳ Caricamento...":"📄 Seleziona PDF o immagine"}</span>
-          </label>
-        </div>
-      )}
-
-      {mode==="manage" && (
-        <div style={{maxHeight:240,overflowY:"auto"}}>
-          {existing.length===0 && <div style={{fontSize:12,color:"#7090c0",textAlign:"center",padding:16}}>Nessun QR caricato per questo evento</div>}
-          {existing.map(function(doc){
-            var p=PEOPLE.find(function(x){return x.id===doc.personId;});
-            var mt=MEAL_TYPES.find(function(m){return m.key===doc.mealType;})||{label:doc.mealType||"?",color:"#7090c0"};
-            return(
-              <div key={doc._id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 8px",background:"#0d0d1a",borderRadius:6,marginBottom:4,fontSize:11}}>
-                <span style={{background:mt.color+"22",color:mt.color,borderRadius:4,padding:"2px 6px",fontSize:10,fontWeight:700,flexShrink:0}}>{mt.label}</span>
-                <span style={{flex:1,color:"#e8e8f0",fontWeight:700}}>{p?p.name:doc.personId}</span>
-                <span style={{color:"#555",fontSize:10}}>{doc.uploadedAt}</span>
-                <button onClick={function(){
-                  try{var ar=doc.fileData.split(",");var mi=ar[0].match(/:(.*?);/)[1];var bs=atob(ar[1]);var n=bs.length;var u=new Uint8Array(n);while(n--){u[n]=bs.charCodeAt(n);}window.open(URL.createObjectURL(new Blob([u],{type:mi})),"_blank");}catch(e){window.open(doc.fileData,"_blank");}
-                }} style={{background:"#1e3a8a22",color:"#4a9eff",border:"none",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:10,flexShrink:0}}>👁️</button>
-                <button onClick={function(){if(window.confirm("Eliminare QR di "+(p?p.name:doc.personId)+"?")) deleteQR(doc._id);}} style={{background:"#3a0a0a",color:"#ff6060",border:"none",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:10,flexShrink:0}}>🗑️</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
+      <label style={{display:"block",background:"#0d0d1a",border:"2px dashed #4caf5044",borderRadius:8,padding:12,textAlign:"center",cursor:uploading?"not-allowed":"pointer",opacity:uploading?0.5:1}}>
+        <input type="file" accept=".pdf,image/*" style={{display:"none"}} disabled={uploading} onChange={function(e){handleUpload(e.target.files[0]);e.target.value="";}}/>
+        <span style={{fontSize:12,color:"#4caf50"}}>{uploading?"⏳ Caricamento...":(existing?"📄 Sostituisci QR":"📄 Carica QR")}</span>
+      </label>
       {progress && <div style={{marginTop:8,fontSize:11,color:done?"#4caf50":"#ff9800",padding:"6px 8px",background:"#0d0d1a",borderRadius:6}}>{progress}</div>}
     </div>
   );
