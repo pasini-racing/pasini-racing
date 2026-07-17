@@ -1985,6 +1985,7 @@ export default function App() {
         );
       })()}
       {showEventForm && <EventFormModal onSave={createEvent} onClose={function(){setShowEventForm(false);}}/>}
+      {confirmDeleteUser && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"#1a0a0a",borderRadius:14,padding:28,maxWidth:360,width:"100%",border:"2px solid #ff4444",textAlign:"center"}}>
             <div style={{fontSize:32,marginBottom:12}}>👤</div>
