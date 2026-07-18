@@ -2022,7 +2022,8 @@ function ExcelImport({ onImport, onClose, people }) {
 
 
 // ── TeamManager ───────────────────────────────────────────
-var EMPTY_USER = {id:"",name:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italia",tshirt:"M",jacket:"M",pants:"M",hoodie:"M",notes:"",pin:"",username:"",address:"",airport:""};
+var NATIONALITY_OPTIONS = ["Italiana","Spagnola","Altra"];
+var EMPTY_USER = {id:"",name:"",firstName:"",lastName:"",role:"",phone:"",email:"",docType:"Passaporto",docNum:"",docExpiry:"",nationality:"Italiana",tshirt:"M",jacket:"M",pants:"M",hoodie:"M",tshirtQty:0,jacketQty:0,pantsQty:0,hoodieQty:0,tshirtDelivered:0,jacketDelivered:0,pantsDelivered:0,hoodieDelivered:0,notes:"",pin:"",username:"",address:"",airport:""};
 
 function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
   var [showForm, setShowForm] = useState(false);
@@ -2032,12 +2033,21 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
   var [globalResults, setGlobalResults] = useState(null);
   var [importing, setImporting] = useState(false);
   function set(k,v){setForm(function(f){var n=Object.assign({},f);n[k]=v;return n;});}
-  function openEdit(p){setForm(Object.assign({},EMPTY_USER,p));setShowForm(true);}
+  function openEdit(p){
+    var base = Object.assign({},EMPTY_USER,p);
+    if (!base.firstName && !base.lastName && base.name) {
+      var parts = base.name.trim().split(/\s+/);
+      base.firstName = parts[0]||"";
+      base.lastName = parts.slice(1).join(" ");
+    }
+    setForm(base);setShowForm(true);
+  }
   function openNew(){setForm(Object.assign({},EMPTY_USER));setShowForm(true);}
   function save(){
-    if(!form.name.trim()) return;
-    var id=form.id||(form.name.toUpperCase().replace(/\s+/g,"_").substring(0,12)+"_"+Date.now());
-    var saved=Object.assign({},form,{id:id});
+    var fullName = ((form.firstName||"")+" "+(form.lastName||"")).trim();
+    if(!fullName) return;
+    var id=form.id||(fullName.toUpperCase().replace(/\s+/g,"_").substring(0,12)+"_"+Date.now());
+    var saved=Object.assign({},form,{id:id, name:fullName});
     fbSet("people",id,saved);
     setPeople(function(prev){var ex=prev.find(function(p){return p.id===id;});return ex?prev.map(function(p){return p.id===id?saved:p;}):prev.concat([saved]);});
     showToast(form.id?"Utente aggiornato ✓":"Nuovo membro creato ✓");
@@ -2045,7 +2055,8 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
   }
   function shareWhatsApp(p) {
     var url = window.location.origin;
-    var msg = "Ciao "+p.name+"! 👋\nQui trovi il link per accedere all'app del team:\n"+url+
+    var greetName = p.firstName || (p.name||"").split(" ")[0];
+    var msg = "Ciao "+greetName+"! 👋\nQui trovi il link per accedere all'app del team:\n"+url+
       "\n\n🔑 Le tue credenziali:\n👤 Username: "+(p.username||"—")+"\n🔒 Password: "+(p.pin||"—");
     var phoneDigits = (p.phone||"").replace(/[^\d]/g,"");
     var waUrl = phoneDigits
@@ -2071,7 +2082,9 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
       var existingIds = people.map(function(p){return p.id;});
       var created = 0, updated = 0;
       rows.slice(headerIdx+1).forEach(function(row){
-        var name = get(row,"Nome");
+        var firstName = get(row,"Nome");
+        var lastName = get(row,"Cognome");
+        var name = (firstName+" "+lastName).trim();
         if (!name) return;
         var username = get(row,"Username").toLowerCase().replace(/\s/g,"");
         var existing = people.find(function(p){ return (p.username||"").toLowerCase()===username && username; }) ||
@@ -2083,6 +2096,8 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
         var person = {
           id: id,
           name: name,
+          firstName: firstName,
+          lastName: lastName,
           role: get(row,"Ruolo"),
           phone: get(row,"Telefono"),
           email: get(row,"Email"),
@@ -2123,11 +2138,18 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
       <div style={{maxWidth:600}}>
         {sec("Dati Anagrafici","👤")}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
-          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Nome *</label><input value={form.name} onChange={function(e){set("name",e.target.value);}} placeholder="Nome Cognome" style={inp}/></div>
+          <div><label style={lbl}>Nome *</label><input value={form.firstName||""} onChange={function(e){set("firstName",e.target.value);}} placeholder="es. Mario" style={inp}/></div>
+          <div><label style={lbl}>Cognome</label><input value={form.lastName||""} onChange={function(e){set("lastName",e.target.value);}} placeholder="es. Rossi" style={inp}/></div>
           <div style={{gridColumn:"1/-1"}}><label style={lbl}>Ruolo</label><input value={form.role} onChange={function(e){set("role",e.target.value);}} placeholder="es. Meccanico" style={inp}/></div>
           <div><label style={lbl}>Telefono</label><input value={form.phone||""} onChange={function(e){set("phone",e.target.value);}} placeholder="+39 333..." style={inp}/></div>
           <div><label style={lbl}>Email</label><input value={form.email||""} onChange={function(e){set("email",e.target.value);}} placeholder="nome@email.com" style={inp}/></div>
-          <div><label style={lbl}>Nazionalità</label><input value={form.nationality||""} onChange={function(e){set("nationality",e.target.value);}} placeholder="es. Italia" style={inp}/></div>
+          <div>
+            <label style={lbl}>Nazionalità</label>
+            <select value={NATIONALITY_OPTIONS.indexOf(form.nationality)>=0 ? form.nationality : "Altra"} onChange={function(e){set("nationality", e.target.value==="Altra"?"":e.target.value);}} style={inp}>
+              {NATIONALITY_OPTIONS.map(function(n){return <option key={n} value={n}>{n}</option>;})}
+            </select>
+            {NATIONALITY_OPTIONS.indexOf(form.nationality)<0 && <input value={form.nationality||""} onChange={function(e){set("nationality",e.target.value);}} placeholder="Specifica nazionalità" style={Object.assign({},inp,{marginTop:6})}/>}
+          </div>
           <div style={{gridColumn:"1/-1"}}><label style={lbl}>Indirizzo di residenza</label><input value={form.address||""} onChange={function(e){set("address",e.target.value);}} placeholder="es. Via Roma 1, Milano" style={inp}/></div>
           <div>
             <label style={lbl}>Aeroporto preferito</label>
@@ -2152,9 +2174,22 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
           <div><label style={lbl}>Scadenza</label><input value={form.docExpiry||""} onChange={function(e){set("docExpiry",e.target.value);}} placeholder="es. 31/12/2028" style={inp}/></div>
         </div>
         {sec("Abbigliamento","👕")}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:4}}>
-          {[["tshirt","T-Shirt"],["jacket","Giacca"],["pants","Pantaloni"],["hoodie","Felpa"]].map(function(pair){return(<div key={pair[0]}><label style={lbl}>{pair[1]}</label><select value={form[pair[0]]||"M"} onChange={function(e){set(pair[0],e.target.value);}} style={inp}>{["XS","S","M","L","XL","XXL","XXXL"].map(function(s){return<option key={s}>{s}</option>;})}</select></div>);})}
+        <div style={{display:"grid",gridTemplateColumns:"1.2fr 1fr 1fr",gap:8,marginBottom:6}}>
+          <div style={{fontSize:10,color:"#5a6a8a",fontWeight:700}}>Capo / Taglia</div>
+          <div style={{fontSize:10,color:"#5a6a8a",fontWeight:700}}>👤 Ne possiede</div>
+          <div style={{fontSize:10,color:"#5a6a8a",fontWeight:700}}>📦 Consegnate</div>
         </div>
+        {[["tshirt","T-Shirt"],["jacket","Giacca"],["pants","Pantaloni"],["hoodie","Felpa"]].map(function(pair){return(
+          <div key={pair[0]} style={{display:"grid",gridTemplateColumns:"1.2fr 1fr 1fr",gap:8,marginBottom:8,alignItems:"end"}}>
+            <div>
+              <label style={lbl}>{pair[1]}</label>
+              <select value={form[pair[0]]||"M"} onChange={function(e){set(pair[0],e.target.value);}} style={inp}>{["XS","S","M","L","XL","XXL","XXXL"].map(function(s){return<option key={s}>{s}</option>;})}</select>
+            </div>
+            <input type="number" min="0" value={form[pair[0]+"Qty"]||0} onChange={function(e){set(pair[0]+"Qty", parseInt(e.target.value,10)||0);}} style={inp}/>
+            <input type="number" min="0" value={form[pair[0]+"Delivered"]||0} onChange={function(e){set(pair[0]+"Delivered", parseInt(e.target.value,10)||0);}} style={inp}/>
+          </div>
+        );})}
+        <div style={{fontSize:10,color:"#7090c0",marginBottom:12,fontStyle:"italic"}}>"Ne possiede" lo compila il singolo membro dal proprio profilo (🪪); "Consegnate" la tieni tu come admin, per sapere cosa hai già dato.</div>
         {sec("Accesso App","🔑")}
         <div style={{background:"#0d1a2a",borderRadius:8,padding:14,marginBottom:4,border:"1px solid #1e3a8a33"}}>
           <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>Credenziali per accedere all'app in modalità visualizzazione.</div>
@@ -2181,8 +2216,8 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
           <button onClick={async function(){
               var XLSX = await import("xlsx");
               var rows = [
-                ["Nome","Ruolo","Telefono","Email","Nazionalità","Indirizzo","Aeroporto","Tipo Documento","Numero Documento","Scadenza Documento","Taglia Maglietta","Taglia Giacca","Taglia Pantaloni","Taglia Felpa","Username","Password","Note"],
-                ["Mario Rossi","Meccanico","+39 333 1234567","mario.rossi@email.com","Italiana","Via Roma 1, Brescia","BGY","Carta d'Identità","CA12345AB","31/12/2030","L","L","M","L","mario","Mario2026","Es. allergie, taglie particolari..."],
+                ["Nome","Cognome","Ruolo","Telefono","Email","Nazionalità","Indirizzo","Aeroporto","Tipo Documento","Numero Documento","Scadenza Documento","Taglia Maglietta","Taglia Giacca","Taglia Pantaloni","Taglia Felpa","Username","Password","Note"],
+                ["Mario","Rossi","Meccanico","+39 333 1234567","mario.rossi@email.com","Italiana","Via Roma 1, Brescia","BGY","Carta d'Identità","CA12345AB","31/12/2030","L","L","M","L","mario","Mario2026","Es. allergie, taglie particolari..."],
               ];
               var wb = XLSX.utils.book_new();
               var ws = XLSX.utils.aoa_to_sheet(rows);
@@ -2193,6 +2228,20 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
             <input type="file" accept=".xlsx,.xls" style={{display:"none"}} disabled={importing} onChange={function(e){handleTeamExcel(e.target.files[0]); e.target.value="";}}/>
             {importing?"⏳ Importo...":"📥 Importa da Excel"}
           </label>
+          <button onClick={async function(){
+              var XLSX = await import("xlsx");
+              var rows = [["Nome","Capo","Taglia","Ne possiede","Consegnate dal team"]];
+              var GARMENTS = [["tshirt","T-Shirt"],["jacket","Giacca"],["pants","Pantaloni"],["hoodie","Felpa"]];
+              people.forEach(function(p){
+                GARMENTS.forEach(function(g){
+                  rows.push([p.name, g[1], p[g[0]]||"", p[g[0]+"Qty"]||0, p[g[0]+"Delivered"]||0]);
+                });
+              });
+              var wb = XLSX.utils.book_new();
+              var ws = XLSX.utils.aoa_to_sheet(rows);
+              XLSX.utils.book_append_sheet(wb, ws, "Abbigliamento");
+              XLSX.writeFile(wb, "Abbigliamento_Team_"+new Date().toISOString().substring(0,10)+".xlsx");
+            }} style={{background:"#0d1a2a",color:"#4caf50",border:"1px solid #4caf5044",padding:"9px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>📦 Esporta Abbigliamento</button>
           <button onClick={openNew} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"9px 18px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>➕ Nuovo Membro</button>
         </div>
       </div>
@@ -2222,6 +2271,90 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
           </div>
         );})}
       </div>
+    </div>
+  );
+}
+
+// ── MyProfile ────────────────────────────────────────────
+// Autoprofilo: ogni membro può aggiornare i propri dati e indicare quanto
+// abbigliamento possiede già, senza dover passare dall'admin.
+function MyProfile({ currentUser, setPeople, setCurrentUser, showToast }) {
+  var [form, setForm] = useState(Object.assign({}, EMPTY_USER, currentUser));
+  var [saved, setSaved] = useState(false);
+  function set(k,v){ setForm(function(f){var n=Object.assign({},f);n[k]=v;return n;}); setSaved(false); }
+  function save(){
+    var merged = Object.assign({}, currentUser, {
+      phone:form.phone, email:form.email, nationality:form.nationality, address:form.address, airport:form.airport,
+      docType:form.docType, docNum:form.docNum, docExpiry:form.docExpiry,
+      tshirt:form.tshirt, jacket:form.jacket, pants:form.pants, hoodie:form.hoodie,
+      tshirtQty:form.tshirtQty, jacketQty:form.jacketQty, pantsQty:form.pantsQty, hoodieQty:form.hoodieQty,
+      notes:form.notes,
+    });
+    fbSet("people", currentUser.id, merged);
+    setPeople(function(prev){ return prev.map(function(p){ return p.id===currentUser.id ? merged : p; }); });
+    setCurrentUser(merged);
+    setSaved(true);
+    showToast("Profilo aggiornato ✓");
+  }
+  var inp = {width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
+  var lbl = {fontSize:11,color:"#7090c0",display:"block",marginBottom:4,fontWeight:600};
+  function sec(t,icon){return <div style={{fontSize:13,fontWeight:800,color:"#4a9eff",marginBottom:12,paddingBottom:6,borderBottom:"1px solid #1e3a8a33",marginTop:16}}>{icon} {t}</div>;}
+  return (
+    <div style={{maxWidth:560}}>
+      <div style={{fontSize:18,fontWeight:800,color:"#4a9eff",marginBottom:4}}>🪪 Il mio profilo</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:10}}>{form.name} — {form.role}</div>
+      {sec("Dati personali","👤")}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
+        <div><label style={lbl}>Telefono</label><input value={form.phone||""} onChange={function(e){set("phone",e.target.value);}} placeholder="+39 333..." style={inp}/></div>
+        <div><label style={lbl}>Email</label><input value={form.email||""} onChange={function(e){set("email",e.target.value);}} placeholder="nome@email.com" style={inp}/></div>
+        <div>
+          <label style={lbl}>Nazionalità</label>
+          <select value={NATIONALITY_OPTIONS.indexOf(form.nationality)>=0 ? form.nationality : "Altra"} onChange={function(e){set("nationality", e.target.value==="Altra"?"":e.target.value);}} style={inp}>
+            {NATIONALITY_OPTIONS.map(function(n){return <option key={n} value={n}>{n}</option>;})}
+          </select>
+          {NATIONALITY_OPTIONS.indexOf(form.nationality)<0 && <input value={form.nationality||""} onChange={function(e){set("nationality",e.target.value);}} placeholder="Specifica nazionalità" style={Object.assign({},inp,{marginTop:6})}/>}
+        </div>
+        <div>
+          <label style={lbl}>Aeroporto preferito</label>
+          <select value={form.airport||""} onChange={function(e){set("airport",e.target.value);}} style={inp}>
+            <option value="">-- Seleziona --</option>
+            <option value="BGY">BGY — Milano/Bergamo Orio al Serio</option>
+            <option value="MXP">MXP — Milano Malpensa</option>
+            <option value="BLQ">BLQ — Bologna Marconi</option>
+            <option value="FCO">FCO — Roma Fiumicino</option>
+            <option value="VCE">VCE — Venezia Marco Polo</option>
+            <option value="TSF">TSF — Treviso</option>
+            <option value="TRN">TRN — Torino Caselle</option>
+            <option value="GRS">GRS — Grosseto</option>
+            <option value="BCN">BCN — Barcellona</option>
+          </select>
+        </div>
+        <div style={{gridColumn:"1/-1"}}><label style={lbl}>Indirizzo di residenza</label><input value={form.address||""} onChange={function(e){set("address",e.target.value);}} placeholder="es. Via Roma 1, Milano (o dirección, ciudad)" style={inp}/></div>
+      </div>
+      {sec("Documento","🪪")}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
+        <div><label style={lbl}>Tipo</label><select value={form.docType||"Passaporto"} onChange={function(e){set("docType",e.target.value);}} style={inp}><option>Passaporto</option><option>Carta d'Identità</option><option>Patente</option></select></div>
+        <div><label style={lbl}>Numero</label><input value={form.docNum||""} onChange={function(e){set("docNum",e.target.value);}} placeholder="es. YA1234567" style={inp}/></div>
+        <div style={{gridColumn:"1/-1"}}><label style={lbl}>Scadenza</label><input value={form.docExpiry||""} onChange={function(e){set("docExpiry",e.target.value);}} placeholder="es. 31/12/2028" style={inp}/></div>
+      </div>
+      {sec("Abbigliamento — quanto possiedo già","👕")}
+      <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>Indica taglia e quanti capi hai già in tuo possesso: serve al team per sapere cosa ordinare per la prossima stagione.</div>
+      <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr",gap:8,marginBottom:6}}>
+        <div style={{fontSize:10,color:"#5a6a8a",fontWeight:700}}>Capo / Taglia</div>
+        <div style={{fontSize:10,color:"#5a6a8a",fontWeight:700}}>Quanti ne ho</div>
+      </div>
+      {[["tshirt","T-Shirt"],["jacket","Giacca"],["pants","Pantaloni"],["hoodie","Felpa"]].map(function(pair){return(
+        <div key={pair[0]} style={{display:"grid",gridTemplateColumns:"1.3fr 1fr",gap:8,marginBottom:8,alignItems:"end"}}>
+          <div>
+            <label style={lbl}>{pair[1]}</label>
+            <select value={form[pair[0]]||"M"} onChange={function(e){set(pair[0],e.target.value);}} style={inp}>{["XS","S","M","L","XL","XXL","XXXL"].map(function(s){return<option key={s}>{s}</option>;})}</select>
+          </div>
+          <input type="number" min="0" value={form[pair[0]+"Qty"]||0} onChange={function(e){set(pair[0]+"Qty", parseInt(e.target.value,10)||0);}} style={inp}/>
+        </div>
+      );})}
+      {sec("Note","📋")}
+      <textarea value={form.notes||""} onChange={function(e){set("notes",e.target.value);}} placeholder="Allergie, preferenze..." style={Object.assign({},inp,{resize:"vertical",minHeight:60,marginBottom:20})}/>
+      <button onClick={save} style={{width:"100%",padding:13,background:saved?"#14532d":"#1e3a8a",color:saved?"#4caf50":"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:15}}>{saved?"✅ Salvato":"💾 Salva Profilo"}</button>
     </div>
   );
 }
@@ -2574,7 +2707,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",costsOnly:true},{k:"bookingsdb",l:"🔑",adminOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",costsOnly:true},{k:"bookingsdb",l:"🔑",adminOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",adminOnly:true},{k:"costs",l:"💰",costsOnly:true},{k:"export",l:"📥",adminOnly:true},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true},{k:"profile",l:"🪪"}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -3347,6 +3480,10 @@ export default function App() {
 
         {view==="team" && isAdmin && (
           <TeamManager people={people} setPeople={setPeople} setConfirmDeleteUser={setConfirmDeleteUser} showToast={showToast}/>
+        )}
+
+        {view==="profile" && (
+          <MyProfile currentUser={currentUser} setPeople={setPeople} setCurrentUser={setCurrentUser} showToast={showToast}/>
         )}
 
         {view==="pdf2xls" && isAdmin && (
