@@ -448,32 +448,42 @@ function buildPDFData(personId, allBookings, eventNotes) {
 
 function normBookingCode(v) { return (v || "").toString().trim().toUpperCase(); }
 
+// Chiave di raggruppamento: stessa persona + stesso codice + stesso tipo, e per i voli
+// anche stessa direzione — andata e ritorno condividono spesso lo stesso PNR e NON sono un doppione.
+function bookingDupKey(b) {
+  return b.person+"__"+normBookingCode(b.booking)+"__"+b.type+(b.type==="volo"?"__"+(b.dir||""):"");
+}
+
 // Vero se questa persona ha già una prenotazione ATTIVA (non cancellata) con lo stesso codice
-function isDuplicateBookingCode(existingBookings, person, code, excludeId) {
+// (stesso tipo, e stessa direzione se è un volo).
+function isDuplicateBookingCode(existingBookings, person, code, excludeId, type, dir) {
   var nc = normBookingCode(code);
   if (!nc) return false;
   return existingBookings.some(function(b) {
     return b.person === person &&
       normBookingCode(b.booking) === nc &&
+      b.type === type &&
+      (type!=="volo" || (b.dir||"")===(dir||"")) &&
       b.status !== "cancellata" &&
       (!excludeId || b._id !== excludeId);
   });
 }
 
 // Divide un elenco di nuove prenotazioni candidate in { toAdd, skipped },
-// scartando quelle il cui codice è già attivo per la stessa persona
+// scartando quelle il cui codice è già attivo per la stessa persona/tipo/direzione
 // (sia contro le prenotazioni esistenti, sia contro doppioni nello stesso lotto).
 function dedupeBookings(existingBookings, candidates) {
   var toAdd = [], skipped = [], seenInBatch = [];
   candidates.forEach(function(b) {
     var nc = normBookingCode(b.booking);
-    var dupExisting = isDuplicateBookingCode(existingBookings, b.person, b.booking);
-    var dupInBatch = nc && seenInBatch.some(function(s) { return s.person === b.person && s.code === nc; });
+    var dupExisting = isDuplicateBookingCode(existingBookings, b.person, b.booking, null, b.type, b.dir);
+    var key = bookingDupKey(b);
+    var dupInBatch = nc && seenInBatch.indexOf(key) !== -1;
     if (dupExisting || dupInBatch) {
       skipped.push(b);
     } else {
       toAdd.push(b);
-      if (nc) seenInBatch.push({ person: b.person, code: nc });
+      if (nc) seenInBatch.push(key);
     }
   });
   return { toAdd: toAdd, skipped: skipped };
@@ -537,6 +547,7 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete, isDuplicate }) 
                   </span>
                 : <span style={{fontWeight:700,fontSize:12}}>{b.hotel}</span>
               }
+              {b.checkin && <span style={{fontSize:11,color:"#7090c0"}}>📅 {b.checkin}</span>}
               {b.room && <span style={{fontSize:11,color:"#7090c0"}}>{b.room}</span>}
               {b.nights && <span style={{fontSize:11,color:"#7090c0"}}>{b.nights} notti</span>}
               {b.booking && <span style={{fontSize:10,color:"#ff9800",fontFamily:"monospace"}}>#{b.booking}</span>}
@@ -548,6 +559,7 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete, isDuplicate }) 
         <span style={{display:"contents"}}>
           <span style={{fontWeight:700,fontSize:12}}>{b.car}</span>
           {b.type==="auto" && <span style={{background:b.roundTrip===false?"#3d2a1a":"#1a4a1a",color:b.roundTrip===false?"#ff9800":"#4caf50",borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700}}>{b.roundTrip===false?"➡ SOLO ANDATA":"🔁 A/R"}</span>}
+          {b.type==="parcheggio" && b.date && <span style={{fontSize:11,color:"#7090c0"}}>📅 {b.date}</span>}
           {b.pickup && <span style={{fontSize:11,color:"#7090c0"}}>{b.pickup}</span>}
           {b.dropoff && <span style={{fontSize:11,color:"#7090c0"}}>🔼 {b.dropoff}</span>}
           {b.booking && b.booking !== "-" && <span style={{fontSize:10,color:"#ff9800",fontFamily:"monospace"}}>#{b.booking}</span>}
@@ -573,6 +585,125 @@ function BookingCard({ b, compact, showPerson, onEdit, onDelete, isDuplicate }) 
 }
 
 // ── EditModal ─────────────────────────────────────────────
+var MONTHS_IT = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
+var DAYNAMES_IT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
+
+// Costruisce l'insieme dei giorni "occupati" da un evento (per evidenziarli nel calendario),
+// analizzando il campo testuale ev.dates (es. "2-5 Lug") — assume l'anno della stagione (2026).
+function buildEventDayMap() {
+  var map = {}; // "Y-M-D" -> [nomi evento]
+  EVENTS.forEach(function(ev){
+    if (!ev.dates) return;
+    var m = ev.dates.match(/(\d+)\s*-\s*(\d+)\s*([A-Za-zÀ-ÿ]+)/);
+    if (!m) return;
+    var startDay = parseInt(m[1],10), endDay = parseInt(m[2],10);
+    var monthIdx = MONTHS_IT.findIndex(function(mo){ return mo.toLowerCase()===m[3].toLowerCase().slice(0,3); });
+    if (monthIdx < 0) return;
+    for (var d=startDay; d<=endDay; d++) {
+      var key = "2026-"+monthIdx+"-"+d;
+      if (!map[key]) map[key] = [];
+      map[key].push(ev.label);
+    }
+  });
+  return map;
+}
+
+// Interpreta un valore testuale tipo "Sab 19 Apr" o "Sab 19 Apr 11:51" nei suoi componenti
+function parseFreeformDate(value) {
+  if (!value) return null;
+  var parts = value.trim().split(/\s+/);
+  var day=null, monthIdx=null, time="";
+  parts.forEach(function(p){
+    if (/^\d{1,2}$/.test(p) && day===null) day = parseInt(p,10);
+    else if (/^\d{1,2}:\d{2}$/.test(p)) time = p;
+    else {
+      var idx = MONTHS_IT.findIndex(function(mo){ return mo.toLowerCase()===p.toLowerCase().slice(0,3); });
+      if (idx>=0) monthIdx = idx;
+    }
+  });
+  if (day===null || monthIdx===null) return null;
+  return { day:day, monthIdx:monthIdx, time:time };
+}
+
+// ── EventAwareDatePicker ────────────────────────────────────
+// Campo data con calendario a tendina: evidenzia i giorni in cui è già in corso un evento.
+function EventAwareDatePicker({ value, onChange, placeholder, inputStyle }) {
+  var wrapRef = useRef(null);
+  var [open, setOpen] = useState(false);
+  var parsed = useMemo(function(){ return parseFreeformDate(value); }, [value]);
+  var today = new Date();
+  var [viewMonth, setViewMonth] = useState(parsed ? parsed.monthIdx : today.getMonth());
+  var [time, setTime] = useState(parsed ? parsed.time : "");
+  var eventDayMap = useMemo(buildEventDayMap, []);
+  var viewYear = 2026;
+
+  useEffect(function(){
+    function onDocClick(e){ if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", onDocClick);
+    return function(){ document.removeEventListener("mousedown", onDocClick); };
+  }, []);
+
+  function pickDay(d) {
+    var dayName = DAYNAMES_IT[new Date(viewYear, viewMonth, d).getDay()];
+    var text = dayName+" "+d+" "+MONTHS_IT[viewMonth]+(time?(" "+time):"");
+    onChange(text);
+  }
+
+  var firstOfMonth = new Date(viewYear, viewMonth, 1);
+  var startOffset = firstOfMonth.getDay(); // 0=Dom
+  var daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  var cells = [];
+  for (var i=0;i<startOffset;i++) cells.push(null);
+  for (var d=1; d<=daysInMonth; d++) cells.push(d);
+
+  return (
+    <div ref={wrapRef} style={{position:"relative"}}>
+      <div onClick={function(){setOpen(function(v){return !v;});}} style={Object.assign({},inputStyle,{cursor:"pointer",userSelect:"none",display:"flex",alignItems:"center",justifyContent:"space-between"})}>
+        <span style={{color:value?"#e8e8f0":"#5a6a8a"}}>{value || placeholder || "Seleziona data"}</span>
+        <span style={{fontSize:12}}>📅</span>
+      </div>
+      {open && (
+        <div style={{position:"absolute",zIndex:50,top:"calc(100% + 4px)",left:0,background:"#12121f",border:"1px solid #1e3a8a",borderRadius:10,padding:12,width:260,boxShadow:"0 10px 30px rgba(0,0,0,0.5)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <button type="button" onClick={function(){setViewMonth(function(m){return m===0?(setOpen(true),0):m-1;});}} disabled={viewMonth===0} style={{background:"none",border:"none",color:viewMonth===0?"#333":"#4a9eff",cursor:viewMonth===0?"default":"pointer",fontSize:16,padding:"2px 8px"}}>‹</button>
+            <span style={{fontSize:12,fontWeight:700,color:"#e8e8f0"}}>{MONTHS_IT[viewMonth]} {viewYear}</span>
+            <button type="button" onClick={function(){setViewMonth(function(m){return m===11?11:m+1;});}} disabled={viewMonth===11} style={{background:"none",border:"none",color:viewMonth===11?"#333":"#4a9eff",cursor:viewMonth===11?"default":"pointer",fontSize:16,padding:"2px 8px"}}>›</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+            {DAYNAMES_IT.map(function(dn){ return <div key={dn} style={{textAlign:"center",fontSize:9,color:"#5a6a8a",fontWeight:700}}>{dn}</div>; })}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:10}}>
+            {cells.map(function(d,i){
+              if (d===null) return <div key={"e"+i}/>;
+              var key = "2026-"+viewMonth+"-"+d;
+              var isEventDay = !!eventDayMap[key];
+              var isSelected = parsed && parsed.day===d && parsed.monthIdx===viewMonth;
+              var isToday = today.getFullYear()===viewYear && today.getMonth()===viewMonth && today.getDate()===d;
+              return (
+                <div key={d} title={isEventDay?eventDayMap[key].join(", "):""} onClick={function(){pickDay(d);}}
+                  style={{textAlign:"center",fontSize:11,padding:"5px 0",borderRadius:6,cursor:"pointer",fontWeight:isEventDay?800:400,
+                    background:isSelected?"#4a9eff":isEventDay?"#4caf5033":"transparent",
+                    color:isSelected?"#fff":isEventDay?"#4caf50":"#e8e8f0",
+                    border:isToday&&!isSelected?"1px solid #4a9eff":"1px solid transparent"}}>
+                  {d}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,borderTop:"1px solid #1e3a8a33",paddingTop:10}}>
+            <span style={{fontSize:11,color:"#7090c0"}}>🕐 Orario</span>
+            <input type="time" value={time} onChange={function(e){setTime(e.target.value);}} style={{flex:1,padding:"6px 8px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:6,color:"#e8e8f0",fontSize:12,outline:"none"}}/>
+          </div>
+          <div style={{display:"flex",gap:6,marginTop:8,fontSize:10,color:"#7090c0",alignItems:"center"}}>
+            <span style={{width:10,height:10,borderRadius:3,background:"#4caf5033",display:"inline-block"}}/> giorni di gara/test
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
   var [form, setForm] = useState(Object.assign({}, booking));
   var [showDuplicate, setShowDuplicate] = useState(false);
@@ -580,10 +711,10 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
   var fields = booking.type === "volo"
     ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]]
     : booking.type === "hotel"
-    ? (form.truck ? [["price","Prezzo (€)"],["notes","Note"]] : [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]])
+    ? (form.truck ? [["price","Prezzo (€)"],["notes","Note"]] : [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["checkin","Check-in"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]])
     : booking.type === "auto"
     ? (form.roundTrip===false ? [["car","Noleggio / Dettagli"],["pickup","Dettagli viaggio"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]] : [["car","Noleggio / Dettagli"],["pickup","Ritiro"],["dropoff","Riconsegna"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]])
-    : [["car","Veicolo"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]];
+    : [["car","Veicolo"],["date","Data"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]];
   var statusOptions = [{v:"confermata",l:"✅ Confermata"},{v:"da_confermare",l:"⏳ Da confermare"},{v:"cancellata",l:"❌ Cancellata"}];
   var ev = EVENTS.find(function(e) { return e.id === booking.event; });
   var inp = {width:"100%",padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e3a8a",borderRadius:6,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
@@ -610,6 +741,8 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
               <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{label}</label>
               {key === "notes"
                 ? <textarea value={form[key]||""} onChange={function(e){setForm(function(f){var n=Object.assign({},f);n[key]=e.target.value;return n;});}} style={Object.assign({},inp,{resize:"vertical",minHeight:60})}/>
+                : (key === "date" || key === "checkin" || key === "pickup" || key === "dropoff")
+                ? <EventAwareDatePicker value={form[key]||""} onChange={function(v){setForm(function(f){var n=Object.assign({},f);n[key]=v;return n;});}} placeholder="es. Sab 19 Apr" inputStyle={inp}/>
                 : <input value={form[key]||""} onChange={function(e){setForm(function(f){var n=Object.assign({},f);n[key]=e.target.value;return n;});}} style={inp}/>
               }
             </div>
@@ -918,7 +1051,7 @@ function AIImportSection({ onImported, onSkip }) {
 }
 
 // ── AddBookingForm ────────────────────────────────────────
-var EMPTY_FORM = {type:"volo",event:"",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",price:"",notes:"",hotel:"",room:"",nights:"",car:"",roundTrip:true,pickup:"",dropoff:"",truck:false,alsoFlight:false,flightBookingCode:"",people:[],status:"confermata"};
+var EMPTY_FORM = {type:"volo",event:"",dir:"andata",flight:"",company:"",dep:"",arr:"",date:"",baggage:"1 mano",booking:"",price:"",notes:"",hotel:"",room:"",nights:"",checkin:"",car:"",roundTrip:true,pickupPlace:"",pickup:"",dropoffPlace:"",dropoff:"",truck:false,alsoFlight:false,flightBookingCode:"",people:[],status:"confermata"};
 
 function AddBookingForm({ defaultEvent, onSave }) {
   var [mode, setMode] = useState(defaultEvent ? "manual" : "ai");
@@ -931,15 +1064,17 @@ function AddBookingForm({ defaultEvent, onSave }) {
   function save() {
     if (!form.event || !form.people.length) return;
     var newBs = [];
+    var pickupCombined = (form.pickupPlace?form.pickupPlace+" ":"")+form.pickup;
+    var dropoffCombined = (form.dropoffPlace?form.dropoffPlace+" ":"")+form.dropoff;
     form.people.forEach(function(pid) {
       var b = {event:form.event, person:pid, type:form.type};
       if (form.type==="volo") Object.assign(b,{dir:form.dir,flight:form.flight,company:form.company,dep:form.dep,arr:form.arr,date:form.date,baggage:form.baggage,booking:form.booking,notes:form.notes});
       else if (form.type==="hotel") {
         if (form.truck) Object.assign(b,{truck:true,hotel:"Camion",notes:form.notes});
-        else Object.assign(b,{hotel:form.hotel,room:form.room,nights:form.nights,booking:form.booking,notes:form.notes});
+        else Object.assign(b,{hotel:form.hotel,room:form.room,nights:form.nights,checkin:form.checkin,booking:form.booking,notes:form.notes});
       }
-      else if (form.type==="auto") Object.assign(b,{car:form.car,roundTrip:!!form.roundTrip,pickup:form.pickup,dropoff:form.roundTrip?form.dropoff:"",booking:form.booking,notes:form.notes});
-      else Object.assign(b,{car:form.car,booking:form.booking,notes:form.notes});
+      else if (form.type==="auto") Object.assign(b,{car:form.car,roundTrip:!!form.roundTrip,pickup:pickupCombined,dropoff:form.roundTrip?dropoffCombined:"",booking:form.booking,notes:form.notes});
+      else Object.assign(b,{car:form.car,date:form.date,booking:form.booking,notes:form.notes});
       newBs.push(b);
       if (form.type==="auto" && form.alsoFlight) {
         newBs.push({event:form.event,person:pid,type:"volo",dir:form.dir,flight:form.flight,company:form.company,dep:form.dep,arr:form.arr,date:form.date,baggage:form.baggage,booking:form.flightBookingCode,notes:form.notes});
@@ -1018,7 +1153,7 @@ function AddBookingForm({ defaultEvent, onSave }) {
                   <div><label style={lbl}>Direzione</label><select value={form.dir} onChange={function(e){set("dir",e.target.value);}} style={inp}><option value="andata">↗ Andata</option><option value="ritorno">↙ Ritorno</option></select></div>
                   <div><label style={lbl}>N° Volo</label><input value={form.flight} onChange={function(e){set("flight",e.target.value);}} placeholder="es. FR847" style={inp}/></div>
                   <div><label style={lbl}>Compagnia</label><input value={form.company} onChange={function(e){set("company",e.target.value);}} placeholder="es. Ryanair" style={inp}/></div>
-                  <div><label style={lbl}>Data</label><input value={form.date} onChange={function(e){set("date",e.target.value);}} placeholder="es. Sab 19 Apr" style={inp}/></div>
+                  <div><label style={lbl}>Data</label><EventAwareDatePicker value={form.date} onChange={function(v){set("date",v);}} placeholder="es. Sab 19 Apr" inputStyle={inp}/></div>
                   <div><label style={lbl}>Partenza</label><input value={form.dep} onChange={function(e){set("dep",e.target.value);}} placeholder="es. BGY 11:51" style={inp}/></div>
                   <div><label style={lbl}>Arrivo</label><input value={form.arr} onChange={function(e){set("arr",e.target.value);}} placeholder="es. BCN 13:35" style={inp}/></div>
                   <div><label style={lbl}>Bagaglio</label><input value={form.baggage} onChange={function(e){set("baggage",e.target.value);}} placeholder="es. 1 mano" style={inp}/></div>
@@ -1036,6 +1171,7 @@ function AddBookingForm({ defaultEvent, onSave }) {
                 {!form.truck && (
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                     <div style={{gridColumn:"1/-1"}}><label style={lbl}>Nome Hotel</label><input value={form.hotel} onChange={function(e){set("hotel",e.target.value);}} placeholder="es. NH Jerez" style={inp}/></div>
+                    <div><label style={lbl}>Check-in</label><EventAwareDatePicker value={form.checkin} onChange={function(v){set("checkin",v);}} placeholder="es. Gio 2 Lug" inputStyle={inp}/></div>
                     <div><label style={lbl}>Camera</label><input value={form.room} onChange={function(e){set("room",e.target.value);}} placeholder="es. 101" style={inp}/></div>
                     <div><label style={lbl}>Notti</label><input value={form.nights} onChange={function(e){set("nights",e.target.value);}} placeholder="es. 3" style={inp}/></div>
                     <div style={{gridColumn:"1/-1"}}><label style={lbl}>N° Prenotazione</label><input value={form.booking} onChange={function(e){set("booking",e.target.value);}} placeholder="es. 6345144227" style={inp}/></div>
@@ -1052,8 +1188,10 @@ function AddBookingForm({ defaultEvent, onSave }) {
                 </label>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                   <div style={{gridColumn:"1/-1"}}><label style={lbl}>Noleggio / Dettagli</label><input value={form.car} onChange={function(e){set("car",e.target.value);}} placeholder="es. Gold Car BGY" style={inp}/></div>
-                  <div style={{gridColumn:form.roundTrip?"1/2":"1/-1"}}><label style={lbl}>{form.roundTrip?"Ritiro":"Dettagli viaggio"}</label><input value={form.pickup} onChange={function(e){set("pickup",e.target.value);}} placeholder="es. SVQ 01 Lug 18:00" style={inp}/></div>
-                  {form.roundTrip && <div><label style={lbl}>Riconsegna</label><input value={form.dropoff} onChange={function(e){set("dropoff",e.target.value);}} placeholder="es. SVQ 06 Lug 11:00" style={inp}/></div>}
+                  <div><label style={lbl}>{form.roundTrip?"Luogo ritiro":"Luogo"}</label><input value={form.pickupPlace} onChange={function(e){set("pickupPlace",e.target.value);}} placeholder="es. SVQ Aeroporto" style={inp}/></div>
+                  <div><label style={lbl}>{form.roundTrip?"Data/ora ritiro":"Data/ora"}</label><EventAwareDatePicker value={form.pickup} onChange={function(v){set("pickup",v);}} placeholder="es. Mer 1 Lug 18:00" inputStyle={inp}/></div>
+                  {form.roundTrip && <div><label style={lbl}>Luogo riconsegna</label><input value={form.dropoffPlace} onChange={function(e){set("dropoffPlace",e.target.value);}} placeholder="es. SVQ Aeroporto" style={inp}/></div>}
+                  {form.roundTrip && <div><label style={lbl}>Data/ora riconsegna</label><EventAwareDatePicker value={form.dropoff} onChange={function(v){set("dropoff",v);}} placeholder="es. Lun 6 Lug 11:00" inputStyle={inp}/></div>}
                   <div style={{gridColumn:"1/-1"}}><label style={lbl}>N° Prenotazione</label><input value={form.booking} onChange={function(e){set("booking",e.target.value);}} placeholder="es. 28794732" style={inp}/></div>
                 </div>
                 <label style={{display:"flex",alignItems:"center",gap:8,background:form.alsoFlight?"#0d1a2a":"#0d0d1a",border:"1px solid "+(form.alsoFlight?"#4a9eff":"#1e3a8a33"),borderRadius:8,padding:"10px 12px",marginBottom:12,cursor:"pointer"}}>
@@ -1067,7 +1205,7 @@ function AddBookingForm({ defaultEvent, onSave }) {
                       <div><label style={lbl}>Direzione</label><select value={form.dir} onChange={function(e){set("dir",e.target.value);}} style={inp}><option value="andata">↗ Andata</option><option value="ritorno">↙ Ritorno</option></select></div>
                       <div><label style={lbl}>N° Volo</label><input value={form.flight} onChange={function(e){set("flight",e.target.value);}} placeholder="es. FR847" style={inp}/></div>
                       <div><label style={lbl}>Compagnia</label><input value={form.company} onChange={function(e){set("company",e.target.value);}} placeholder="es. Ryanair" style={inp}/></div>
-                      <div><label style={lbl}>Data</label><input value={form.date} onChange={function(e){set("date",e.target.value);}} placeholder="es. Sab 19 Apr" style={inp}/></div>
+                      <div><label style={lbl}>Data</label><EventAwareDatePicker value={form.date} onChange={function(v){set("date",v);}} placeholder="es. Sab 19 Apr" inputStyle={inp}/></div>
                       <div><label style={lbl}>Partenza</label><input value={form.dep} onChange={function(e){set("dep",e.target.value);}} placeholder="es. BGY 11:51" style={inp}/></div>
                       <div><label style={lbl}>Arrivo</label><input value={form.arr} onChange={function(e){set("arr",e.target.value);}} placeholder="es. BCN 13:35" style={inp}/></div>
                       <div><label style={lbl}>Bagaglio</label><input value={form.baggage} onChange={function(e){set("baggage",e.target.value);}} placeholder="es. 1 mano" style={inp}/></div>
@@ -1082,6 +1220,7 @@ function AddBookingForm({ defaultEvent, onSave }) {
                 <div style={{fontSize:13,fontWeight:800,color:"#4a9eff",marginBottom:12,paddingBottom:6,borderBottom:"1px solid #1e3a8a33"}}>🅿️ Parcheggio</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                   <div style={{gridColumn:"1/-1"}}><label style={lbl}>Dettagli</label><input value={form.car} onChange={function(e){set("car",e.target.value);}} placeholder="es. Parkingo" style={inp}/></div>
+                  <div style={{gridColumn:"1/-1"}}><label style={lbl}>Data</label><EventAwareDatePicker value={form.date} onChange={function(v){set("date",v);}} placeholder="es. Mer 1 Lug" inputStyle={inp}/></div>
                   <div style={{gridColumn:"1/-1"}}><label style={lbl}>N° Prenotazione</label><input value={form.booking} onChange={function(e){set("booking",e.target.value);}} placeholder="es. 28794732" style={inp}/></div>
                 </div>
               </div>
@@ -2183,14 +2322,15 @@ export default function App() {
     return function(){unsub();};
   }, []);
 
-  // Prenotazioni doppie: stesso codice attivo per la stessa persona
+  // Prenotazioni doppie: stesso codice attivo per la stessa persona, stesso tipo
+  // (e stessa direzione per i voli, così andata/ritorno con stesso PNR non sono un doppione)
   var duplicateBookingIds = useMemo(function(){
     var groups = {};
     bookings.forEach(function(b){
       if (b.status==="cancellata") return;
       var code = normBookingCode(b.booking);
       if (!code) return;
-      var key = b.person+"__"+code;
+      var key = bookingDupKey(b);
       if (!groups[key]) groups[key] = [];
       groups[key].push(b);
     });
