@@ -2030,6 +2030,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
   var [search, setSearch] = useState("");
   var [globalSearch, setGlobalSearch] = useState("");
   var [globalResults, setGlobalResults] = useState(null);
+  var [importing, setImporting] = useState(false);
   function set(k,v){setForm(function(f){var n=Object.assign({},f);n[k]=v;return n;});}
   function openEdit(p){setForm(Object.assign({},EMPTY_USER,p));setShowForm(true);}
   function openNew(){setForm(Object.assign({},EMPTY_USER));setShowForm(true);}
@@ -2041,6 +2042,73 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
     setPeople(function(prev){var ex=prev.find(function(p){return p.id===id;});return ex?prev.map(function(p){return p.id===id?saved:p;}):prev.concat([saved]);});
     showToast(form.id?"Utente aggiornato ✓":"Nuovo membro creato ✓");
     setShowForm(false);
+  }
+  function shareWhatsApp(p) {
+    var url = window.location.origin;
+    var msg = "Ciao "+p.name+"! 👋\nQui trovi il link per accedere all'app del team:\n"+url+
+      "\n\n🔑 Le tue credenziali:\n👤 Username: "+(p.username||"—")+"\n🔒 Password: "+(p.pin||"—");
+    var phoneDigits = (p.phone||"").replace(/[^\d]/g,"");
+    var waUrl = phoneDigits
+      ? ("https://wa.me/"+phoneDigits+"?text="+encodeURIComponent(msg))
+      : ("https://wa.me/?text="+encodeURIComponent(msg));
+    window.open(waUrl, "_blank");
+  }
+  async function handleTeamExcel(file) {
+    if (!file) return;
+    setImporting(true);
+    try {
+      var XLSX = await import("xlsx");
+      var data = await file.arrayBuffer();
+      var wb = XLSX.read(data, {type:"array"});
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:""});
+      var headerIdx = rows.findIndex(function(r){ return r.some(function(c){ return String(c).trim()==="Nome"; }); });
+      if (headerIdx === -1) { showToast("Intestazioni non trovate: usa il template fornito", "#ff4444"); setImporting(false); return; }
+      var headerRow = rows[headerIdx].map(function(h){ return String(h||"").trim(); });
+      var colIdx = {};
+      headerRow.forEach(function(h,i){ colIdx[h]=i; });
+      function col(name){ return colIdx.hasOwnProperty(name) ? colIdx[name] : -1; }
+      function get(row,name){ var i=col(name); return (i>=0 && i<row.length) ? String(row[i]||"").trim() : ""; }
+      var existingIds = people.map(function(p){return p.id;});
+      var created = 0, updated = 0;
+      rows.slice(headerIdx+1).forEach(function(row){
+        var name = get(row,"Nome");
+        if (!name) return;
+        var username = get(row,"Username").toLowerCase().replace(/\s/g,"");
+        var existing = people.find(function(p){ return (p.username||"").toLowerCase()===username && username; }) ||
+                        people.find(function(p){ return p.name.toLowerCase()===name.toLowerCase(); });
+        var id = existing ? existing.id : name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]+/g,"_").replace(/^_+|_+$/g,"").substring(0,16);
+        var n = 1;
+        while (!existing && existingIds.indexOf(id)!==-1) { n++; id = id.replace(/_\d+$/,"")+"_"+n; }
+        existingIds.push(id);
+        var person = {
+          id: id,
+          name: name,
+          role: get(row,"Ruolo"),
+          phone: get(row,"Telefono"),
+          email: get(row,"Email"),
+          nationality: get(row,"Nazionalità"),
+          address: get(row,"Indirizzo"),
+          airport: get(row,"Aeroporto"),
+          docType: get(row,"Tipo Documento"),
+          docNum: get(row,"Numero Documento"),
+          docExpiry: get(row,"Scadenza Documento"),
+          tshirt: get(row,"Taglia Maglietta"),
+          jacket: get(row,"Taglia Giacca"),
+          pants: get(row,"Taglia Pantaloni"),
+          hoodie: get(row,"Taglia Felpa"),
+          username: username,
+          pin: get(row,"Password"),
+          notes: get(row,"Note"),
+        };
+        if (existing) { person = Object.assign({}, existing, person); updated++; } else created++;
+        fbSet("people", id, person);
+        setPeople(function(prev){ var ex=prev.find(function(p){return p.id===id;}); return ex ? prev.map(function(p){return p.id===id?person:p;}) : prev.concat([person]); });
+      });
+      showToast("Importati "+created+" nuovi membri, aggiornati "+updated+" ✓");
+    } catch(e) {
+      showToast("Errore import: "+e.message, "#ff4444");
+    }
+    setImporting(false);
   }
   var filtered=people.filter(function(p){if(!search) return true;var q=search.toLowerCase();return p.name.toLowerCase().includes(q)||p.role.toLowerCase().includes(q);});
   var inp={width:"100%",padding:"9px 11px",background:"#0d0d1a",border:"1px solid #1e3a8a55",borderRadius:7,color:"#e8e8f0",fontSize:13,boxSizing:"border-box",outline:"none"};
@@ -2090,10 +2158,11 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
         {sec("Accesso App","🔑")}
         <div style={{background:"#0d1a2a",borderRadius:8,padding:14,marginBottom:4,border:"1px solid #1e3a8a33"}}>
           <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>Credenziali per accedere all'app in modalità visualizzazione.</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:form.username&&form.pin?12:0}}>
             <div><label style={lbl}>Username</label><input value={form.username||""} onChange={function(e){set("username",e.target.value.toLowerCase().replace(/\s/g,""));}} placeholder="es. mario" style={inp} autoCapitalize="none"/></div>
             <div><label style={lbl}>Codice</label><input value={form.pin||""} onChange={function(e){set("pin",e.target.value);}} placeholder="es. Pass2026!" style={inp}/></div>
           </div>
+          {form.username && form.pin && <button onClick={function(){shareWhatsApp(form);}} style={{width:"100%",padding:"9px 12px",background:"#14532d",color:"#4caf50",border:"none",borderRadius:6,cursor:"pointer",fontWeight:700,fontSize:13}}>📤 Invia credenziali su WhatsApp</button>}
         </div>
         {sec("Note","📋")}
         <textarea value={form.notes||""} onChange={function(e){set("notes",e.target.value);}} placeholder="Allergie, preferenze..." style={Object.assign({},inp,{resize:"vertical",minHeight:60,marginBottom:20})}/>
@@ -2108,7 +2177,24 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
         <div style={{fontSize:18,fontWeight:800,color:"#4a9eff"}}>⚙️ Gestione Team</div>
-        <button onClick={openNew} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"9px 18px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>➕ Nuovo Membro</button>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={async function(){
+              var XLSX = await import("xlsx");
+              var rows = [
+                ["Nome","Ruolo","Telefono","Email","Nazionalità","Indirizzo","Aeroporto","Tipo Documento","Numero Documento","Scadenza Documento","Taglia Maglietta","Taglia Giacca","Taglia Pantaloni","Taglia Felpa","Username","Password","Note"],
+                ["Mario Rossi","Meccanico","+39 333 1234567","mario.rossi@email.com","Italiana","Via Roma 1, Brescia","BGY","Carta d'Identità","CA12345AB","31/12/2030","L","L","M","L","mario","Mario2026","Es. allergie, taglie particolari..."],
+              ];
+              var wb = XLSX.utils.book_new();
+              var ws = XLSX.utils.aoa_to_sheet(rows);
+              XLSX.utils.book_append_sheet(wb, ws, "Membri Team");
+              XLSX.writeFile(wb, "Template_Membri_Team.xlsx");
+            }} style={{background:"#0d1a2a",color:"#4a9eff",border:"1px solid #1e3a8a44",padding:"9px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>📄 Template Excel</button>
+          <label style={{background:"#0d1a2a",color:"#4a9eff",border:"1px solid #1e3a8a44",padding:"9px 14px",borderRadius:8,cursor:importing?"default":"pointer",fontWeight:700,fontSize:13,opacity:importing?0.6:1}}>
+            <input type="file" accept=".xlsx,.xls" style={{display:"none"}} disabled={importing} onChange={function(e){handleTeamExcel(e.target.files[0]); e.target.value="";}}/>
+            {importing?"⏳ Importo...":"📥 Importa da Excel"}
+          </label>
+          <button onClick={openNew} style={{background:"#14532d",color:"#4caf50",border:"none",padding:"9px 18px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>➕ Nuovo Membro</button>
+        </div>
       </div>
       <input placeholder="🔍 Cerca..." value={search} onChange={function(e){setSearch(e.target.value);}} style={{width:"100%",padding:"10px 14px",background:"#12121f",border:"1px solid #1e3a8a",borderRadius:8,color:"#e8e8f0",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:18}}/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
@@ -2122,6 +2208,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast }) {
                 <div style={{fontSize:11,color:"#7090c0"}}>{p.role}</div>
               </div>
               <button onClick={function(){openEdit(p);}} style={{background:"#1e3a8a22",border:"1px solid #1e3a8a44",color:"#4a9eff",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>✏️</button>
+              {p.username && p.pin && <button onClick={function(){shareWhatsApp(p);}} title="Invia credenziali su WhatsApp" style={{background:"#14532d22",border:"1px solid #4caf5044",color:"#4caf50",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>📤</button>}
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
               {p.phone&&<span style={{background:"#1a4a1a22",color:"#4caf50",borderRadius:5,padding:"2px 8px",fontSize:11}}>📞 {p.phone}</span>}
