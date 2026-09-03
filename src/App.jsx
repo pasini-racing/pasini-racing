@@ -2984,10 +2984,16 @@ export default function App() {
             return new Date(2026, month, day, parseInt(tm[1],10), parseInt(tm[2],10));
           }
 
-          // Determine which event is "current": last event whose start date has passed
+          // Determine which event is "current": the one with the latest start date that has already passed
+          // (NON basarsi sull'ordine dell'array: da quando EVENTS arriva da Firestore l'ordine non è garantito cronologico)
           var startedEvents = EVENTS.filter(function(ev){ var d=daysTo(ev.id); return d!==null && d<=0; });
-          var currentEv = startedEvents.length ? startedEvents[startedEvents.length-1] : null;
-          var futureEv = EVENTS.find(function(ev){ var d=daysTo(ev.id); return d!==null && d>0; });
+          var currentEv = startedEvents.length ? startedEvents.reduce(function(best, ev){
+            return daysTo(ev.id) > daysTo(best.id) ? ev : best;
+          }) : null;
+          var futureCandidates = EVENTS.filter(function(ev){ var d=daysTo(ev.id); return d!==null && d>0; });
+          var futureEv = futureCandidates.length ? futureCandidates.reduce(function(best, ev){
+            return daysTo(ev.id) < daysTo(best.id) ? ev : best;
+          }) : null;
 
           var nextEv;
           var eventInProgress = false;
