@@ -1,8 +1,9 @@
 # Team Echovit Pasini Racing App
 
-## Login Admin
-- Username: `luca`
-- Codice: `Elizabeth25@`
+App React + Firebase (Firestore), deploy automatico su Vercel.
 
-## Deploy
-Collegato a Vercel per deploy automatico.
+## Variabili d'ambiente (Vercel)
+- `ANTHROPIC_API_KEY`: chiave usata dal proxy `api/claude.js` (import AI di prenotazioni/documenti).
+
+## Sicurezza
+Vedi `SECURITY.md` e `firestore.rules`. Le credenziali non vanno scritte in questo file.

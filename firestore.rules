@@ -1,0 +1,34 @@
+// Da incollare in Firebase Console > Firestore > Regole SOLO dopo aver eseguito
+// scripts/sync-auth-users.js e provato il login con almeno un account admin e uno normale.
+// Protegge i dati da chi non e' nel team (oggi chiunque conosca la configurazione potrebbe leggerli).
+// Limite noto: ogni membro loggato puo' leggere l'anagrafica; per nascondere documenti e codici agli altri
+// membri serve spostare quei campi in una collezione separata (fase successiva).
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin()  { return signedIn() && request.auth.token.admin == true; }
+
+    match /people/{id} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (signedIn() && request.auth.token.personId == id
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                            .hasAny(['isAdmin','canSeeCosts','username','role','pin']));
+    }
+    match /events/{id}    { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /bookings/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /eventCosts/{id}{ allow read, write: if isAdmin(); }
+    match /meta/{id}      { allow read, write: if isAdmin(); }
+    // Raccolte usate da tutto il team (documenti evento, QR pasti, ricevute, galleria, note)
+    match /notes/{id}            { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /eventDocs/{id}        { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /galleryLinks/{id}     { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /teamQR/{id}           { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /mealQR/{id}           { allow read, write: if signedIn(); }
+    match /mealCheckins/{id}     { allow read, write: if signedIn(); }
+    match /receipts/{id}         { allow read, write: if signedIn(); }
+    match /personalReceipts/{id} { allow read, write: if signedIn(); }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
