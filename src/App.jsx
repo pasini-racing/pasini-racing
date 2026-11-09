@@ -4327,7 +4327,7 @@ function BackupExport({ showToast }) {
 // ── Reset totale ───────────────────────────────
 // Cancella tutti i dati della stagione e gli utenti (tranne chi esegue il reset), poi ricrea il calendario 2027.
 async function wipeCollection(name, keepIds, chunk) {
-  var deleted = 0, size = chunk || 400;
+  var deleted = 0, passes = 0, size = chunk || 400;
   if (keepIds && keepIds.length) {
     var all = await db.collection(name).get();
     var targets = all.docs.filter(function(d){ return keepIds.indexOf(d.id) < 0; });
@@ -4337,6 +4337,7 @@ async function wipeCollection(name, keepIds, chunk) {
   for (;;) {
     var snap = await db.collection(name).limit(size).get();
     if (snap.empty) break;
+    if (++passes > 500) break;
     var batch = db.batch();
     snap.docs.forEach(function(d){ batch.delete(d.ref); });
     await batch.commit();
@@ -4363,7 +4364,11 @@ function ResetTotale({ currentUser, setBookings, setPeople, showToast }) {
     try {
       var cols = ["bookings","events","eventCosts","eventBudgets","eventDocs","receipts","personalReceipts","teamQR","mealQR","mealCheckins","notes","galleryLinks"];
       var heavy = ["receipts","personalReceipts","eventDocs","galleryLinks","teamQR","mealQR"];
-      for (var c=0;c<cols.length;c++) { var n = await wipeCollection(cols[c], null, heavy.indexOf(cols[c])>=0 ? 20 : 400); addLog(cols[c]+": "+n+" eliminati"); }
+      for (var c=0;c<cols.length;c++) {
+        // events: l'app le ricrea da sola se vuote -> un solo passaggio (poi vengono riscritte comunque)
+        var n = cols[c]==="events" ? await wipeCollection("events", ["__none__"]) : await wipeCollection(cols[c], null, heavy.indexOf(cols[c])>=0 ? 20 : 400);
+        addLog(cols[c]+": "+n+" eliminati");
+      }
       var np = await wipeCollection("people", [currentUser.id]); addLog("persone: "+np+" eliminate (resti solo tu)");
       // calendario 2027
       var batch = db.batch();
