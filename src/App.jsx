@@ -4222,6 +4222,7 @@ var AIRPORTS = {
   LIN:{name:"Milano Linate",code:"LIN",lat:45.45,lng:9.28},
   MAD:{name:"Madrid",code:"MAD",lat:40.49,lng:-3.57},
   GRO:{name:"Girona",code:"GRO",lat:41.90,lng:2.76},
+  PEG:{name:"Perugia",code:"PEG",lat:43.10,lng:12.51},
 };
 // Aeroporti preferiti di una persona: fino a 3, in ordine di preferenza (il primo e' anche p.airport)
 function airportListOf(p) {
