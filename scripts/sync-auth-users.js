@@ -22,7 +22,7 @@ const SUFFIX = '@pasiniracing.app';
       if (e.code === 'auth/user-not-found') await admin.auth().createUser(Object.assign({ uid: id }, user));
       else { skipped.push(`${p.name || id}: ${e.message}`); continue; }
     }
-    await admin.auth().setCustomUserClaims(id, { admin: !!p.isAdmin, personId: id });
+    await admin.auth().setCustomUserClaims(id, { admin: !!p.isAdmin, personId: id, costs: !!(p.isAdmin || (p.perms && p.perms.costs) || p.canSeeCosts) });
     ok++;
   }
   console.log(`Utenti sincronizzati: ${ok}`);

@@ -8,6 +8,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isAdmin()  { return signedIn() && request.auth.token.admin == true; }
+    function canCosts() { return isAdmin() || (signedIn() && request.auth.token.costs == true); }
 
     match /people/{id} {
       allow read: if signedIn();
@@ -18,7 +19,8 @@ service cloud.firestore {
     }
     match /events/{id}    { allow read: if signedIn(); allow write: if isAdmin(); }
     match /bookings/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
-    match /eventCosts/{id}{ allow read, write: if isAdmin(); }
+    match /eventCosts/{id}{ allow read, write: if canCosts(); }
+    match /eventBudgets/{id}{ allow read, write: if canCosts(); }
     match /meta/{id}      { allow read, write: if isAdmin(); }
     // Raccolte usate da tutto il team (documenti evento, QR pasti, ricevute, galleria, note)
     match /notes/{id}            { allow read: if signedIn(); allow write: if isAdmin(); }
