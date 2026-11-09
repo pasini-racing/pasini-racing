@@ -4635,7 +4635,14 @@ function FlightPlanner({ people, bookings }) {
       <div style={{background:"#12121f",borderRadius:12,padding:20,border:"1px solid #1e3a8a33",marginBottom:20}}>
         <div style={{marginBottom:12}}>
           <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:5,fontWeight:600}}>EVENTO</label>
-          <select value={selEvent} onChange={function(e){setSelEvent(e.target.value);setGroups(null);}} style={Object.assign({},inp,{width:"100%"})}>
+          <select value={selEvent} onChange={function(e){
+            var id=e.target.value; setSelEvent(id); setGroups(null);
+            // date proposte attorno alla gara: il calendario si apre gia' li' (andata il giorno prima, ritorno il giorno dopo)
+            var evSel = EVENTS.find(function(x){return x.id===id;});
+            function shiftIso(iso, d){ var dt=isoToDate(iso); if(!dt) return ""; dt.setDate(dt.getDate()+d); return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0"); }
+            setDateOut(evSel && evSel.startDate ? shiftIso(evSel.startDate,-1) : "");
+            setDateBack(evSel && evSel.endDate ? shiftIso(evSel.endDate,1) : "");
+          }} style={Object.assign({},inp,{width:"100%"})}>
             <option value="">-- Seleziona evento --</option>
             {EVENTS.map(function(ev){var dest=EVENT_AIRPORTS[ev.id];return React.createElement("option",{key:ev.id,value:ev.id},ev.label+" → "+(dest?dest.destName:"?")+" ("+ev.dates+")");})}</select>
         </div>
