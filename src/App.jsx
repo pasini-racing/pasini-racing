@@ -485,9 +485,9 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
   var [showDuplicate, setShowDuplicate] = useState(false);
   var [dupPeople, setDupPeople] = useState([]);
   var fields = booking.type === "volo"
-    ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]]
+    ? [["flight","N° Volo"],["company","Compagnia"],["dep","Partenza"],["arr","Arrivo"],["date","Data"],["baggage","Bagaglio"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["cancelUntil","Cancellazione gratuita fino al"],["notes","Note"]]
     : booking.type === "hotel"
-    ? (form.truck ? [["price","Prezzo (€)"],["notes","Note"]] : [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["checkin","Check-in"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]])
+    ? (form.truck ? [["price","Prezzo (€)"],["notes","Note"]] : [["hotel","Hotel"],["address","Indirizzo (per Maps)"],["checkin","Check-in"],["room","Camera"],["nights","Notti"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["cancelUntil","Cancellazione gratuita fino al"],["notes","Note"]])
     : booking.type === "auto"
     ? (form.roundTrip===false ? [["car","Noleggio / Dettagli"],["pickup","Dettagli viaggio"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]] : [["car","Noleggio / Dettagli"],["pickup","Ritiro"],["dropoff","Riconsegna"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]])
     : [["car","Veicolo"],["date","Data"],["booking","N° Prenotazione"],["price","Prezzo (€)"],["notes","Note"]];
@@ -515,7 +515,9 @@ function EditModal({ booking, onSave, onClose, onDelete, onDuplicate }) {
           return (
             <div key={key} style={{marginBottom:12}}>
               <label style={{fontSize:11,color:"#7090c0",display:"block",marginBottom:4}}>{label}</label>
-              {key === "notes"
+              {key === "cancelUntil"
+                ? <input type="date" value={form[key]||""} onChange={function(e){setForm(function(f){var n=Object.assign({},f);n[key]=e.target.value;return n;});}} style={inp}/>
+                : key === "notes"
                 ? <textarea value={form[key]||""} onChange={function(e){setForm(function(f){var n=Object.assign({},f);n[key]=e.target.value;return n;});}} style={Object.assign({},inp,{resize:"vertical",minHeight:60})}/>
                 : (key === "date" || key === "checkin" || key === "pickup" || key === "dropoff")
                 ? <EventAwareDatePicker value={form[key]||""} onChange={function(v){setForm(function(f){var n=Object.assign({},f);n[key]=v;return n;});}} placeholder="es. Sab 19 Apr" inputStyle={inp}/>
@@ -2534,7 +2536,7 @@ export default function App() {
     setGlobalResults(results);
   }
 
-  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",perm:"checklist"},{k:"bookingsdb",l:"🔑",adminOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",perm:"flights"},{k:"costs",l:"💰",perm:"costs"},{k:"export",l:"📥",perm:"export"},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true},{k:"profile",l:"🪪"}];
+  var NAV=[{k:"overview",l:"📊"},{k:"person",l:"👤"},{k:"event",l:"🏁"},{k:"checklist",l:"📋",perm:"checklist"},{k:"control",l:"🧭",perm:"checklist"},{k:"truck",l:"🚛",perm:"viewAll"},{k:"bookingsdb",l:"🔑",adminOnly:true},{k:"add",l:"➕",adminOnly:true},{k:"flights",l:"🗺️",perm:"flights"},{k:"costs",l:"💰",perm:"costs"},{k:"export",l:"📥",perm:"export"},{k:"pdf2xls",l:"🤖",adminOnly:true},{k:"gallery",l:"🖼️"},{k:"team",l:"⚙️",adminOnly:true},{k:"profile",l:"🪪"}];
 
   if (!fbLoaded) return (
     <div style={{position:"fixed",inset:0,background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -3284,6 +3286,14 @@ export default function App() {
 
         {view==="checklist" && can(currentUser,"checklist") && (
           <ChecklistDashboard bookings={bookings} people={people} setView={setView} setSelEvent={setSelEvent} setViewAll={function(){setViewAll(true);}}/>
+        )}
+
+        {view==="control" && can(currentUser,"checklist") && (
+          <RaceControl bookings={bookings} people={people}/>
+        )}
+
+        {view==="truck" && can(currentUser,"viewAll") && (
+          <TruckPage/>
         )}
 
         {view==="bookingsdb" && isAdmin && (
@@ -4285,6 +4295,128 @@ function DocExpiryAlerts({ people }) {
           <span style={{color:colors[r.status],textAlign:"right"}}>{txt}</span>
         </div>;
       })}
+    </div>
+  );
+}
+
+
+// ── Controllo gara: alloggi, stanze, documenti, scadenze cancellazione ─────────
+function daysUntil(iso) {
+  var d = isoToDate(iso); if (!d) return null;
+  var t = new Date(); t = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  return Math.round((d - t) / 86400000);
+}
+function RaceControl({ bookings, people }) {
+  var active = (bookings||[]).filter(function(b){ return b.status!=="cancellata"; });
+  function pname(id){ var p=(people||[]).find(function(x){return x.id===id;}); return p?p.name:id; }
+  var deadlines = active.filter(function(b){ return b.cancelUntil && daysUntil(b.cancelUntil)!==null; })
+    .sort(function(a,b){ return String(a.cancelUntil).localeCompare(String(b.cancelUntil)); });
+  var evs = EVENTS.slice().sort(function(a,b){ return String(a.startDate||"").localeCompare(String(b.startDate||"")); });
+  var card = {background:"#12121f",border:"1px solid #1e3a8a44",borderRadius:12,padding:16,marginBottom:14};
+  var row = {display:"flex",justifyContent:"space-between",gap:8,padding:"6px 0",borderTop:"1px solid #1e3a8a22",fontSize:13};
+  return (
+    <div>
+      <div style={{fontWeight:800,color:"#fff",fontSize:18,marginBottom:12}}>🧭 Controllo gara</div>
+
+      <div style={card}>
+        <div style={{fontWeight:800,color:"#fff",fontSize:15,marginBottom:4}}>⏰ Scadenze cancellazione gratuita</div>
+        <div style={{fontSize:11,color:"#7090c0",marginBottom:10}}>Si compila in Modifica prenotazione, campo "Cancellazione gratuita fino al".</div>
+        {deadlines.length===0 && <div style={{color:"#7090c0",fontSize:13}}>Nessuna scadenza inserita.</div>}
+        {deadlines.map(function(b,i){
+          var n = daysUntil(b.cancelUntil);
+          var col = n<0 ? "#7090c0" : n<=7 ? "#ff4444" : n<=30 ? "#ff9800" : "#4caf50";
+          var txt = n<0 ? "scaduta da "+(-n)+" gg" : n===0 ? "OGGI" : "tra "+n+" gg";
+          var d = isoToDate(b.cancelUntil);
+          return <div key={b._id||i} style={row}>
+            <span style={{color:"#e8e8f0"}}>{bookingLabel(b,people)}<span style={{color:"#7090c0"}}> · {(EVENTS.find(function(e){return e.id===b.event;})||{}).label||b.event}</span></span>
+            <span style={{color:col,textAlign:"right",whiteSpace:"nowrap"}}>{fmtDocDate(d)} ({txt})</span>
+          </div>;
+        })}
+      </div>
+
+      {evs.map(function(ev){
+        var eb = active.filter(function(b){ return b.event===ev.id; });
+        var persons = [];
+        eb.forEach(function(b){ if (b.person && persons.indexOf(b.person)<0) persons.push(b.person); });
+        var hotels = eb.filter(function(b){ return b.type==="hotel" && !b.truck; });
+        var truckSleep = eb.filter(function(b){ return b.type==="hotel" && b.truck; });
+        var housed = {}; hotels.concat(truckSleep).forEach(function(b){ if (b.person) housed[b.person]=true; });
+        var noBed = persons.filter(function(id){ return !housed[id]; });
+        var emptyRooms = hotels.filter(function(b){ return !b.person || !(people||[]).some(function(p){return p.id===b.person;}); });
+        var travel = {}; eb.filter(function(b){ return b.type==="volo"||b.type==="auto"; }).forEach(function(b){ if (b.person) travel[b.person]=true; });
+        var noTravel = persons.filter(function(id){ return !travel[id] && housed[id]; });
+        var end = isoToDate(ev.endDate);
+        var docBad = persons.map(function(id){
+          var p=(people||[]).find(function(x){return x.id===id;}); if(!p) return null;
+          var exp=parseDocDate(p.docExpiry);
+          if (!p.docExpiry || !exp) return {p:p,why:"scadenza non inserita"};
+          if (end && exp < end) return {p:p,why:"scade il "+fmtDocDate(exp)+", prima della fine gara"};
+          return null;
+        }).filter(Boolean);
+        var issues = noBed.length + emptyRooms.length + docBad.length + noTravel.length;
+        return (
+          <div key={ev.id} style={card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{fontWeight:800,color:"#fff",fontSize:15}}>🏁 {ev.label} <span style={{fontSize:11,color:"#7090c0",fontWeight:400}}>{ev.dates}</span></div>
+              <div style={{fontSize:11,fontWeight:700,color:persons.length===0?"#7090c0":issues?"#ff9800":"#4caf50"}}>{persons.length===0?"nessuna prenotazione":issues?issues+" da controllare":"tutto ok"}</div>
+            </div>
+            <div style={{fontSize:12,color:"#9db4e0",marginBottom:6}}>
+              👥 {persons.length} persone · ✈️ {eb.filter(function(b){return b.type==="volo";}).length} voli · 🏨 {hotels.length} camere · 🚛 {truckSleep.length} nel camion
+            </div>
+            {noBed.length>0 && <div style={row}><span style={{color:"#ff9800"}}>Senza alloggio</span><span style={{color:"#e8e8f0",textAlign:"right"}}>{noBed.map(pname).join(", ")}</span></div>}
+            {emptyRooms.length>0 && <div style={row}><span style={{color:"#ff9800"}}>Camere senza persona assegnata</span><span style={{color:"#e8e8f0",textAlign:"right"}}>{emptyRooms.length} ({emptyRooms.map(function(b){return b.hotel||"hotel";}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(", ")})</span></div>}
+            {noTravel.length>0 && <div style={row}><span style={{color:"#ff9800"}}>Alloggio ma nessun viaggio (volo/auto)</span><span style={{color:"#e8e8f0",textAlign:"right"}}>{noTravel.map(pname).join(", ")}</span></div>}
+            {docBad.length>0 && docBad.map(function(d){ return <div key={d.p.id} style={row}><span style={{color:"#ff4444"}}>Documento: {d.p.name}</span><span style={{color:"#ff4444",textAlign:"right"}}>{d.why}</span></div>; })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Pagina bilico: spostamenti stagione 2027 ───────────────────────────────────
+var TRUCK_LEGS_2027 = [
+  { date:"2027-04-24", time:"06:00", where:"Partenza con bilico da Brescia, destinazione circuito Estoril (domenica 25 sosta per divieto di circolazione dei pesanti; arrivo Mer 28 Apr mattina)", km:2300, est:true, race:"R1 Estoril" },
+  { date:"2027-05-03", time:"06:00", where:"Estoril, destinazione appoggio vicino aeroporto di Barcellona (parcheggio fino a R2)", km:1270, est:false, race:"Dopo R1" },
+  { date:"2027-06-02", time:"09:00", where:"Dall'appoggio aeroporto Barcellona al circuito di Montmeló", km:45, est:true, race:"R2 Barcellona" },
+  { date:"2027-06-07", time:"06:00", where:"Montmeló, destinazione Brescia (domenica 6 carico e sosta in circuito)", km:1050, est:false, race:"Dopo R2" },
+  { date:"2027-06-14", time:"06:00", where:"Brescia, destinazione circuito Brno (arrivo Mar 15 Giu)", km:950, est:true, race:"R3 Brno" },
+  { date:"2027-06-21", time:"06:00", where:"Brno, destinazione Brescia", km:950, est:true, race:"Dopo R3" },
+  { date:"2027-06-30", time:"08:30", where:"Brescia, destinazione circuito Misano", km:350, est:false, race:"R4 Misano" },
+  { date:"2027-07-04", time:"17:00", where:"Ritorno da Misano a Brescia", km:350, est:false, race:"Dopo R4" },
+  { date:"2027-07-19", time:"06:00", where:"Brescia, destinazione circuito Magny-Cours (arrivo Mar 20 Lug)", km:820, est:true, race:"R5 Magny-Cours" },
+  { date:"2027-07-26", time:"06:00", where:"Magny-Cours, destinazione Brescia (pausa estiva a Brescia)", km:820, est:true, race:"Dopo R5" },
+  { date:"2027-08-30", time:"06:00", where:"Brescia, destinazione circuito Aragón (arrivo Mar 31 Ago sera / Mer 1 Set mattina)", km:1360, est:false, race:"R6 Aragón" },
+  { date:"2027-09-06", time:"06:00", where:"Aragón, destinazione appoggio vicino al circuito di Valencia (parcheggio fino a R7)", km:330, est:false, race:"Dopo R6" },
+  { date:"2027-09-22", time:"09:00", where:"Dall'appoggio al circuito di Valencia", km:10, est:true, race:"R7 Valencia" },
+  { date:"2027-09-27", time:"06:00", where:"Valencia, destinazione Brescia (arrivo Mar 28 sera / Mer 29 Set)", km:1400, est:true, race:"Dopo R7" },
+];
+function TruckPage() {
+  var total = TRUCK_LEGS_2027.reduce(function(t,l){return t+l.km;},0);
+  var today = new Date().toISOString().substring(0,10);
+  var next = TRUCK_LEGS_2027.find(function(l){ return l.date >= today; });
+  var DOW = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
+  return (
+    <div>
+      <div style={{fontWeight:800,color:"#fff",fontSize:18,marginBottom:4}}>🚛 Bilico 2027</div>
+      <div style={{fontSize:12,color:"#7090c0",marginBottom:14}}>{TRUCK_LEGS_2027.length} spostamenti · {total.toLocaleString("it-IT")} km totali. Appoggi: aeroporto di Barcellona (tra R1 e R2) e circuito di Valencia (tra R6 e R7).</div>
+      {TRUCK_LEGS_2027.map(function(l,i){
+        var d = isoToDate(l.date);
+        var isNext = next && next.date===l.date && next.where===l.where;
+        return (
+          <div key={i} style={{background:"#12121f",border:"1px solid "+(isNext?"#4a9eff":"#1e3a8a44"),borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:4}}>
+              <span style={{fontWeight:800,color:isNext?"#4a9eff":"#fff",fontSize:13}}>{DOW[d.getDay()]} {fmtDocDate(d)} · {l.time}{isNext?"  ← prossimo":""}</span>
+              <span style={{fontSize:11,color:"#9db4e0"}}>{l.race}</span>
+            </div>
+            <div style={{fontSize:13,color:"#e8e8f0"}}>{l.where}</div>
+            <div style={{fontSize:11,color:l.est?"#ff9800":"#7090c0",marginTop:4}}>{l.km.toLocaleString("it-IT")} km {l.est?"(stima da verificare)":"(percorso nel 2026)"}</div>
+          </div>
+        );
+      })}
+      <div style={{fontSize:11,color:"#7090c0",marginTop:10,lineHeight:1.5}}>
+        Il bilico parte con almeno un giorno di margine: deve essere in circuito il mercoledì (Brno il martedì). Verificare i divieti di circolazione domenicali per i mezzi pesanti (Italia, Francia, Spagna, Germania, Austria) e i limiti di guida e riposo dell'autista.
+      </div>
     </div>
   );
 }
