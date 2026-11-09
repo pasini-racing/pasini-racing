@@ -1898,7 +1898,8 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast, curre
           email: get(row,"Email"),
           nationality: get(row,"Nazionalità"),
           address: get(row,"Indirizzo"),
-          airport: get(row,"Aeroporto"),
+          airport: parseAirportList(get(row,"Aeroporto"))[0] || "",
+          airports: parseAirportList(get(row,"Aeroporto")),
           docType: get(row,"Tipo Documento"),
           docNum: get(row,"Numero Documento"),
           docExpiry: get(row,"Scadenza Documento"),
@@ -1948,21 +1949,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast, curre
             {NATIONALITY_OPTIONS.indexOf(form.nationality)<0 && <input value={form.nationality||""} onChange={function(e){set("nationality",e.target.value);}} placeholder="Specifica nazionalità" style={Object.assign({},inp,{marginTop:6})}/>}
           </div>
           <div style={{gridColumn:"1/-1"}}><label style={lbl}>Indirizzo di residenza</label><input value={form.address||""} onChange={function(e){set("address",e.target.value);}} placeholder="es. Via Roma 1, Milano" style={inp}/></div>
-          <div>
-            <label style={lbl}>Aeroporto preferito</label>
-            <select value={form.airport||""} onChange={function(e){set("airport",e.target.value);}} style={inp}>
-              <option value="">-- Seleziona --</option>
-              <option value="BGY">BGY — Milano/Bergamo Orio al Serio</option>
-              <option value="MXP">MXP — Milano Malpensa</option>
-              <option value="BLQ">BLQ — Bologna Marconi</option>
-              <option value="FCO">FCO — Roma Fiumicino</option>
-              <option value="VCE">VCE — Venezia Marco Polo</option>
-              <option value="TSF">TSF — Treviso</option>
-              <option value="TRN">TRN — Torino Caselle</option>
-              <option value="GRS">GRS — Grosseto</option>
-              <option value="BCN">BCN — Barcellona</option>
-            </select>
-          </div>
+          <AirportPicker person={form} inp={inp} lbl={lbl} onChange={function(arr){set("airports",arr);set("airport",arr[0]||"");}}/>
         </div>
         {sec("Documento","🪪")}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
@@ -2077,7 +2064,7 @@ function TeamManager({ people, setPeople, setConfirmDeleteUser, showToast, curre
               {p.docNum&&<span style={{background:"#2a1a3d22",color:"#9c27b0",borderRadius:5,padding:"2px 8px",fontSize:11}}>🪪 {p.docNum}</span>}
               {p.tshirt&&<span style={{background:"#3d2a1a22",color:"#ff9800",borderRadius:5,padding:"2px 8px",fontSize:11}}>👕 {p.tshirt}</span>}{p.hoodie&&<span style={{background:"#2a1a3d22",color:"#9c27b0",borderRadius:5,padding:"2px 8px",fontSize:11}}>🧥 {p.hoodie}</span>}
             </div>
-            {p.airport&&<div style={{background:"#1a2a1a",borderRadius:5,padding:"4px 8px",fontSize:11,color:"#4caf50",border:"1px solid #4caf5022",marginBottom:4}}>✈ Aeroporto: <b>{p.airport}</b></div>}
+            {airportListOf(p).length>0&&<div style={{background:"#1a2a1a",borderRadius:5,padding:"4px 8px",fontSize:11,color:"#4caf50",border:"1px solid #4caf5022",marginBottom:4}}>✈ Aeroporti: <b>{airportListOf(p).join(" · ")}</b></div>}
             {p.username&&<div style={{background:"#0d1a2a",borderRadius:5,padding:"4px 8px",fontSize:11,color:"#4a9eff",border:"1px solid #1e3a8a22"}}>🔑 {p.username} / {p.pin||"—"}{p.isAdmin&&<span style={{color:"#ff9800",marginLeft:6,fontWeight:700}}>ADMIN</span>}{!p.isAdmin&&PERMISSIONS.filter(function(pm){return can(p,pm.k);}).map(function(pm){return <span key={pm.k} style={{color:"#4caf50",marginLeft:6,fontSize:10}}>• {pm.k}</span>;})}</div>}
             {p.notes&&<div style={{marginTop:6,fontSize:11,color:"#c0a060",fontStyle:"italic"}}>📋 {p.notes}</div>}
           </div>
@@ -2096,7 +2083,7 @@ function MyProfile({ currentUser, setPeople, setCurrentUser, showToast }) {
   function set(k,v){ setForm(function(f){var n=Object.assign({},f);n[k]=v;return n;}); setSaved(false); }
   function save(){
     var merged = Object.assign({}, currentUser, {
-      phone:form.phone, email:form.email, nationality:form.nationality, address:form.address, airport:form.airport,
+      phone:form.phone, email:form.email, nationality:form.nationality, address:form.address, airport:form.airport, airports:form.airports||airportListOf(form),
       docType:form.docType, docNum:form.docNum, docExpiry:form.docExpiry,
       tshirt:form.tshirt, jacket:form.jacket, pants:form.pants, hoodie:form.hoodie,
       tshirtQty:form.tshirtQty, jacketQty:form.jacketQty, pantsQty:form.pantsQty, hoodieQty:form.hoodieQty,
@@ -2126,21 +2113,7 @@ function MyProfile({ currentUser, setPeople, setCurrentUser, showToast }) {
           </select>
           {NATIONALITY_OPTIONS.indexOf(form.nationality)<0 && <input value={form.nationality||""} onChange={function(e){set("nationality",e.target.value);}} placeholder="Specifica nazionalità" style={Object.assign({},inp,{marginTop:6})}/>}
         </div>
-        <div>
-          <label style={lbl}>Aeroporto preferito</label>
-          <select value={form.airport||""} onChange={function(e){set("airport",e.target.value);}} style={inp}>
-            <option value="">-- Seleziona --</option>
-            <option value="BGY">BGY — Milano/Bergamo Orio al Serio</option>
-            <option value="MXP">MXP — Milano Malpensa</option>
-            <option value="BLQ">BLQ — Bologna Marconi</option>
-            <option value="FCO">FCO — Roma Fiumicino</option>
-            <option value="VCE">VCE — Venezia Marco Polo</option>
-            <option value="TSF">TSF — Treviso</option>
-            <option value="TRN">TRN — Torino Caselle</option>
-            <option value="GRS">GRS — Grosseto</option>
-            <option value="BCN">BCN — Barcellona</option>
-          </select>
-        </div>
+        <AirportPicker person={form} inp={inp} lbl={lbl} onChange={function(arr){set("airports",arr);set("airport",arr[0]||"");}}/>
         <div style={{gridColumn:"1/-1"}}><label style={lbl}>Indirizzo di residenza</label><input value={form.address||""} onChange={function(e){set("address",e.target.value);}} placeholder="es. Via Roma 1, Milano (o dirección, ciudad)" style={inp}/></div>
       </div>
       {sec("Documento","🪪")}
@@ -4149,7 +4122,7 @@ function ExportView({ bookings, people, eventNotes }) {
       XLSX.utils.book_append_sheet(wb,ws1,"Piano Stagione");
 
       var teamRows=[["Nome","Ruolo","Telefono","Email","Nazionalità","Aeroporto","Documento","N° Doc","Scadenza","T-Shirt","Giacca","Pantaloni","Felpa","Note"]];
-      people.forEach(function(p){ teamRows.push([p.name||"",p.role||"",p.phone||"",p.email||"",p.nationality||"",p.airport||"",p.docType||"",p.docNum||"",p.docExpiry||"",p.tshirt||"",p.jacket||"",p.pants||"",p.hoodie||"",p.notes||""]); });
+      people.forEach(function(p){ teamRows.push([p.name||"",p.role||"",p.phone||"",p.email||"",p.nationality||"",airportListOf(p).join(", "),p.docType||"",p.docNum||"",p.docExpiry||"",p.tshirt||"",p.jacket||"",p.pants||"",p.hoodie||"",p.notes||""]); });
       var wsTeam=XLSX.utils.aoa_to_sheet(teamRows);
       setColWidths(wsTeam,[20,22,14,24,12,8,14,12,10,8,8,10,8,24]);
       XLSX.utils.book_append_sheet(wb,wsTeam,"Team");
@@ -4236,7 +4209,53 @@ var AIRPORTS = {
   PSA:{name:"Pisa",code:"PSA",lat:43.68,lng:10.39},
   TRN:{name:"Torino",code:"TRN",lat:45.20,lng:7.65},
   NAP:{name:"Napoli",code:"NAP",lat:40.88,lng:14.29},
+  PSR:{name:"Pescara",code:"PSR",lat:42.43,lng:14.18},
+  AOI:{name:"Ancona Falconara",code:"AOI",lat:43.62,lng:13.36},
+  RMI:{name:"Rimini",code:"RMI",lat:44.02,lng:12.61},
+  FLR:{name:"Firenze",code:"FLR",lat:43.81,lng:11.20},
+  BCN:{name:"Barcellona",code:"BCN",lat:41.30,lng:2.08},
+  TSF:{name:"Treviso",code:"TSF",lat:45.65,lng:12.19},
+  GRS:{name:"Grosseto",code:"GRS",lat:42.76,lng:11.07},
+  VRN:{name:"Verona",code:"VRN",lat:45.40,lng:10.89},
+  PMF:{name:"Parma",code:"PMF",lat:44.82,lng:10.30},
+  FRL:{name:"Forli",code:"FRL",lat:44.19,lng:12.07},
+  LIN:{name:"Milano Linate",code:"LIN",lat:45.45,lng:9.28},
+  MAD:{name:"Madrid",code:"MAD",lat:40.49,lng:-3.57},
+  GRO:{name:"Girona",code:"GRO",lat:41.90,lng:2.76},
 };
+// Aeroporti preferiti di una persona: fino a 3, in ordine di preferenza (il primo e' anche p.airport)
+function airportListOf(p) {
+  if (!p) return [];
+  if (Array.isArray(p.airports) && p.airports.length) return p.airports.filter(Boolean);
+  return p.airport ? [p.airport] : [];
+}
+function parseAirportList(v) {
+  var out = [];
+  String(v||"").toUpperCase().split(/[^A-Z]+/).forEach(function(c){ if (c.length===3 && out.indexOf(c)<0) out.push(c); });
+  return out.slice(0,3);
+}
+function AirportPicker({ person, onChange, inp, lbl }) {
+  var list = airportListOf(person);
+  function setAt(i, code) {
+    var next = list.slice(); while (next.length < 3) next.push("");
+    next[i] = code;
+    next = next.filter(function(c,idx){ return c && next.indexOf(c)===idx; });
+    onChange(next);
+  }
+  return (
+    <div style={{gridColumn:"1/-1"}}>
+      <label style={lbl}>Aeroporti preferiti (fino a 3, in ordine di preferenza)</label>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+        {[0,1,2].map(function(i){
+          return <select key={i} value={list[i]||""} onChange={function(e){setAt(i,e.target.value);}} style={inp}>
+            <option value="">{i===0?"1ª scelta":i===1?"2ª scelta":"3ª scelta"}</option>
+            {Object.keys(AIRPORTS).map(function(a){ return <option key={a} value={a}>{a} — {AIRPORTS[a].name}</option>; })}
+          </select>;
+        })}
+      </div>
+    </div>
+  );
+}
 var EVENT_AIRPORTS = {
   R1_ESTORIL:{dest:"LIS",destName:"Lisbona"},
   R2_BARCELLONA:{dest:"BCN",destName:"Barcellona"},
@@ -4557,7 +4576,7 @@ function FlightPlanner({ people, bookings }) {
     eventPeople.forEach(function(pid) {
       var person = people.find(function(p){return p.id===pid;});
       if (!person) return;
-      var airport = person.airport || "BGY";
+      var airport = airportListOf(person)[0] || "BGY";
       if (!byAirport[airport]) byAirport[airport] = [];
       byAirport[airport].push(person);
     });
@@ -4657,6 +4676,23 @@ function FlightPlanner({ people, bookings }) {
                   <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>✈ {g.airport.code} → {g.dest.dest} <span style={{fontSize:11,color:"#7090c0",marginLeft:8}}>Gruppo {gi+1}</span></div>
                 )}
                 <div style={{fontSize:12,color:"#7090c0",marginTop:3}}>{g.airport.name} → {g.dest.destName} · {g.people.length}/5 persone</div>
+                {(function(){
+                  var counts = {};
+                  g.people.forEach(function(pid){ var pp=people.find(function(x){return x.id===pid;}); airportListOf(pp).forEach(function(a){ counts[a]=(counts[a]||0)+1; }); });
+                  var codes = Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];});
+                  if (codes.length<2) return null;
+                  var cur = g.customAirport||g.airport.code;
+                  return <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8,alignItems:"center"}}>
+                    <span style={{fontSize:11,color:"#7090c0"}}>Alternative dai preferiti:</span>
+                    {codes.map(function(a){
+                      var all = counts[a]===g.people.length;
+                      return <button key={a} onClick={function(){changeGroupAirport(gi,a);}}
+                        style={{padding:"3px 9px",borderRadius:12,border:"1px solid "+(a===cur?"#4a9eff":"#1e3a8a66"),background:a===cur?"#1e3a8a":"#0d0d1a",color:a===cur?"#fff":(all?"#4caf50":"#9db4e0"),cursor:"pointer",fontSize:11,fontWeight:700}}>
+                        {a} <span style={{fontWeight:400}}>({counts[a]}/{g.people.length}{all?" ✓":""})</span>
+                      </button>;
+                    })}
+                  </div>;
+                })()}
               </div>
               <div style={{display:"flex",gap:6}}>
                 <button onClick={function(){setEditingGroup(isEditing?null:gi);}} style={{padding:"6px 12px",background:isEditing?"#4a9eff":"#1e3a8a22",color:isEditing?"#fff":"#4a9eff",border:"1px solid #1e3a8a44",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>{isEditing?"✓ Fatto":"✏️ Modifica"}</button>
