@@ -2822,14 +2822,25 @@ export default function App() {
           }) : [];
 
           // Expiry warning
-          var expiringDocs = people.filter(function(p){
-            if (!p.docExpiry || p.docExpiry === "NaT") return false;
-            var parts = p.docExpiry.split("/");
-            if (parts.length !== 3) return false;
+          // Documento: banner personale (solo per l'interessato)
+          var myDocAlert = (function(){
+            var p = currentUser; if (!p || !p.docExpiry || p.docExpiry === "NaT") return null;
+            var parts = String(p.docExpiry).split("/"); if (parts.length !== 3) return null;
             var d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+            if (isNaN(d.getTime())) return null;
             var diff = Math.ceil((d - TODAY) / (1000*60*60*24));
-            return diff >= 0 && diff <= 90;
-          });
+            if (diff < 0) return {level:"red", txt:"Il tuo documento è SCADUTO il "+p.docExpiry+". Rinnovalo e comunica la nuova scadenza."};
+            var myEvIds = {}; bookings.forEach(function(b){ if (b.person===p.id && b.status!=="cancellata") myEvIds[b.event]=true; });
+            var bad = EVENTS.filter(function(ev){ var e=isoToDate(ev.endDate); return myEvIds[ev.id] && e && d < e; })
+              .sort(function(x,y){ return String(x.startDate).localeCompare(String(y.startDate)); })[0];
+            if (bad) return {level:"orange", txt:"Il tuo documento scade il "+p.docExpiry+", prima della gara "+bad.label+". Serve un documento valido."};
+            if (diff <= 90) return {level:"orange", txt:"Il tuo documento scade il "+p.docExpiry+" (tra "+diff+" giorni)."};
+            return null;
+          })();
+          // Voli assegnati (avviso in app per la persona)
+          var myFlightNews = currentUser ? bookings.filter(function(b){
+            return b.person===currentUser.id && b.type==="volo" && b.status!=="cancellata";
+          }) : [];
 
           var CITY_WEATHER = {
             "Barcellona":"Barcelona","Estoril":"Estoril","Jerez":"Jerez de la Frontera",
@@ -2847,29 +2858,15 @@ export default function App() {
               <div style={{fontSize:18,fontWeight:900,color:"#fff",letterSpacing:1}}>TEAM ECHOVIT PASINI RACING</div>
             </div>
 
-            {/* Banner scadenze */}
-            {expiringDocs.length > 0 && (
-              <div style={{background:"#1a0a00",border:"2px solid #ff980066",borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start"}}>
-                <div style={{fontSize:20,flexShrink:0}}>⚠️</div>
-                <div>
-                  <div style={{fontSize:12,fontWeight:800,color:"#ff9800",marginBottom:6}}>Documenti in scadenza entro 90 giorni</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {expiringDocs.map(function(p){
-                      var parts = p.docExpiry.split("/");
-                      var d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
-                      var diff = Math.ceil((d - TODAY) / (1000*60*60*24));
-                      var color = diff <= 30 ? "#ff4444" : "#ff9800";
-                      return (
-                        <span key={p.id} onClick={function(){setView("person");setSelPerson(p.id);}}
-                          style={{background:color+"22",color:color,borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,cursor:"pointer",border:"1px solid "+color+"44"}}>
-                          {p.name.split(" ")[0]} — {p.docExpiry} ({diff}gg)
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
+            {/* Banner documento personale */}
+            {myDocAlert && (
+              <div style={{background:myDocAlert.level==="red"?"#1a0000":"#1a0a00",border:"2px solid "+(myDocAlert.level==="red"?"#ff444466":"#ff980066"),borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start"}}>
+                <div style={{fontSize:20,flexShrink:0}}>{myDocAlert.level==="red"?"⛔":"⚠️"}</div>
+                <div style={{fontSize:13,fontWeight:700,color:myDocAlert.level==="red"?"#ff6060":"#ff9800"}}>{myDocAlert.txt}</div>
               </div>
             )}
+
+            <FlightNews flights={myFlightNews} userId={currentUser && currentUser.id}/>
 
             {/* Banner prenotazioni mancanti per il prossimo evento (solo admin) */}
             {can(currentUser,"checklist") && nextEv && !eventInProgress && (function(){
@@ -4286,6 +4283,39 @@ function parseDocDate(v) {
   return null;
 }
 function fmtDocDate(d) { return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); }
+
+// ── Avviso in app: volo assegnato o modificato (visto/non visto per dispositivo) ──
+function FlightNews({ flights, userId }) {
+  var key = "flightSeen_" + (userId||"");
+  var [seen, setSeen] = useState(function(){ try { return JSON.parse(localStorage.getItem(key)||"null"); } catch(e) { return null; } });
+  function sig(b){ return [b.date,b.dep,b.arr,b.flight,b.company,b.dir].join("|"); }
+  if (!userId || !flights || !flights.length) return null;
+  // primo avvio su questo dispositivo: niente avvisi retroattivi
+  if (seen === null) {
+    var init = {}; flights.forEach(function(b){ init[b._id||sig(b)] = sig(b); });
+    try { localStorage.setItem(key, JSON.stringify(init)); } catch(e) {}
+    return null;
+  }
+  var fresh = flights.filter(function(b){ var k=b._id||sig(b); return seen[k] === undefined || seen[k] !== sig(b); });
+  if (!fresh.length) return null;
+  function ack() {
+    var n = Object.assign({}, seen); flights.forEach(function(b){ n[b._id||sig(b)] = sig(b); });
+    try { localStorage.setItem(key, JSON.stringify(n)); } catch(e) {}
+    setSeen(n);
+  }
+  return (
+    <div style={{background:"#001a2a",border:"2px solid #2196f366",borderRadius:12,padding:"12px 16px",marginBottom:16}}>
+      <div style={{fontSize:12,fontWeight:800,color:"#64b5f6",marginBottom:6}}>✈️ Novità sui tuoi voli</div>
+      {fresh.map(function(b,i){
+        var isNew = seen[b._id||sig(b)] === undefined;
+        return <div key={i} style={{fontSize:13,color:"#e8e8f0",padding:"3px 0"}}>
+          {isNew ? "Nuovo volo: " : "Volo modificato: "}<b>{b.dep} → {b.arr}</b> · {b.date}{b.flight ? " · "+b.flight : ""}
+        </div>;
+      })}
+      <button onClick={ack} style={{marginTop:8,padding:"6px 14px",background:"#1a3a5a",color:"#64b5f6",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12}}>Ho visto</button>
+    </div>
+  );
+}
 
 function DocExpiryAlerts({ people }) {
   var rows = (people||[]).map(function(p){
